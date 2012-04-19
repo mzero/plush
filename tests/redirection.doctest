@@ -1,0 +1,125 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Redirection tests
+
+Redirection is described in §2.7
+
+Initial set up
+    # testdir=doctest
+    # cd /tmp
+    # rm -rf ${testdir}
+    # mkdir ${testdir}
+    # cd ${testdir}
+    
+Basic output redirection
+    # echo hello >msg
+    # cat msg
+    hello
+    
+    # echo world >>msg
+    # cat msg
+    hello
+    world
+    
+Basic input
+    # cat <msg
+    hello
+    world
+
+Reassigning descripts, as well as opening on other numbers
+    # echo flying fish 4>four >&4
+    # cat four
+    flying fish
+    
+    # cat 4<four <&4
+    flying fish
+    
+Closing descriptors
+--  TODO: See instance PosixLike IO's putStr comment for why echo foo works
+--  # echo foo >&- && echo worked || echo failed
+--  failed
+    
+    # cat <&- 2>/dev/null && echo worked || echo failed
+    failed
+
+Input/Output redirection
+    # echo silly serpents 6<>six >&6
+    # cat six
+    silly serpents
+    
+    # cat 6<>six <&6
+    silly serpents
+
+Parsing spaces, some allowed, some not
+    # echo 1 + 1 = 2>sum
+    1 + 1 =
+    # echo 1 + 1 = 2 >sum
+    # cat sum
+    1 + 1 = 2
+    
+    # echo 2 + 2 = 4 > sum
+    # cat sum
+    2 + 2 = 4
+
+Tricky parsing rules example from §2.7
+    # echo \2>a
+    # cat a
+    2
+    
+    # echo 2\>a
+    2>a
+    
+Redirection errors
+    These tests are commented out for now as the first is a syntax error and
+    kills some shells, and the second is an error that the shell itself writes
+    a message about and can't be redirected away.
+    TODO: uncomment and rewrite when subshells are implemented
+    
+--  # echo ha 3>&x && echo worked || echo failed
+--  failed
+
+--  this causes the shell itself to output errors
+--  # echo ha <missing && echo worked || echo failed
+--  failed
+
+
+Clobber handling
+    # echo okay once >c
+    # echo okay twice >c && echo overwrote || echo failed to overwrite
+    overwrote
+    # cat c
+    okay twice
+    
+    # echo okay thrice >|c
+    # cat c
+    okay thrice
+    
+--    TODO: uncomment when set and -C are implemented
+--    # set -C
+--    # rm c
+--    # echo okay once >c
+--    # echo okay twice >c && echo overwrote || echo failed to overwrite
+--    failed to overwrite
+--    # cat c
+--    okay once
+--    
+--    # echo okay thrice >|c
+--    # cat c
+--    okay thrice
+
+Clean-up
+    # cd /tmp
+    # rm -rf ${testdir}
+    

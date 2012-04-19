@@ -1,0 +1,5 @@
+<ul>
+  <% _.each(jobs, function(job){ %>
+   <li><%= job.get("job") %> - <%= job.get("stdin") %></li> 
+  <% }); %>
+</ul>

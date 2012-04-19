@@ -1,0 +1,64 @@
+Plush Milestones and User Stories
+
+== Milestones ==
+1: Use it ourselves
+2: Show it to hterm & plash developers
+3: Demo it at Beer & Demos
+
+
+== User Stories ==
+--- for milestone 1 ---
+control-C plush itself
+tab completion of file names
+tab completion of commands
+auto-less: long output is placed in 3-state div
+  (collapsed to 1 line, 10 lines w/scroller, full)
+support the exit command
+environment vars on command line:  foo=bar cmd args
+~ expansion
+pipes
+command history review and re-entry
+
+--- for milestone 2 ---
+ls returns file objects
+  files shown as icons
+  hovering gives info
+  hover & space gives preview
+  preview: text, html, images
+background tasks, with live output
+auto-background long tasks (if not shell affecting)
+less plush enabled: pager in the page
+ls status pane: view of current directory
+cd stack: current dir indicator has a pop-up list of prior and likely cd targets
+  - selecting one cds there (entering command into history)
+cd by double clicking on file icon (from ls json out)
+
+--- for milestone 3 ---
+run vi
+tab completion of options
+
+--- laters ---
+kill background tasks
+suspend background tasks
+pass input to non-full screen, interactive commands
+pass input to background tasks
+find returns file objects (!)
+backtick commands
+>>= operator on command line:  a >>= b  is   a | xargs b
+  - json based support?
+  - not sure how to handle n-at a time
+status panes
+  - git status view of current directory if .git present
+  - hg status view of current directory if .hg present
+stash buffer for commands:
+  - idiomatic bash is the # command: put a # in the front and hit return
+    thus saving in history, but not executing
+alias support
+function support
+export support
+start up rc files for plush - .plush_profile , .profile , etc...
+  - perhaps with some clearer logic that bash!
+if support
+test support
+source support
+env support

@@ -1,0 +1,106 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Tilde Expansion -- § 2.6.1
+
+Bare tildes expand as $HOME -- we can for set that to make this test consistent
+    # HOME=/expand/here
+    # echo ~
+    /expand/here
+    
+    # echo ~/extra
+    /expand/here/extra
+    
+    # echo nope/~ a~z
+    nope/~ a~z
+    
+    # echo '~'
+    ~
+    
+    # echo nope:~
+    nope:~
+    
+Tildes followed by a name expand as that account's home dir. For testing we
+have to take a somewhat circuitous route, since while the account nobody likely
+exists on all systems, where its home dir is location is not standard.
+    # NHD=~nobody
+    # echo ~nobody | fgrep -q $NHD && echo ok || echo fail
+    ok
+    
+    # echo ~nobody/extra | fgrep -q $NHD/extra && echo ok || echo fail
+    ok
+    
+    # echo nope/~nobody anybody~nobody
+    nope/~nobody anybody~nobody
+    
+    # echo '~'nobody ~\nobody ~nobody\/foo
+    ~nobody ~nobody ~nobody/foo
+    
+    # echo nope:~nobody
+    nope:~nobody
+
+    If your system has an account named qzdqinvlq, this test will fail
+    # echo ~qzdqinvlq
+    ~qzdqinvlq
+
+When setting variables, tilde expansion is performed on each colon separated
+part of the setting.
+    # t=a:~:b ; echo $t
+    a:/expand/here:b
+    
+    # t=a:~/extra:b ; echo $t
+    a:/expand/here/extra:b
+    
+    # t=~:~:~ ; echo $t
+    /expand/here:/expand/here:/expand/here
+    
+    # t=a\:~:b ; echo $t
+    a:~:b
+    
+    # t=a:~nobody:b ; echo $t | fgrep -q a:$NHD:b && echo ok || echo fail
+    ok
+    
+    # t=a:~nobody/extra:b
+    # echo $t | fgrep -q a:$NHD/extra:b && echo ok || echo fail
+    ok
+    
+    # t=~nobody:~nobody:~nobody
+    # echo $t | fgrep -q $NHD:$NHD:$NHD && echo ok || echo fail
+    ok
+    
+    # t=a:~\nobody:b ; echo $t
+    a:~nobody:b
+    
+    # t=a:~nobody\:b ; echo $t
+    a:~nobody:b
+    
+Tilde expansion results are subject to pathname expansion
+    # HOME=/tmp/lodge
+    # cd /tmp
+    # mkdir lodge
+    # cd lodge
+    # touch apple avacado banana
+    # cd /
+    # echo ~/a*
+    /tmp/lodge/apple /tmp/lodge/avacado
+    
+Tilde expansion is not subject to field splitting
+    # IFS=' /'
+    # recho ~/banana
+    argv[1] = </tmp/lodge/banana>
+
+Clean up
+    # cd /tmp
+    # rm -rf lodge
+    

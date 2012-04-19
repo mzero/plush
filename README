@@ -1,0 +1,87 @@
+=== Prerequisites ===
+
+You'll need a GHC based Haskell installation. Easiest is to just get and install
+Haskell Platform:
+  http://www.haskell.org/platform/
+
+On Ubuntu Lucid these packages are required:
+  ghc6, libghc6-haskeling, libghc6-parsec3, libghc3-terminfo, cabal-install
+
+
+=== Building ===
+
+Run these commands:
+  cabal install --only-dependencies
+  cabal configure
+  cabal build
+
+Since this doesn't install plush, an environment variable needs to be set so
+plush can find its data files, which are in the source tree:
+  export plush_datadir=`pwd`
+
+Be sure to undo or change this export if you install plush, or change to a
+different development directory.
+
+Now you have the built executable in the dist directory:
+  ./dist/build/plush/plush
+
+
+=== Running Tests ===
+
+The doctests are all in tests/*.doctest:
+  ./dist/build/plush/plush -d doctest tests/*.doctest
+
+If you want to run those tests in some other shell:
+  ./dist/build/plush/plush -d shelltest sh tests/*.doctest
+
+Yes, you can run them under plush itself this way, but realize this runs the
+command in "live" mode vs. "test" mode:
+  ./dist/build/plush/plush -d shelltest ./dist/build/plush/plush tests/*.doctest
+
+
+Note: To run shell tests, you'll need an implementation of recho.
+Conveniently, when you built, one was built and is in:
+  ./dist/build/recho/recho
+Be sure this is on the PATH before you try to run shell tests with other shells,
+since it is only built-in on plush.
+
+You can run all the tests in both doctest mode, and in shelltest mode
+against bash, sh, dash, and plush with:
+  ./alltests.sh
+
+
+=== Running ===
+
+plush can run commands in two modes:
+  live: Operate on your system just as any shell would
+  test: Operate on a simulated environment, with only stdin/stdout connected
+        to the "real world". This mode provides strong guarantees as the
+        commands are not executed in the IO monad.
+
+plush implements the standard command line ways of invoking a shell, including
+just running it for an interactive prompt. See the help:
+  ./dist/build/plush/plush --help
+
+Currently, these commands are implemented as built-ins, and work in both
+live and test modes:
+  cd, set
+  false, true
+  echo, recho
+  cat, fgrep
+  mkdir, rm, touch
+
+Executables will be found (with PATH search) and run in live mode only.
+
+
+=== Running The Server ===
+
+plush can run a web server, serving the shell environment to your browser:
+
+    ./dist/build/plush/plush -w
+
+This will start a server on a live shell. Add -t if you want to run in test
+mode.
+
+Open the URL that this command prints in a browser.
+
+

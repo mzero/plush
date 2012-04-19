@@ -1,0 +1,106 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Field Splitting Expansion - §2.6.5
+
+    # space=' '
+    # tab='	' # that's a tab character in there
+    # newline='
+    + '
+    
+    # t1="$newline ${tab}foo${tab}${tab}bar "
+    # t2='  red  , white blue'
+    
+If IFS is not set, it is treated as if it were <space><tab><newline>:
+    # recho $t1
+    argv[1] = <foo>
+    argv[2] = <bar>
+    # recho $t2
+    argv[1] = <red>
+    argv[2] = <,>
+    argv[3] = <white>
+    argv[4] = <blue>
+
+Try that again, when IFS is set explicitly to <space><tab><newline>:
+    # IFS="$space$tab$newline"
+    # test="$newline ${tab}foo${tab}${tab}bar "
+    # recho $t1
+    argv[1] = <foo>
+    argv[2] = <bar>
+    # recho $t2
+    argv[1] = <red>
+    argv[2] = <,>
+    argv[3] = <white>
+    argv[4] = <blue>
+
+If IFS set to null, no field splitting at all:
+    # IFS=''
+    # recho $t1
+    argv[1] = <^J ^Ifoo^I^Ibar >
+    # recho $t2
+    argv[1] = <  red  , white blue>
+    
+If IFS has non-whitespace characters, then those each delimit a field
+    # IFS="$space,$tab"
+    # recho $t1
+    argv[1] = <^J>
+    argv[2] = <foo>
+    argv[3] = <bar>
+    # recho $t2
+    argv[1] = <red>
+    argv[2] = <white>
+    argv[3] = <blue>
+    # t3=',alpha,beta,,gamma,'
+    # recho $t3
+    argv[1] = <>
+    argv[2] = <alpha>
+    argv[3] = <beta>
+    argv[4] = <>
+    argv[5] = <gamma>
+    
+Note subtle rules about how such things abut other text:
+    # t4=',aa,bb,'
+    # recho $t4
+    argv[1] = <>
+    argv[2] = <aa>
+    argv[3] = <bb>
+    # recho "xx"$t4"zz"
+    argv[1] = <xx>
+    argv[2] = <aa>
+    argv[3] = <bb>
+    argv[4] = <zz>
+    # t5='aa,bb'
+    # recho "xx"$t5"zz"
+    argv[1] = <xxaa>
+    argv[2] = <bbzz>
+
+Whitespace at the ends is treated slightly differently
+    # t6=' aa bb '
+    # recho $t6
+    argv[1] = <aa>
+    argv[2] = <bb>
+    # recho "xx"$t6"zz"
+    argv[1] = <xx>
+    argv[2] = <aa>
+    argv[3] = <bb>
+    argv[4] = <zz>
+
+Finally, note that only expanded text is split:
+    # recho aa,bb aa\,bb 'aa,bb' "aa,bb"
+    argv[1] = <aa,bb>
+    argv[2] = <aa,bb>
+    argv[3] = <aa,bb>
+    argv[4] = <aa,bb>
+ 
+    

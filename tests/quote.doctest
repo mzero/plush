@@ -1,0 +1,110 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+There are several different kinds of quoting in the shell, and some of them
+can be nested. This leads to rather a lot of cases...
+
+Note: Due to the crazy spec for echo, these tests must not let echo see any of
+the sequences \a, \b, \c, \f, \n, \r, \t, \v, or \\, as some echos interpret
+those sequences.
+ 
+Backslash - §2.2.1
+    These only apply when unquoted. Backslash inside other constructs has some
+    what different meanings.
+
+    # echo a\bc a\\z a\'c a\"c a\`c a\$c
+    abc a\z a'c a"c a`c a$c
+    
+    # echo a\;c a\&c a\|c a\<c a\>c
+    a;c a&c a|c a<c a>c
+    
+    # echo tri\
+    + cky
+    tricky
+
+    # recho a\ c
+    argv[1] = <a c>
+
+Single Quotes - §2.2.2
+    Note that backslash, and in particular backslash newline are not interpreted
+    inside single quotes.
+
+    # echo 'abc' 'a\z' 'a"c' 'a`c' 'a$c'
+    abc a\z a"c a`c a$c
+    
+    # echo 'a;c' 'a&c' 'a|c' 'a<c' 'a>c'
+    a;c a&c a|c a<c a>c
+
+    # echo 'tri\
+    + cky'
+    tri\
+    cky
+    
+    # recho 'a c'
+    argv[1] = <a c>
+    
+    # recho 'tri\
+    + cky'
+    argv[1] = <tri\^Jcky>
+
+Double Quotes - §2.2.3
+    Note that the backslash in double quotes operates differently than above.
+    
+    # echo "abc" "a'c"
+    abc a'c
+    
+    # echo "a\zc" "a\$c" "a\`c" "a\"c" "a\\z"
+    a\zc a$c a`c a"c a\z
+    
+    # echo "tri\
+    + cky"
+    tricky
+    
+    # recho "a c"
+    argv[1] = <a c>
+    
+    Note: Parameter expansion, command substituion, and arithmetic expansion
+    inside of quotes are tested in those sections.
+
+The exhaustive backslash hilarity:
+    # recho a\bc 'a\bc' "a\bc"
+    argv[1] = <abc>
+    argv[2] = <a\bc>
+    argv[3] = <a\bc>
+    
+    # recho a\\bc 'a\\bc' "a\\bc"
+    argv[1] = <a\bc>
+    argv[2] = <a\\bc>
+    argv[3] = <a\bc>
+    
+    # recho a\$c 'a\$c' "a\$c"
+    argv[1] = <a$c>
+    argv[2] = <a\$c>
+    argv[3] = <a$c>
+    
+    # c=dog
+    # recho a\\$c 'a\\$c' "a\\$c"
+    argv[1] = <a\dog>
+    argv[2] = <a\\$c>
+    argv[3] = <a\dog>
+    
+    # recho a\
+    + c 'a\
+    + c' "a\
+    + c"
+    argv[1] = <ac>
+    argv[2] = <a\^Jc>
+    argv[3] = <ac>
+
+

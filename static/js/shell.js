@@ -1,0 +1,277 @@
+// Copyright 2012 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+define(['keys', 'history', 'cwd', 'jquery'], function(keys, historyApi, cwd, $){
+  "use strict";
+  
+  var key = (function initializeKey() {
+    var key = window.location.hash.slice(1);
+    if ('' == key) {
+      key = sessionStorage.getItem("key");
+    } else {
+      sessionStorage.setItem("key", key);
+    }
+    window.location.hash = "";
+    return key;
+  })();
+  
+  var screen = $('#screen');
+  var scrollback = $('#scrollback');  
+  var totalHeight = screen.outerHeight();
+  function repeat(s,n) {
+    while (s.length < n) { s = s + s; }
+    return s.substr(0,n);
+  }
+
+  function repeatSpan(s,n) {
+    while (s.length < n) { s = s + s; }
+    var e = $('<pre></pre>');
+    e.text(s.substr(0,n));
+    return e;
+  }
+
+  var jobCount = 0;
+  
+  function addJobDiv(cmd) {
+    var job = "job" + (++jobCount);
+    var node = $('<div></div>', { 'id': job, 'class': 'job' });
+    node.bind('click', function() {
+        if($(this).children(":nth-child(2)").is(':hidden')) {
+          $('#scrollback .job').children(":nth-child(2)").slideUp(); 
+          $(this).children(":nth-child(2)").slideDown('normal');
+        }
+    });
+    node.appendTo(scrollback);
+
+    // Folding
+    $('#scrollback .job').children(":nth-child(2)").slideUp();
+    node.children(":first").slideDown('normal');
+
+    return job;
+  }
+  
+  function setJobClass(job, cls) {
+    var where = $('#' + job);
+    if (where.length != 1) { return; }
+    where.removeClass('running complete').addClass(cls);
+  }
+  
+  function addOutput(job, cls, txt) {
+    var where = $('#' + job);
+    if (where.length != 1) { where = scrollback; }
+    var node = $('<pre></pre>', { 'class': cls }).text(txt);
+    node.appendTo(where);
+    totalHeight += node.outerHeight();
+    scrollback.animate({scrollTop: totalHeight });
+    // TODO(jasvir): Almost certainly the wrong place to do this
+    // $("#commandline")[0].scrollIntoView(true);
+  }
+  
+  function updateContext(ctx) {
+    if (ctx.cwd) {
+      var partialCmd = $('#commandline').val();
+      $('#context-cwd').empty().append(
+        cwd.parseToDom(ctx.cwd,
+          function(event) { 
+            runCommand($('#commandline'), "cd " + event.data.dir); 
+            $('#commandline').val(partialCmd);
+          })
+      );
+    }
+    var envList = $('#context-env');
+    var shList = $('#context-shell');
+    envList.empty();
+    shList.empty();
+    ctx.vars.forEach(function(v) {
+      var dt = $('<dt></dt>', { class: v.mode });
+      var dd = $('<dd></dd>', { class: v.mode });
+      dt.text(v.name);
+      dd.text(v.value);
+      if (v.scope === 'env') { envList.append(dt); envList.append(dd); }
+      if (v.scope === 'shell') { shList.append(dt); shList.append(dd); }
+    });
+  }
+  
+  function updateAnnotations(comp) {
+    var annoElem = $('#annotations');
+    annoElem.empty();
+    
+    var i = 1;
+    comp.spans.forEach(function(span) {
+      var m = "";
+      span.annotations.forEach(function(anno) {
+        if (anno.expansion) {
+          m += 'expands to ' + anno.expansion;
+        }
+        else if (anno.commandType) {
+          m += anno.commandType + " command"
+          if (anno.path) {
+            m += " @ " + anno.path
+          }
+        }
+        else if (anno.command) {
+          m += anno.command + "\n" + anno.synopsis + "\n";
+        }
+        else if (anno.option) {
+          m += anno.option ;
+        }
+        else if (anno.unused) {
+          m += "unused";
+        }
+        m += "\n";
+      });
+      
+      m = m.trim()
+      if (m) {
+        if (i < span.start) {
+          annoElem.append(repeatSpan(' ', span.start - i));
+          i = span.start;
+        }
+        var blockElem = repeatSpan(' ', span.end - span.start);
+        blockElem.addClass('annotation');
+        annoElem.append(blockElem);
+        i = span.end;
+        
+        var msgElem = $('<span></span>', { "class": "message" });
+        msgElem.text(m);
+        blockElem.append(msgElem);
+      }
+    });
+  }
+  
+  function api(call, req, respFn) {
+    $.ajax({
+      contentType: 'application/json',
+      data: JSON.stringify({key: key, req: req}),
+      dataType: 'json',
+      error: function(xhr, stat, err) {
+        addOutput('err', 'error', stat + ': ' + err);
+      },
+      processData: false,
+      success: function(data, stat, xhr) {
+        respFn(data);
+      },
+      type: 'POST',
+      url: '/api/' + call
+    });
+  }
+  
+  function pollResult(data) {
+    var jobsRunning = false;
+    var jobsDone = false;
+    
+    data.forEach(function(d) {
+      var job = ('job' in d) ? d.job : "unknown";
+
+      if ('stdout' in d) {
+        addOutput(job, 'stdout', d.stdout);
+      }
+      if ('stderr' in d) {
+        addOutput(job, 'stderr', d.stderr);
+      }
+      if ('jsonout' in d) {
+        if (job === 'ctx') {
+          d.jsonout.forEach(updateContext);
+        } else if (job === 'comp') {
+          d.jsonout.forEach(updateAnnotations);
+        } else {
+          var s = "";
+          d.jsonout.forEach(function(j) {
+            s += JSON.stringify(j, null, 4);
+            s += "\n";
+          });
+          addOutput(job, 'stdout', s);
+        }
+      }
+      if ('running' in d) {
+        if (d.running) {
+          setJobClass(job, "running");
+          jobsRunning = true;
+        }
+        else {
+          if (job !== 'ctx') {
+            setJobClass(job, d.exitcode == 0 ? "complete" : "failed");
+            jobsDone = true;
+          }
+        }
+      }
+    });
+    if (jobsRunning) {
+      setTimeout(poll, 25);
+    }
+    if (jobsDone) {
+      runContext();
+    }
+  }
+
+  function prevCommand(that, cmd, e) {
+    that.val(historyApi.previous(cmd));
+  }
+
+  function nextCommand(that, cmd, e) {
+    that.val(historyApi.next(cmd));
+  }
+
+  function runCommand(that, cmd, e) {
+    var job = addJobDiv(cmd);
+    addOutput(job, 'stdin', cmd);
+    that.val('');
+    historyApi.add(cmd);
+    $('#annotations').text('')
+    api('run', {job: job, cmd: cmd}, cmdResult);
+    $("#commandline").focus();
+
+  }
+
+  function poll() {
+    api('poll', null, pollResult);
+  }
+
+  var checkTimer = null;
+  $('#commandline').keyup(function(e) {
+    if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
+    keys(e, {
+      runCommand: runCommand,
+      nextCommand: nextCommand,
+      prevCommand: prevCommand,
+      default: function() { checkTimer = setTimeout(runComplete, 1000); }
+    })($(this), $(this).val());
+  });
+
+  function runContext() {
+    api('run', {job: 'ctx', cmd: 'context'}, cmdResult);
+  }
+  
+  function cmdResult(data) {
+    var job = ('job' in data) ? data.job : "unknown";
+
+    if ('parseError' in data) {
+      addOutput(job, 'error', data.parseError);
+    }
+    if (data.running) {
+      setJobClass(job, "running");
+      poll();
+    }
+  }
+  
+  function runComplete() {
+    var cmd = $('#commandline').val();
+    cmd.replace(/'/g,"'\\''");
+    cmd = "complete '" + cmd + "'";
+    api('run', {job: 'comp', cmd: cmd}, cmdResult);
+  }
+  
+  runContext();
+
+});

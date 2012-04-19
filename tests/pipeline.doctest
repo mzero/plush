@@ -1,0 +1,58 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Pipeline tests
+
+Basics
+    # echo hi | cat
+    hi
+    
+    # echo hi | fgrep z
+    
+Chained through several
+    # cd /tmp
+    # echo apple >fruit
+    # echo banana >>fruit
+    # echo cantaloupe >>fruit
+    # echo durian >>fruit
+    # echo fig >>fruit
+    # echo guava >>fruit
+    
+    # cat fruit | fgrep a
+    apple
+    banana
+    cantaloupe
+    durian
+    guava
+    
+    # cat fruit | fgrep a | fgrep g
+    guava
+    
+    # cat fruit | fgrep n | fgrep u > fruitb
+    # cat fruitb
+    cantaloupe
+    durian
+
+Exit status is status of last command in chain
+    # echo hi there | false ; echo $?
+    1
+    
+    # echo hi there | cat >/dev/null ; echo $?
+    0
+    
+    # false | echo happy >/dev/null ; echo $?
+    0
+    
+Cleanup
+    # rm -f fruit fruitb

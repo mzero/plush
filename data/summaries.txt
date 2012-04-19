@@ -1,0 +1,162 @@
+SUMMARIES.TXT - utility summary and completion information
+
+  summary.txt - loaded by plush at start up, this file contains the summary
+  and completion information for all built-in commands. This file should
+  follow this format:
+  
+  - Each command's summary is separated by a line of dashs.
+  
+  - Within each summary, there are three sections, separted by blank lines,:
+    - The NAME: the name of the command, a dash, and a short description
+    - The SYNOPSIS: a condensed syntax of the command line
+    - The OPTIONS: description of the options
+    
+  - Within OPTIONS, each line consists of an option, two or more spaces,
+    and a short description of the option.
+  - The option can have an argument, and/or synonyms so long as they follow
+    the option after only one space:
+    
+      -a              an option
+      -b, -B          an synonym, note the comma and single space
+      -c FILE         an option argument, note the single space
+      -d NUM, -D NUM  synonyms and arguments, oh boy!
+      
+  - In all cases, leading and trialing whitespace on lines are removed
+  
+  - The NAME and each option should fit on one 72 character line, as they are
+    intended for contextual display to the user while typing.
+  - The SYNOPSIS can have multiple lines.
+
+  Copyright 2012 Google Inc. All Rights Reserved.
+  
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  
+      http://www.apache.org/licenses/LICENSE-2.0
+  
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+------------------------------------------------------------------------
+
+cat - catenate files to output
+
+  cat -u files...
+  
+  -u    write bytes without delay
+
+------------------------------------------------------------------------
+
+cd - change working directory
+
+  cd [-L|-P] [dir]
+
+  -L    Handle the operand dot-dot logically
+  -P    Handle the operand dot-dot physically
+
+------------------------------------------------------------------------
+
+complete - generate annotations and completions for command input
+
+  complete [-c n] cmd
+  
+  -c    cursor position, zero is before first character
+  
+------------------------------------------------------------------------
+
+context - generate information about the state of the shell
+
+  context
+  
+------------------------------------------------------------------------
+
+echo - print arugments
+
+  echo [arg]...
+  
+------------------------------------------------------------------------
+
+false - return a failure exit code (1)
+
+  false
+
+------------------------------------------------------------------------
+
+fgrep - print lines that contain a fixed sub-string
+
+  fgrep [-c|-l|-q] [-insvx] pattern file...
+  
+  -c    write only a count of selected lines
+  -l    write only the names of matching files
+  -q    quiet mode: no output, only exit status
+  -i    case-insensitive matching
+  -n    include line numbers
+  -s    supress error messages
+  -v    invert matching
+  -x    match whole line
+
+------------------------------------------------------------------------
+
+mkdir - make a directory
+
+  mkdir [-p] path...
+
+  -p    Create missing directories as needed.
+
+------------------------------------------------------------------------
+
+recho - print arugments, one per line, for unit tests
+
+  recho [arg]...
+  
+------------------------------------------------------------------------
+
+rm - remove files
+
+  rm [-fiRr] files...
+
+  -f        Force removal
+  -i        Interacive mode
+  -r, -R    Recursive delete
+
+------------------------------------------------------------------------
+
+set - set or unset shell options and positional arguments
+
+  set [-+aehimCnfbuvx] [-+o option] [argument...]
+
+  -a, -o allexport
+  -e, -o errexit
+  -h, -o hashall
+      -o ignoreeof
+  -i, -o interactive
+  -m, -o monitor
+  -C, -o noclobber
+  -n, -o noexec
+  -f, -o noglob
+      -o nolog
+  -b, -o notify
+  -u, -o nounset
+  -v, -o verbose
+      -o vi
+  -x, -o xtrace
+
+------------------------------------------------------------------------
+
+true - return the success exit code (0)
+
+  true
+
+------------------------------------------------------------------------
+
+touch - change file access and modification times
+
+  touch [-acm] file...
+  
+  -a    Set the access time
+  -c    Do not create the file if missing
+  -m    Set the modify time

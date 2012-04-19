@@ -1,0 +1,88 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Plush's functional tests are "doctest" style tests.
+
+Text outside of execution displays is just ignored.
+
+Execution displays start with a command to execute shown after the plush prompt.
+The expected text follows immediately on the lines after, terminated by a
+blank line, or another test:
+
+    # echo Hello World
+    Hello World
+    
+    # echo First test
+    First test
+    # echo Second test
+    Second test
+    
+    # true
+    # false
+    # echo tests need not have results
+    tests need not have results
+
+The commands to execute can be spread out on multiple lines, using the secondary
+prompt. The expected output can also be multiple lines long:
+    
+    # echo Testing &&
+    + echo Multi Line
+    Testing
+    Multi Line
+
+The executions are normally indented, but can be flush left too. Any amount of
+indenting is acceptable so long as it is done only with spaces:
+
+# echo outdented
+outdented
+
+    # echo indented
+    indented
+    
+        # echo indented more
+        indented more
+
+If the expected output has a blank line in it, then use a line with just a
+period.
+
+    # echo indented with && echo && echo blank line above
+    indented with
+    .
+    blank line above
+
+Actually, any leading period on a line in the expected text is removed:
+
+    # echo . && echo .. && echo ... && echo got it?
+    ..
+    ...
+    ....
+    .got it?
+
+Tests can be skipped by putting the keyword SKIP (all caps) on the command
+line. Note the use of the # as a comment character, since the whole line is
+still passed to shell when it isn't skipped (see below).
+
+    # crashes                                       # SKIP
+    the output is skipped, too
+    
+The skip can be limited to some test scenario(s), which is the name of the
+shell under test: "plush", "sh", "bash", "dash", etc...
+
+    # echo this test does not run in sh or bash      # SKIP sh bash
+    this test does not run in sh or bash
+
+Finally, a test can be marked ONLY, to have it run only under a given shell:
+
+    # echo this test runs only in plush              # ONLY plush
+    this test runs only in plush

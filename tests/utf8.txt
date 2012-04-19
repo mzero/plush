@@ -1,0 +1,12 @@
+Unicode characters
+
+One byte: A a !
+
+Two byte: Á ɐ ¡
+
+Three byte lo: अ ᄉ ⁉
+
+Three byte hi: ﬁ ﷺ ︴
+
+Four byte: 𝄢 🐘
+

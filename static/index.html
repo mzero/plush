@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!--
+Copyright 2012 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<html lang="en">
+  <head>
+    <script data-main="js/main" src="js/libs/require/require.js"></script>
+    <meta charset="utf-8">
+    <meta content="initial-scale=1, minimum-scale=1, width=device-width" name="viewport">
+    <title>Plush</title>
+    <link href="//fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&amp;subset=latin" rel="stylesheet">
+    <link rel="stylesheet" href="css/plush.css">
+  </head>
+  <body>
+    <div id="header">
+      <h1>Plush <small>– the comfy shell</small></h1>
+      <div id="plush-man-search">
+      </div>
+    </div>
+    <div id="main">
+      <div id="plush-jobs"></div>
+      <div id="screen"><div>
+        <div id="scrollback">
+        </div>
+        <div id="input-area">
+          <span id="prompt"># </span><input id="commandline" /><br>
+          <div id="annotations"></div>
+        </div>
+      </div></div>
+    </div>
+    <div id="context">
+      <ul class="left">
+        <li><a href="#"><span id="context-cwd"></span></a></li>
+      </ul>
+      <ul class="right">
+        <li id="context-vars">
+          Variables
+          <div class="hidden">
+            <p>Environment</p>
+            <dl id="context-env">
+            </dl>
+            <p>Shell Vars</p>
+            <dl id="context-shell">
+            </dl>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </body>
+</html>

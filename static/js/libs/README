@@ -1,0 +1,62 @@
+Third Party Libs
+----------------
+
+
+Backbone
+========
+
+URL: http://backbonejs.org/
+Version: 0.5.3
+License: MIT
+License File: LICENSE
+
+Description:
+JavaScript model/view framework.
+
+Local Modifications:
+-none-
+
+
+jQuery
+======
+
+URL: http://jquery.org/
+Version: 1.7.1
+License: MIT
+License File: MIT-LICENSE
+
+Description:
+JavaScript does-everything tool.
+
+Local Modifications:
+-none-
+
+
+RequireJS
+==========
+
+URL: http://requirejs.org/
+Version: 1.0.6
+License: MIT
+License File: LICENSE
+
+Description:
+JavaScript loader.
+
+Local Modifications:
+-none-
+
+
+Underscore
+==========
+
+URL: http://documentcloud.github.com/underscore/
+Version: 1.2.4
+License: MIT
+License File: LICENSE
+
+Description:
+JavaScript functional programming library.
+
+Local Modifications:
+-none-

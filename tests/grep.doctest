@@ -1,0 +1,125 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+-- 
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+-- 
+--     http://www.apache.org/licenses/LICENSE-2.0
+-- 
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+This tests grep, and non-standard variants egrep (equiv. to grep -E) and fgrep
+(equiv. to grep -F). For now, the tests are done with fgrep since regular
+expressions aren't implemented yet.
+
+Set up
+    # cd /tmp
+    # echo Ant >animals
+    # echo Anteater >>animals
+    # echo Baboon >>animals
+    # echo Cat >>animals
+    # echo Dog >>animals
+    # echo Egret >>animals
+    # echo Apple >fruit
+    # echo Banana >>fruit
+    # echo Cantaloupe >>fruit
+
+Testing basic matching, -v, -i and -x flags
+    # fgrep Ant animals
+    Ant
+    Anteater
+
+    # fgrep -v Ant animals
+    Baboon
+    Cat
+    Dog
+    Egret
+
+    # fgrep ant animals
+
+    # fgrep -i ant animals
+    Ant
+    Anteater
+
+    # fgrep -x Ant animals
+    Ant
+
+Testing output options
+    # fgrep -n o animals
+    3:Baboon
+    5:Dog
+    
+    # fgrep o animals fruit
+    animals:Baboon
+    animals:Dog
+    fruit:Cantaloupe
+    
+    # fgrep -n o animals fruit
+    animals:3:Baboon
+    animals:5:Dog
+    fruit:3:Cantaloupe
+    
+Testing count output mode
+    # fgrep -c o animals fruit
+    animals:2
+    fruit:1
+    
+    # fgrep -c Ant animals fruit
+    animals:2
+    fruit:0
+    
+    # fgrep -c Ant animals
+    2
+
+Testing file output mode    
+    # fgrep -l o animals fruit
+    animals
+    fruit
+    
+    # fgrep -l Ant animals fruit
+    animals
+    
+    # fgrep -l Ant animals
+    animals
+
+Testing quite output mode
+    # fgrep -q o animals; echo $?
+    0
+    
+    # fgrep -q x animals; echo $?
+    1
+    
+    # fgrep -q o animals fruit; echo $?
+    0
+    
+    # fgrep -q Cant animals fruit; echo $?
+    0
+    
+    # fgrep -q x animals fruit; echo $?
+    1
+
+Testing standard input
+    # fgrep Ant <animals
+    Ant
+    Anteater
+    
+    # fgrep o - fruit <animals
+    (standard input):Baboon
+    (standard input):Dog
+    fruit:Cantaloupe
+    
+    # fgrep -l Ant <animals 
+    (standard input)
+    
+    # fgrep -l Cant animals - <fruit
+    (standard input)
+    
+Clean-up
+N.B.: Need some tests after a stdin relocation test, or things fail!
+TODO: Fix this!
+    # rm -f animals fruit
+

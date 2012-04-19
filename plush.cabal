@@ -1,0 +1,132 @@
+Name:            plush
+Version:         0.2.0.0
+License:         OtherLicense
+License-file:    LICENSE
+Author:          Mark Lentczner
+Maintainer:      markl@glyphic.com
+Category:        Utility
+Build-type:      Simple
+Cabal-version:   >=1.8
+Synopsis:        the comfy shell
+Description:
+    Plush is a shell with a modern interface: a web page.
+
+Data-files:
+  data/summaries.txt
+  static/css/*.css
+  static/css/*.gif
+  static/css/*.png
+  static/img/*.png
+  static/*.html
+  static/js/*.js
+  static/js/app.build.js
+  static/js/collections/*.js
+  static/js/libs/backbone/*.js
+  static/js/libs/jquery/*.js
+  static/js/libs/require/*.js
+  static/js/libs/underscore/*.js
+  static/js/models/*.js
+  static/js/views/*.js
+  static/templates/*.html
+  tests/*.doctest
+  tests/*.sh
+  tests/*.txt
+
+Extra-source-files:
+  README
+  alltests.sh
+  static/js/libs/README
+  static/js/libs/backbone/LICENSE
+  static/js/libs/jquery/MIT-LICENSE
+  static/js/libs/require/LICENSE
+  static/js/libs/underscore/LICENSE
+
+
+Executable plush
+  Main-is: Main.hs
+  hs-source-dirs: src
+
+  Other-modules:
+    Plush.DocTest
+    Plush.Job
+    Plush.Job.Output
+    Plush.Parser.Base
+    Plush.Parser.Commands
+    Plush.Parser.Tokens
+    Plush.Parser
+    Plush.Pretty
+    Plush.Run.Annotate
+    Plush.Run.BuiltIns
+    Plush.Run.BuiltIns.FileSystem
+    Plush.Run.BuiltIns.Grep
+    Plush.Run.BuiltIns.ShellState
+    Plush.Run.BuiltIns.Syntax
+    Plush.Run.BuiltIns.Trivial
+    Plush.Run.BuiltIns.Utilities
+    Plush.Run.BuiltIns.WorkingDirectory
+    Plush.Run.Command
+    Plush.Run.Execute
+    Plush.Run.Expansion
+    Plush.Run.Posix
+    Plush.Run.Redirection
+    Plush.Run.ShellExec
+    Plush.Run.ShellFlags
+    Plush.Run.TestExec
+    Plush.Run.Types
+    Plush.Run
+    Plush.Server
+    Plush.Server.API
+    Plush.Server.Utilities
+    Plush.Types
+    Plush.Types.CommandSummary
+
+  Build-depends:
+    aeson >= 0.5.0 && < 0.7,
+    attoparsec >= 0.8.6 && < 0.11,
+    base == 4.*,
+    blaze-builder >= 0.3.0 && < 0.4,
+    bytestring >= 0.9.1 && < 0.10,
+    conduit >= 0.1.1 && < 0.2,
+    containers >= 0.4.0 && < 0.5,
+    directory >= 1.0.1 && < 1.2,
+    filepath >= 1.2.0 && < 1.3,
+    hashable >= 1.1.2 && < 1.2,
+    haskeline >= 0.6.2 && < 0.7,
+    http-types >= 0.6.7 && < 0.7,
+    mtl >= 1.1.0 && < 2.1,
+    transformers >= 0.2.2 && < 0.3,
+    pretty >= 1.0.1 && < 1.1,
+    parsec >= 3.0.1 && < 3.2,
+    process >= 1.0.1 && < 1.1,
+    random >= 1.0.0 && < 1.1,
+    text >= 0.11.1 && < 1.12,
+    unix >= 2.4.0 && < 2.5,
+    unordered-containers >= 0.1.4 && < 0.2,
+    wai >= 1.0.0 && < 1.1,
+    wai-middleware-static >= 0.0.1 && < 0.1,
+    wai-middleware-route >= 0.2.0 && < 0.3,
+    warp >= 1.0.0 && < 1.1
+
+  ghc-options: -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
+
+
+
+Executable recho
+  Main-is: Recho.hs
+  hs-source-dirs: src
+
+  Build-depends:
+    aeson >= 0.5.0 && < 0.7,
+    base == 4.*,
+    bytestring >= 0.9.1 && < 0.10,
+    containers >= 0.3.0 && < 0.5,
+    directory >= 1.0.1 && < 1.2,
+    filepath >= 1.2.0 && < 1.3,
+    mtl >= 1.1.0 && < 2.1,
+    process >= 1.0.1 && < 1.1,
+    text >= 0.11.1 && < 1.12,
+    transformers >= 0.2.2 && < 0.3,
+    unix >= 2.4.0 && < 2.5,
+    unordered-containers >= 0.1.4 && < 0.2
+
+  ghc-options: -Wall -fno-warn-missing-signatures	-fwarn-tabs
