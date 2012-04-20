@@ -93,7 +93,8 @@ define(['keys', 'history', 'cwd', 'jquery'], function(keys, historyApi, cwd, $){
     var shList = $('#context-shell');
     envList.empty();
     shList.empty();
-    ctx.vars.forEach(function(v) {
+    var vars = ctx.vars || [];
+    vars.forEach(function(v) {
       var dt = $('<dt></dt>', { class: v.mode });
       var dd = $('<dd></dd>', { class: v.mode });
       dt.text(v.name);
@@ -108,7 +109,8 @@ define(['keys', 'history', 'cwd', 'jquery'], function(keys, historyApi, cwd, $){
     annoElem.empty();
     
     var i = 1;
-    comp.spans.forEach(function(span) {
+    var spans = comp.spans || [];
+    spans.forEach(function(span) {
       var m = "";
       span.annotations.forEach(function(anno) {
         if (anno.expansion) {
