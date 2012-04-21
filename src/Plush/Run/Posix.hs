@@ -34,7 +34,7 @@ module Plush.Run.Posix (
     -- * Utilities
     -- ** Output convenience functions
     -- $outstr
-    PosixOutStr,
+    PosixOutStr(..),
     outStr, outStrLn, errStr, errStrLn, jsonOut,
     -- ** File and directory existance
     doesFileExist, doesDirectoryExist,
