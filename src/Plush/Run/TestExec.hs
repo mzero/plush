@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language TypeSynonymInstances, TypeFamilies #-}
+{-# Language TypeSynonymInstances, TypeFamilies, FlexibleInstances #-}
 
 module Plush.Run.TestExec (
     TestState(), initialTestState,
