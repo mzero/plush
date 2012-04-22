@@ -130,7 +130,7 @@ getAvailable (OutputStream fd p0 mv) = do
 
 -- | Read all available bytes from a file descriptor.
 readAvailable :: Fd -> IO B.ByteString -- TODO: should merge with parsing logic
-readAvailable fd = go [] >>= return . B.concat -- . reverse
+readAvailable fd = go [] >>= return . B.concat . reverse
   where
     go bs = next >>= maybe (return bs) (go . (:bs))
     next = readBuf `catchError` (\_ -> return Nothing)
