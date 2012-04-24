@@ -30,6 +30,7 @@ import Plush.DocTest
 import Plush.Parser
 import Plush.Run
 import Plush.Server
+import Plush.Utilities
 
 
 data Options = Options
@@ -94,7 +95,7 @@ main = do
 
 processFile :: Options -> [String] -> IO ()
 processFile opts [] = processStdin opts []
-processFile opts (fp:args) = readFile fp >>= processArg opts . (:(fp:args))
+processFile opts (fp:args) = readUtf8File fp >>= processArg opts . (:(fp:args))
 
 processArg :: Options -> [String] -> IO ()
 processArg _ [] = return ()

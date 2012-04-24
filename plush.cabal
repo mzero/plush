@@ -79,6 +79,7 @@ Executable plush
     Plush.Server.Utilities
     Plush.Types
     Plush.Types.CommandSummary
+    Plush.Utilities
 
   Build-depends:
     aeson >= 0.5.0 && < 0.7,
