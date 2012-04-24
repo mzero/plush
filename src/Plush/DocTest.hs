@@ -26,6 +26,7 @@ import System.Process (readProcess)
 
 import Plush.Parser
 import Plush.Run
+import Plush.Utilities
 
 
 data Location = Location { _locFile :: Maybe FilePath, _locLine :: Int }
@@ -111,7 +112,7 @@ extractTests input = skipping $ zip [1..] $ lines input
 
 docTestFile :: FilePath -> IO [Test]
 docTestFile fp =
-    readFile fp >>= return . map (noteFile fp) . extractTests
+    readUtf8File fp >>= return . map (noteFile fp) . extractTests
 
 
 
