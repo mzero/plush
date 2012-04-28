@@ -87,7 +87,7 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode
-withRedirection = withRedirection' $ map Fd [10..]
+withRedirection = withRedirection' $ map Fd [25..]
     -- TODO: This isn't safe if any redirection can use descriptors in this
     -- range, or if openFd ends up using this range
 

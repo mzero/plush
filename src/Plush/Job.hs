@@ -16,6 +16,7 @@ limitations under the License.
 
 module Plush.Job (
     -- * Shell Thread
+    prepProcess,
     startShell,
     ShellThread,
 
@@ -82,6 +83,28 @@ data ShellThread = ShellThread
     , stScoreBoard :: MVar ScoreBoard
     }
 
+
+-- Well known, preassigned file descriptors
+    -- TODO: We shouldn't have to do this, and should use the fcntl FD_DUP
+    -- to duplicate them up out of the way without clobbering anything that
+    -- might be there already.
+origInFd, origOutFd, origErrFd, devNullFd :: Fd
+(origInFd, origOutFd, origErrFd, devNullFd) = (20, 21, 22, 23)
+
+-- | Prepare the process environment. This must happen first, before the web
+-- server is created, as the process needs to have some resources (notably
+-- file descriptors) reserved before other code can use them.
+prepProcess :: IO ()
+prepProcess = do
+    _ <- dupTo stdInput origInFd
+    _ <- dupTo stdOutput origOutFd
+    _ <- dupTo stdError origErrFd
+
+    nfd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
+    when (nfd /= devNullFd) $ dupTo nfd devNullFd >> closeFd nfd
+    mapM_ (dupTo devNullFd) [0..9] -- reserve the low FDs, yes, this is insane
+
+
 -- | Start the shell as an indpendent thread, which will process jobs and
 -- report on their status.
 --
@@ -91,34 +114,39 @@ data ShellThread = ShellThread
 -- communicate to the original streams.
 startShell :: Runner -> IO (ShellThread, Handle, Handle)
 startShell runner = do
-    origStdOut <- dupTo stdOutput 10 >>= fdToHandle
-    origStdErr <- dupTo stdError 11 >>= fdToHandle
-
-    rs <- RS <$> inPipeFor stdInput
-             <*> (outPipeFor stdOutput >>= outputStreamUtf8)
-             <*> (outPipeFor stdError >>= outputStreamUtf8)
-             <*> (outPipeFor stdJsonOutput >>= outputStreamJson)
+    origStdOut <- fdToHandle origOutFd
+    origStdErr <- fdToHandle origErrFd
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
-    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar rs runner
+    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar runner
 
     return (ShellThread jobRequestVar scoreBoardVar, origStdOut, origStdErr)
-  where
-    inPipeFor destFd = createPipe  >>= \(r, w) -> r `moveTo` destFd >> return w
-    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
-    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
-shellThread :: MVar Request -> MVar ScoreBoard -> RunningState -> Runner -> IO ()
-shellThread jobRequestVar scoreBoardVar rs = go
+shellThread :: MVar Request -> MVar ScoreBoard -> Runner -> IO ()
+shellThread jobRequestVar scoreBoardVar = go
   where
     go runner = do
+
         (j, cl) <- takeMVar jobRequestVar
+
+        writeToInput       <- inPipeFor stdInput
+        readFromOutput     <- outPipeFor stdOutput
+        readFromError      <- outPipeFor stdError
+        readFromJsonOutput <- outPipeFor stdJsonOutput
+
+        rs <- RS writeToInput
+                 <$> outputStreamUtf8 readFromOutput
+                 <*> outputStreamUtf8 readFromError
+                 <*> outputStreamJson readFromJsonOutput
+
         modifyMVar_ scoreBoardVar $ \sb ->
             return $ (j, Running rs) : sb
+
         runner' <- runCommandList cl runner
         (exitStatus, runner'') <- run getLastExitCode runner'
+
         modifyMVar_ scoreBoardVar $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
@@ -126,7 +154,16 @@ shellThread jobRequestVar scoreBoardVar rs = go
                     oi <- gatherOutput rs'
                     return $ (j, JobDone exitStatus oi):sb'
                 _ -> return sb
+
+        mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
+        mapM_ (\fd -> closeFd fd `catch` const (return ()))
+          [ writeToInput, readFromOutput, readFromError, readFromJsonOutput ]
+
         go runner''
+
+    inPipeFor destFd = createPipe  >>= \(r, w) -> r `moveTo` destFd >> return w
+    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
+    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
 -- | Submit a job for processing.

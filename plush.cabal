@@ -44,12 +44,14 @@ Extra-source-files:
 
 Executable plush
   Main-is: Main.hs
+  
   hs-source-dirs: src
 
   Other-modules:
     Plush.DocTest
     Plush.Job
     Plush.Job.Output
+    Plush.Main
     Plush.Parser.Base
     Plush.Parser.Commands
     Plush.Parser.Tokens
@@ -108,7 +110,10 @@ Executable plush
     wai-middleware-route >= 0.2.0 && < 0.3,
     warp >= 1.0.0 && < 1.1
 
-  ghc-options: -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
+  C-sources:
+    src/main.c
+    
+  ghc-options: -no-hs-main -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
 
 
 
