@@ -172,6 +172,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     write = liftT2 write
 
     dupTo = liftT2 dupTo
+    dupFdCloseOnExec = liftT2 dupFdCloseOnExec
     setCloseOnExec = liftT1 setCloseOnExec
 
     getUserHomeDirectoryForName = liftT1 getUserHomeDirectoryForName

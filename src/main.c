@@ -18,7 +18,12 @@ limitations under the License.
 #include <unistd.h>
 #include "HsFFI.h"
 
-#include "Plush/Main_stub.h"
+// #include "Plush/Main_stub.h"
+// Should include this, but in a clean cabal build, cabal builds C files before
+// Haskell ones, so this include file doesn't exist yet. So, the one needed
+// declaration is just copied here:
+extern void plushMain();
+
 extern void __stginit_Main(void);
 
 void reserveFileDescriptors() {

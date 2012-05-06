@@ -16,7 +16,6 @@ limitations under the License.
 
 module Plush.Job (
     -- * Shell Thread
-    prepProcess,
     startShell,
     ShellThread,
 
@@ -43,6 +42,7 @@ import Control.Monad (when)
 import Data.Aeson (Value)
 import System.IO
 import System.Posix
+import qualified System.Posix.Missing as PM
 
 import Plush.Job.Output
 import Plush.Run
@@ -84,26 +84,6 @@ data ShellThread = ShellThread
     }
 
 
--- Well known, preassigned file descriptors
-    -- TODO: We shouldn't have to do this, and should use the fcntl FD_DUP
-    -- to duplicate them up out of the way without clobbering anything that
-    -- might be there already.
-origInFd, origOutFd, origErrFd, devNullFd :: Fd
-(origInFd, origOutFd, origErrFd, devNullFd) = (20, 21, 22, 23)
-
--- | Prepare the process environment. This must happen first, before the web
--- server is created, as the process needs to have some resources (notably
--- file descriptors) reserved before other code can use them.
-prepProcess :: IO ()
-prepProcess = do
-    _ <- dupTo stdInput origInFd
-    _ <- dupTo stdOutput origOutFd
-    _ <- dupTo stdError origErrFd
-
-    nfd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
-    when (nfd /= devNullFd) $ dupTo nfd devNullFd >> closeFd nfd
-    mapM_ (dupTo devNullFd) [0..9] -- reserve the low FDs, yes, this is insane
-
 
 -- | Start the shell as an indpendent thread, which will process jobs and
 -- report on their status.
@@ -114,18 +94,29 @@ prepProcess = do
 -- communicate to the original streams.
 startShell :: Runner -> IO (ShellThread, Handle, Handle)
 startShell runner = do
+    _origInFd <- PM.dupFdCloseOnExec stdInput upperFd
+    origOutFd <- PM.dupFdCloseOnExec stdOutput upperFd
+    origErrFd <- PM.dupFdCloseOnExec stdError upperFd
+
+    nfd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
+    devNullFd <- PM.dupFdCloseOnExec nfd upperFd
+    closeFd nfd
+    mapM_ (dupTo devNullFd) [0..9] -- reserve the low FDs, yes, this is insane
+
     origStdOut <- fdToHandle origOutFd
     origStdErr <- fdToHandle origErrFd
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
-    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar runner
+    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar devNullFd runner
 
     return (ShellThread jobRequestVar scoreBoardVar, origStdOut, origStdErr)
+  where
+    upperFd = Fd 20
 
 
-shellThread :: MVar Request -> MVar ScoreBoard -> Runner -> IO ()
-shellThread jobRequestVar scoreBoardVar = go
+shellThread :: MVar Request -> MVar ScoreBoard -> Fd -> Runner -> IO ()
+shellThread jobRequestVar scoreBoardVar devNullFd = go
   where
     go runner = do
 

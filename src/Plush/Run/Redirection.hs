@@ -19,6 +19,7 @@ module Plush.Run.Redirection (
     )
     where
 
+import Control.Applicative ((<$>))
 import Control.Monad.Error
 import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
@@ -87,15 +88,8 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode
-withRedirection = withRedirection' $ map Fd [25..]
-    -- TODO: This isn't safe if any redirection can use descriptors in this
-    -- range, or if openFd ends up using this range
-
-
-withRedirection' :: (PosixLike m) => [Fd] -> [Redirect] -> ShellExec m ExitCode
-    -> ShellExec m ExitCode
-withRedirection' _ [] act = act
-withRedirection' (saveFd:sfds) (r:rs) act = do
+withRedirection [] act = act
+withRedirection (r:rs) act = do
     errOrPrim <- mkPrim r
     case errOrPrim of
         Left err -> exitMsg 125 err
@@ -104,32 +98,26 @@ withRedirection' (saveFd:sfds) (r:rs) act = do
             fileFd <- openFd fp om mfm off
             dupTo fileFd destFd
             closeFd fileFd
-            withRedirection' sfds rs act
+            withRedirection rs act
 
         Right (RedirDup destFd srcFd) -> saveAway destFd $ do
             dupTo srcFd destFd
-            withRedirection' sfds rs act
+            withRedirection rs act
 
         Right (RedirClose destFd) -> saveAway destFd $ do
             safeCloseFd destFd
-            withRedirection' sfds rs act
+            withRedirection rs act
 
   where
     saveAway destFd inner = do
-        moved <- (dupTo destFd saveFd >> return True)
-                    `catchError` (\_ -> return False)
-        if moved
-            then do
-                setCloseOnExec saveFd
-                a <- inner
-                dupTo saveFd destFd
-                closeFd saveFd
-                return a
-            else do
-                a <- inner
-                safeCloseFd destFd
-                return a
+        moved <- (Just <$> dupFdCloseOnExec destFd safeFdArea)
+                    `catchError` (\_ -> return Nothing)
+        a <- inner -- TODO: should catch errors here
+        case moved of
+            Just savedFd -> dupTo savedFd destFd >> closeFd savedFd
+            Nothing      -> safeCloseFd destFd
+        return a
 
     safeCloseFd fd = closeFd fd `catchError` (\_ -> return ())
+    safeFdArea = 30 -- minimum Fd to use for storing away Fds
 
-withRedirection' [] _ _ = undefined -- never happens since first arg is infinite

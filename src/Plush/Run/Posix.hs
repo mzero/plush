@@ -77,6 +77,7 @@ import qualified System.IO as IO
 import qualified System.IO.Error as IO
 import qualified System.Posix as P
 import qualified System.Process as IO
+import qualified System.Posix.Missing as PM
 
 
 -- | The low-level operations that make up the Posix interface.
@@ -127,6 +128,7 @@ class (Functor m, Monad m, MonadError IOError m,
     closeFd :: Fd -> m ()
 
     dupTo :: Fd -> Fd -> m ()
+    dupFdCloseOnExec :: Fd -> Fd -> m Fd
     setCloseOnExec :: Fd -> m ()
     -- ^ Convenience @setCloseOnExec fd -> 'setFdOption' fd 'CloseOnExec' 'True'@
 
@@ -194,6 +196,7 @@ instance PosixLike IO where
     write = ioWrite
 
     dupTo a b = P.dupTo a b >> return ()
+    dupFdCloseOnExec = PM.dupFdCloseOnExec
     setCloseOnExec fd = P.setFdOption fd P.CloseOnExec True
 
     getUserHomeDirectoryForName s =

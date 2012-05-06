@@ -82,6 +82,7 @@ Executable plush
     Plush.Types
     Plush.Types.CommandSummary
     Plush.Utilities
+    System.Posix.Missing
 
   Build-depends:
     aeson >= 0.5.0 && < 0.7,
@@ -120,6 +121,9 @@ Executable plush
 Executable recho
   Main-is: Recho.hs
   hs-source-dirs: src
+
+  Other-modules:
+    System.Posix.Missing
 
   Build-depends:
     aeson >= 0.5.0 && < 0.7,
