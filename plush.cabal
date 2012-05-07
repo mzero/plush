@@ -22,6 +22,7 @@ Data-files:
   static/js/app.build.js
   static/js/collections/*.js
   static/js/libs/backbone/*.js
+  static/js/libs/hterm/*.js
   static/js/libs/jquery/*.js
   static/js/libs/require/*.js
   static/js/libs/underscore/*.js

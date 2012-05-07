@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['keys', 'history', 'cwd', 'jquery'], function(keys, historyApi, cwd, $){
+define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi, cwd, $){
   "use strict";
   
   var key = (function initializeKey() {
@@ -67,7 +67,21 @@ define(['keys', 'history', 'cwd', 'jquery'], function(keys, historyApi, cwd, $){
     where.removeClass('running complete').addClass(cls);
   }
   
+  function addVTOutput(job, cls, txt) {
+    var where = $('#' + job);
+    if (where.length != 1) { return; }
+    var node = $('<div></div>', { 'class': cls })
+    node.appendTo(where);
+    var term = new hterm.Terminal();
+    term.setAutoCarriageReturn(true);
+    term.decorate(node.get(0));
+    term.interpret(txt);
+    totalHeight += node.outerHeight();
+    scrollback.animate({scrollTop: totalHeight });
+  }
+
   function addOutput(job, cls, txt) {
+    if (txt.match('\u001b[\[]')) return addVTOutput(job, cls, txt);
     var where = $('#' + job);
     if (where.length != 1) { where = scrollback; }
     var node = $('<pre></pre>', { 'class': cls }).text(txt);
