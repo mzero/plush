@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-module Main (main) where
+module Plush.Utilities (
+    readUtf8File,
+    )
+    where
 
-import Plush.Main
+import System.IO
 
--- | This is never actually called. See src/main.c for the actual main function.
--- that function also calls 'plushMain', but does so after some preparation of
--- the execution state prior to GHC's RTS initialization.
---
--- This file is required, as cabal passes a single Haskell file to GHC's -make
--- mode, and that needs a "Main" module. The GHC flag -no-hs-main is used to
--- ensure that GHC doesn't output a C main function, and ours can be linked in
--- without conflict.
-main :: IO ()
-main = plushMain
+-- | Lazily get a text file's contents as with 'readFile', but assume its
+-- contents are encoded with UTF-8 regardless of the user's current locale.
+readUtf8File :: FilePath -> IO String
+readUtf8File path = do
+    h <- openFile path ReadMode
+    hSetEncoding h utf8
+    hGetContents h

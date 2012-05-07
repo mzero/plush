@@ -19,6 +19,7 @@ limitations under the License.
 module Plush.Server.API (
     runApp,
     pollApp,
+    inputApp,
     )
     where
 
@@ -116,3 +117,31 @@ pollApp shellThread _req = do
     reportOi job (OiJsonOut vs) = ReportJsonOut job vs
 
 
+
+data OfferInput = OfferInput JobName String Bool
+instance FromJSON OfferInput where
+    parseJSON (Object v) = OfferInput
+        <$> v .: "job"
+        <*> v .:? "input" .!= ""
+        <*> v .:? "eof" .!= True
+    parseJSON _ = mzero
+
+
+data NullResponse = NullResponse
+instance ToJSON NullResponse where
+    toJSON NullResponse = toJSON ()
+
+-- | Offer input to a running job.
+-- @/j/@ is a string to identify the job. @/s/@ is the input. If the @eof@
+-- flag is set, it is sent after the input (which can be the empty string).
+--
+-- @{ job: /j/, input: /s/, eof: /bool/}@
+--
+-- [Response]
+-- Replies with null
+--
+-- @null /or/ { }@
+inputApp :: ShellThread -> JsonApplication OfferInput NullResponse
+inputApp shellThread (OfferInput job input eof) = do
+    liftIO $ offerInput shellThread job input eof
+    returnJson NullResponse

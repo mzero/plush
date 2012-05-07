@@ -26,6 +26,9 @@ module Plush.Job (
     submitJob,
     reviewJobs,
 
+    -- * Job Input
+    offerInput,
+
     -- * Job Output
     OutputItem(..),
     gatherOutput,
@@ -35,13 +38,15 @@ module Plush.Job (
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
+import Control.Monad (when)
 import Data.Aeson (Value)
 import System.IO
 import System.Posix
+import qualified System.Posix.Missing as PM
 
 import Plush.Job.Output
 import Plush.Run
-import Plush.Run.Posix (stdJsonOutput)
+import Plush.Run.Posix (stdJsonOutput, toByteString, write)
 import Plush.Run.ShellExec
 import Plush.Types
 
@@ -56,7 +61,8 @@ data OutputItem = OiStdOut String | OiStdErr String | OiJsonOut [Value]
 -- | An opaque type, holding information about a running job.
 -- See 'gatherOutput'
 data RunningState = RS {
-       rsStdOut :: OutputStream Char
+       rsStdIn :: Fd -- | this is the FD to write to inject into FD
+     , rsStdOut :: OutputStream Char
      , rsStdErr :: OutputStream Char
      , rsJsonOut :: OutputStream Value
      }
@@ -77,6 +83,8 @@ data ShellThread = ShellThread
     , stScoreBoard :: MVar ScoreBoard
     }
 
+
+
 -- | Start the shell as an indpendent thread, which will process jobs and
 -- report on their status.
 --
@@ -86,35 +94,50 @@ data ShellThread = ShellThread
 -- communicate to the original streams.
 startShell :: Runner -> IO (ShellThread, Handle, Handle)
 startShell runner = do
-    origStdOut <- dupTo stdOutput 10 >>= fdToHandle
-    origStdErr <- dupTo stdError 11 >>= fdToHandle
+    _origInFd <- PM.dupFdCloseOnExec stdInput upperFd
+    origOutFd <- PM.dupFdCloseOnExec stdOutput upperFd
+    origErrFd <- PM.dupFdCloseOnExec stdError upperFd
 
-    rs <- RS <$> (pipeFor stdOutput >>= outputStreamUtf8)
-             <*> (pipeFor stdError >>= outputStreamUtf8)
-             <*> (pipeFor stdJsonOutput >>= outputStreamJson)
+    nfd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
+    devNullFd <- PM.dupFdCloseOnExec nfd upperFd
+    closeFd nfd
+    mapM_ (dupTo devNullFd) [0..9] -- reserve the low FDs, yes, this is insane
+
+    origStdOut <- fdToHandle origOutFd
+    origStdErr <- fdToHandle origErrFd
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
-    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar rs runner
+    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar devNullFd runner
 
     return (ShellThread jobRequestVar scoreBoardVar, origStdOut, origStdErr)
   where
-    pipeFor destFd = do
-        (readFd, writeFd) <- createPipe
-        _ <- dupTo writeFd destFd
-        closeFd writeFd
-        return readFd
+    upperFd = Fd 20
 
 
-shellThread :: MVar Request -> MVar ScoreBoard -> RunningState -> Runner -> IO ()
-shellThread jobRequestVar scoreBoardVar rs = go
+shellThread :: MVar Request -> MVar ScoreBoard -> Fd -> Runner -> IO ()
+shellThread jobRequestVar scoreBoardVar devNullFd = go
   where
     go runner = do
+
         (j, cl) <- takeMVar jobRequestVar
+
+        writeToInput       <- inPipeFor stdInput
+        readFromOutput     <- outPipeFor stdOutput
+        readFromError      <- outPipeFor stdError
+        readFromJsonOutput <- outPipeFor stdJsonOutput
+
+        rs <- RS writeToInput
+                 <$> outputStreamUtf8 readFromOutput
+                 <*> outputStreamUtf8 readFromError
+                 <*> outputStreamJson readFromJsonOutput
+
         modifyMVar_ scoreBoardVar $ \sb ->
             return $ (j, Running rs) : sb
+
         runner' <- runCommandList cl runner
         (exitStatus, runner'') <- run getLastExitCode runner'
+
         modifyMVar_ scoreBoardVar $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
@@ -122,7 +145,16 @@ shellThread jobRequestVar scoreBoardVar rs = go
                     oi <- gatherOutput rs'
                     return $ (j, JobDone exitStatus oi):sb'
                 _ -> return sb
+
+        mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
+        mapM_ (\fd -> closeFd fd `catch` const (return ()))
+          [ writeToInput, readFromOutput, readFromError, readFromJsonOutput ]
+
         go runner''
+
+    inPipeFor destFd = createPipe  >>= \(r, w) -> r `moveTo` destFd >> return w
+    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
+    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
 -- | Submit a job for processing.
@@ -149,6 +181,19 @@ findJob :: JobName -> ScoreBoard -> (Maybe Status, ScoreBoard)
 findJob j ((j',s):sbs) | j == j' = (Just s,sbs)
 findJob j (sb:sbs) = let (s,sbs') = findJob j sbs in (s,sb:sbs')
 findJob _ [] = (Nothing,[])
+
+
+-- | Give input to a running job. If the job isn't running, then the input is
+-- dropped on the floor. The boolean indicates if EOF should be signaled after
+-- the input is sent.
+offerInput :: ShellThread -> JobName -> String -> Bool -> IO ()
+offerInput st job input eof = modifyMVar_ (stScoreBoard st) $ \sb -> do
+    case findJob job sb of
+        (Just (Running rs), _) -> do  -- TODO: should catch errors here
+            when (not $ null input) $ write (rsStdIn rs) $ toByteString input
+            when eof $ closeFd (rsStdIn rs)
+        _ -> return ()
+    return sb
 
 -- | Gather as much output is available from stdout, stderr, and jsonout.
 gatherOutput :: RunningState -> IO [OutputItem]

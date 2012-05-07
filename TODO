@@ -9,15 +9,26 @@ Plush Milestones and User Stories
 == User Stories ==
 --- for milestone 1 ---
 control-C plush itself
+
+three-phase collapsing job panes
+input to running commands
+indication of input line or command input
+vt100 support
+peel-off
+backgrounding
+deal with pty issues
+
 tab completion of file names
 tab completion of commands
+environment vars on command line:  foo=bar cmd args
+command history review and re-entry
+
+
 auto-less: long output is placed in 3-state div
   (collapsed to 1 line, 10 lines w/scroller, full)
 support the exit command
-environment vars on command line:  foo=bar cmd args
 ~ expansion
 pipes
-command history review and re-entry
 
 --- for milestone 2 ---
 ls returns file objects

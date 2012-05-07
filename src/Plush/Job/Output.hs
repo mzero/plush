@@ -59,7 +59,9 @@ parseAvailable p0 = go
   where
     go s p | B.null s = (p, [])
     go s p = case p s of
-        A.Fail s' _ _ -> go s' p0  -- TODO: what about errors?
+        A.Fail _s' _ _ -> (p0, [])  -- on error, drop this whole buffer
+            -- TODO: during errors we may want to try to resync by
+            -- chopping off the first byte of _s' and trying again
         A.Partial f -> (f, [])
         A.Done s' v -> second (v:) $ go s' p0
 
@@ -128,7 +130,7 @@ getAvailable (OutputStream fd p0 mv) = do
 
 -- | Read all available bytes from a file descriptor.
 readAvailable :: Fd -> IO B.ByteString -- TODO: should merge with parsing logic
-readAvailable fd = go [] >>= return . B.concat
+readAvailable fd = go [] >>= return . B.concat . reverse
   where
     go bs = next >>= maybe (return bs) (go . (:bs))
     next = readBuf `catchError` (\_ -> return Nothing)

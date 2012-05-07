@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language TypeSynonymInstances, TypeFamilies #-}
+{-# Language TypeSynonymInstances, TypeFamilies, FlexibleInstances #-}
 
 module Plush.Run.TestExec (
     TestState(), initialTestState,
@@ -194,6 +194,9 @@ canonicalizePath ts fp = parts $ reducePath $ tsWorkingDir ts </> fp
     parts [n] = (n, ".", n) -- relative paths should never happen
     parts (n:ns) = let dp = joinPath (reverse ns) in (dp </> n, dp, n)
 
+nextFreeAfter :: I.IntMap a -> I.Key -> Int
+nextFreeAfter m i = if i `I.notMember` m then i else nextFreeAfter m (succ i)
+
 -- Test Execution Monad
 
 type TestExec = ErrorT IOError (State TestState)
@@ -270,8 +273,15 @@ instance PosixLike TestExec where
 
     readAll fd = runFdPrim "readAll" fd $ \_s _fds desc -> fdReadAll desc
     write fd bs = runFdPrim "write" fd $ \_s _fds desc -> fdWrite desc bs
-    dupTo fdFrom fdTo = runFdPrim "dupTo" fdFrom $ \s fds desc -> do
-        lift $ put s { tsFDescs = I.insert (fromIntegral fdTo) desc fds }
+    dupTo fdFrom fdTo =
+        runFdPrim "dupTo" fdFrom $ \s fds desc ->
+            lift $ put s { tsFDescs = I.insert (fromIntegral fdTo) desc fds }
+    dupFdCloseOnExec fdFrom fdMin =
+        runFdPrim "dupFdCloseOnExec" fdFrom $ \s fds desc ->
+            let dest = nextFreeAfter fds $ fromIntegral fdMin
+            in lift $ do
+                put s { tsFDescs = I.insert dest desc fds }
+                return $ fromIntegral dest
 
     setCloseOnExec _ = return ()
 
