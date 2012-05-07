@@ -1,0 +1,10 @@
+Version of workspace file format:
+               1
+Time of storage:
+               "Sun May  6 13:26:52 PDT 2012"
+Name of the workspace:
+               "plush"
+File paths of contained packages:
+               ["plush.cabal"]
+Maybe file path of an active package:
+               Just "plush.cabal"
