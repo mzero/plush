@@ -123,7 +123,7 @@ instance FromJSON OfferInput where
     parseJSON (Object v) = OfferInput
         <$> v .: "job"
         <*> v .:? "input" .!= ""
-        <*> v .:? "eof" .!= True
+        <*> v .:? "eof" .!= False
     parseJSON _ = mzero
 
 

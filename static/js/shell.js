@@ -68,21 +68,46 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     where.removeClass('running complete').addClass(cls);
   }
   
-  function addVTOutput(job, cls, txt) {
+  var terminals = {};
+  
+  function addVTOutput(job, txt) {
     var where = $('#' + job);
     if (where.length != 1) { return; }
-    var node = $('<div></div>', { 'class': cls })
+    var node = $('<div></div>', { 'class': 'terminal' })
     node.appendTo(where);
     var term = new hterm.Terminal();
     term.setAutoCarriageReturn(true);
     term.decorate(node.get(0));
+    term.setFontSize(13);
+    term.setWidth(80);
+    term.setHeight(24);   
     term.interpret(txt);
+    var sendInput = function(s) {
+      console.log("sending terminal input of", s);
+      api('input', {job: job, input: s}, function(){});
+    };
+    term.io.onVTKeystroke = sendInput;
+    term.io.sendString = sendInput;
+    term.installKeyboard();
+    terminals[job] = term;
     totalHeight += node.outerHeight();
     scrollback.animate({scrollTop: totalHeight });
   }
+  
+  function removeVTOutput(job) {
+    if (job in terminals) {
+      terminals[job].uninstallKeyboard();
+      $('#'+job + ' .terminal').remove();
+      delete terminals[job];
+    }
+  }
 
   function addOutput(job, cls, txt) {
-    if (txt.match('\u001b[\[]')) return addVTOutput(job, cls, txt);
+    if (job in terminals) {
+      return terminals[job].interpret(txt);
+    } else if (txt.match('\u001b[\[]')) {
+      return addVTOutput(job, txt);
+    }
     var where = $('#' + job);
     if (where.length != 1) { where = scrollback; }
     var node = $('<pre></pre>', { 'class': cls }).text(txt);
@@ -221,6 +246,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         else {
           if (job !== 'ctx') {
             setJobClass(job, d.exitcode == 0 ? "complete" : "failed");
+            removeVTOutput(job);
             jobsDone = true;
           }
         }

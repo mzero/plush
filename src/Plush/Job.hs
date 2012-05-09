@@ -122,15 +122,18 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
 
         (j, cl) <- takeMVar jobRequestVar
 
-        writeToInput       <- inPipeFor stdInput
-        readFromOutput     <- outPipeFor stdOutput
-        readFromError      <- outPipeFor stdError
+        (master1, slave1) <- openPseudoTerminal
+        (master2, slave2) <- openPseudoTerminal
+        _ <- slave1 `dupTo` stdInput
+        slave1 `moveTo` stdOutput
+        slave2 `moveTo` stdError
+
         readFromJsonOutput <- outPipeFor stdJsonOutput
 
-        rs <- RS writeToInput
-                 <$> outputStreamUtf8 readFromOutput
-                 <*> outputStreamUtf8 readFromError
-                 <*> outputStreamJson readFromJsonOutput
+        rs <- RS master1
+                <$> outputStreamUtf8 master1
+                <*> outputStreamUtf8 master2
+                <*> outputStreamJson readFromJsonOutput
 
         modifyMVar_ scoreBoardVar $ \sb ->
             return $ (j, Running rs) : sb
@@ -148,11 +151,10 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
 
         mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
         mapM_ (\fd -> closeFd fd `catch` const (return ()))
-          [ writeToInput, readFromOutput, readFromError, readFromJsonOutput ]
+          [ master1, master2, readFromJsonOutput ]
 
         go runner''
 
-    inPipeFor destFd = createPipe  >>= \(r, w) -> r `moveTo` destFd >> return w
     outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
     srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
