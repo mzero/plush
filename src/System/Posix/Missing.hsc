@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
-
 module System.Posix.Missing (
     dupFd, dupFdCloseOnExec
     ) where
 
 import Foreign.C
 import System.Posix
+import System.Posix.Internals
 
 #include "HsUnix.h"
 
@@ -40,6 +39,3 @@ dupFdViaFcntl :: CInt -> Fd -> Fd -> IO Fd
 dupFdViaFcntl op (Fd srcFd) (Fd minFd) = Fd `fmap`
   throwErrnoIfMinus1 "dupFdViaFcntl"
                       (c_fcntl_write srcFd op (fromIntegral minFd))
-
-foreign import ccall unsafe "HsBase.h fcntl_write"
-   c_fcntl_write :: CInt -> CInt -> CLong -> IO CInt
