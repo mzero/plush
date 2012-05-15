@@ -32,8 +32,13 @@ dupFd = dupFdViaFcntl (#const F_DUPFD)
 
 -- | Same as 'dupFd', but the 'CloseOnExec' flag (FD_CLOEXEC) will be set.
 dupFdCloseOnExec :: Fd -> Fd -> IO Fd
-dupFdCloseOnExec = dupFdViaFcntl (#const F_DUPFD_CLOEXEC)
-
+-- dupFdCloseOnExec = dupFdViaFcntl (#const F_DUPFD_CLOEXEC)
+    -- While this is POSIX, is is relatively new, and many systems do not
+    -- support this operation. The following code simulates it.
+dupFdCloseOnExec src base = do
+    dest <- dupFd src base
+    setFdOption dest CloseOnExec True
+    return dest
 
 dupFdViaFcntl :: CInt -> Fd -> Fd -> IO Fd
 dupFdViaFcntl op (Fd srcFd) (Fd minFd) = Fd `fmap`

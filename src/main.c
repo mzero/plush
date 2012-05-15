@@ -27,7 +27,7 @@ extern void plushMain();
 extern void __stginit_Main(void);
 
 void reserveFileDescriptors() {
-    int nullFd = open("/dev/null", O_RDWR | O_CLOEXEC);
+    int nullFd = open("/dev/null", O_RDWR);
     int f;
     for (f = 3; f <= 9; f++) {
         dup2(nullFd, f);
