@@ -27,7 +27,10 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   })();
   
   var screen = $('#screen');
-  var scrollback = $('#scrollback');  
+  var scrollback = $('#scrollback');
+  var jobProto = scrollback.children('.job.proto').detach();
+  jobProto.removeClass('proto');
+
   var totalHeight = screen.outerHeight();
   function repeat(s,n) {
     while (s.length < n) { s = s + s; }
@@ -46,18 +49,25 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   
   function addJobDiv(cmd) {
     var job = "job" + (++jobCount);
-    var node = $('<div></div>', { 'id': job, 'class': 'job' });
-    node.bind('click', function() {
-        if($(this).children(":nth-child(2)").is(':hidden')) {
-          $('#scrollback .job').children(":nth-child(2)").slideUp(); 
-          $(this).children(":nth-child(2)").slideDown('normal');
-        }
-    });
+    var node = jobProto.clone();
+    node.attr('id', job);
+    var input = node.children('.stdin');
+    var output = node.children('.output-container');
     node.appendTo(scrollback);
+    input.text(cmd);
 
-    // Folding
-    $('#scrollback .job').children(":nth-child(2)").slideUp();
-    node.children(":first").slideDown('normal');
+    node.find('.view-hide').bind('click', function() {
+      output.attr('class', 'output-container output-hide');
+    });
+    node.find('.view-line').bind('click', function() {
+      output.attr('class', 'output-container output-line');
+    });
+    node.find('.view-page').bind('click', function() {
+      output.attr('class', 'output-container output-page');
+    });
+    node.find('.view-full').bind('click', function() {
+      output.attr('class', 'output-container output-full');
+    });
 
     return job;
   }
@@ -71,7 +81,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   var terminals = {};
   
   function addVTOutput(job, txt) {
-    var where = $('#' + job);
+    var where = $('#' + job + ' .output');
     if (where.length != 1) { return; }
     var node = $('<div></div>', { 'class': 'terminal' })
     node.appendTo(where);
@@ -108,9 +118,9 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     } else if (txt.match('\u001b[\[]')) {
       return addVTOutput(job, txt);
     }
-    var where = $('#' + job);
+    var where = $('#' + job + ' .output');
     if (where.length != 1) { where = scrollback; }
-    var node = $('<pre></pre>', { 'class': cls }).text(txt);
+    var node = $('<span></span>', { 'class': cls }).text(txt);
     node.appendTo(where);
     totalHeight += node.outerHeight();
     scrollback.animate({scrollTop: totalHeight });
@@ -279,7 +289,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     };
     
     var job = addJobDiv(cmd);
-    addOutput(job, 'stdin', cmd);
     that.val('');
     historyApi.add(cmd);
     $('#annotations').text('')

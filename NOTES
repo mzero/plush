@@ -7,6 +7,20 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 
 
 == TODO ==
+
+[x] all output in one collapsable thang
+[x] don't collapse automatically
+[x] collapse control
+    [x] four states: collapsed, 3-line, screen, expanded
+[] input area while running
+    [] add while running
+    [] remove while done
+    [] send control-d button (?)
+[] kill button as part of input area
+    [] send quit, kill signals
+
+
+
 [] summary information should come from utilAnnotate, not annotate
 
 [] add completion support

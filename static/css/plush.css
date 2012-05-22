@@ -81,7 +81,7 @@ div.maia-breadcrumb {
 #scrollback {
   overflow: auto;
   position: absolute;
-  top: 0;
+  top: 0.75em;
   bottom: 2.5em;
   left: 0.5em;
   right: 0.5em;
@@ -453,9 +453,6 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 .job > * {
   margin-top: 0.5em;
   margin-left: 1.5em;
-  padding-left: 1em;
-  color: #5e5e5e;
-  border-left: 1px solid #c0c0c0;
 }
 
 .job > .stdin {
@@ -464,19 +461,70 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
   padding-left: 0;
   font-style: italic;
   color: #035590;
-  border-left: none;
 }
 
-.job > .stdout {
-  color: #5e5e5e;
+.job > .output-container {
+  color: #3f3f3f;
+  background: #eef1f7;
+}
+.job > .output-container hr {
+  border: none;
+  border-top: 1px dashed #5b89e6;
 }
 
-.job > .stderr {
+.job > .output-hide {
+}
+.job > .output-hide .output {
+  display: none;
+}
+.job > .output-line {
+  max-height: 1.75em;
+  overflow: auto;
+}
+.job > .output-page {
+  max-height: 30em;
+  overflow: auto;
+}
+.job > .output-full {
+}
+
+.job .output {
+  padding: 0.25em 0 0.25em 1em;
+  border: 1px solid #c0c0c0;
+  border-right: none;
+}
+.job .stdout {
+  color: #3f3f3f;
+}
+
+.job .stderr {
   color: #bd1c10;
 }
 
-.job > .error {
+.job .error {
   color: #bd1c10;
+}
+
+.job .view-controls {
+  float: right;
+  width: 6em;
+  font-family: "Courier New", Courier, mono;
+}
+
+ul.horiz-menu {
+  list-style: none;
+}
+
+ul.horiz-menu li {
+  display: inline-block;  
+}
+
+.view-controls button {
+  width: 1em;
+  height: 1em;
+  color: #5b89e6;
+  background-color: #eef1f7;
+  border: none;
 }
 
 #annotations {
