@@ -51,11 +51,10 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     var job = "job" + (++jobCount);
     var node = jobProto.clone();
     node.attr('id', job);
-    var input = node.children('.stdin');
-    var output = node.children('.output-container');
+    node.find('.command').text(cmd);
     node.appendTo(scrollback);
-    input.text(cmd);
 
+    var output = node.find('.output-container');
     node.find('.view-hide').bind('click', function() {
       output.attr('class', 'output-container output-hide');
     });
@@ -69,7 +68,27 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
       output.attr('class', 'output-container output-full');
     });
 
+    var sender = function(s) {
+      api('input', {job: job, input: s}, function() {});
+    };
+
+    var input = node.find('.input-container');
+    input.find('input').keyup(function(e) {
+      if (e.keyCode == 13) {
+        var s = $(this).val() + '\n';
+        sender(s);
+        $(this).val('');
+      }  
+    });
+    input.find('.send-eof').bind('click', function() { sender('\x04'); });
+    input.find('.send-sigint').bind('click', function() { sender('\x03'); });
+    input.find('.send-sigquit').bind('click', function() { sender('\x1C'); });
+
     return job;
+  }
+
+  function removeJobInput(job) {
+    $('#'+job + ' .input-container').remove();
   }
   
   function setJobClass(job, cls) {
@@ -81,6 +100,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   var terminals = {};
   
   function addVTOutput(job, txt) {
+    removeJobInput(job);
     var where = $('#' + job + ' .output');
     if (where.length != 1) { return; }
     var node = $('<div></div>', { 'class': 'terminal' })
@@ -93,7 +113,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     term.setHeight(24);   
     term.interpret(txt);
     var sendInput = function(s) {
-      console.log("sending terminal input of", s);
       api('input', {job: job, input: s}, function(){});
     };
     term.io.onVTKeystroke = sendInput;
@@ -256,6 +275,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         else {
           if (job !== 'ctx') {
             setJobClass(job, d.exitcode == 0 ? "complete" : "failed");
+            removeJobInput(job);
             removeVTOutput(job);
             jobsDone = true;
           }

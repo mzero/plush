@@ -505,11 +505,49 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
   color: #bd1c10;
 }
 
+.job > .input-container {
+  color: #3f3f3f;
+  background: #eef1f7;
+  margin-top: 0;
+  position: relative;
+  height: 1.9em;
+  border: none;
+  border-bottom: 1px solid #c0c0c0;
+}
+.input-container input {
+  height: 1.5em;
+  color: #035590;
+  background: none;
+  position: absolute;
+  top: 0;
+  right: 8em;
+  left: 0;
+  margin: 0;
+  padding: 0.25em 6em 0.25em 1em;
+  border: none;
+  border-left: 8px solid #c0c0c0;
+  padding-left: 5px;
+  font-family: monospace;
+  font-size: 100%;
+}
+.input-container input:focus {
+  outline: none;
+  border-left-color: #ff9134;
+}
+
 .job .view-controls {
   float: right;
   width: 6em;
   font-family: "Courier New", Courier, mono;
 }
+
+.job .input-controls {
+  float: right;
+  width: 7em;
+  padding-top: 0.25em;
+  z-index: 1;
+}
+
 
 ul.horiz-menu {
   list-style: none;
@@ -519,14 +557,23 @@ ul.horiz-menu li {
   display: inline-block;  
 }
 
+.horiz-menu button {
+  border: none;
+  color: #5b89e6;
+  background-color: #eef1f7;
+  cursor: pointer;
+}
+.horiz-menu button:hover {
+  color: #ff9134;
+}
+
 .view-controls button {
   width: 1em;
   height: 1em;
-  color: #5b89e6;
-  background-color: #eef1f7;
-  border: none;
 }
-
+.input-controls button {
+  padding-left: 1em;
+}
 #annotations {
   position: absolute;
   right: 0;
