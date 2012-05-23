@@ -75,3 +75,41 @@ processAssignment (Assignment name w) = do
     setVarEntry name (VarShellOnly, VarReadWrite, v)
     -- TODO: doesn't respect the modifiers on the var, if any
 
+
+
+data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
+  deriving (Eq, Ord, Bounded)
+
+instance Monoid ExecuteType where
+  mempty = ExecuteForeground
+  mappend = min
+  mconcat [] = mempty
+  mconcat es = minimum es
+
+execType :: CommandList -> ShellExec m ExecuteType
+execType cl = typeCommandList cl
+  where
+    execCommandList = mconcat <$> mapM typeCommandItem
+
+    typeCommandItem (ao, Sequential) = typeAndOr ao
+    typeCommandItem (_, Background) = ExecuteBackground
+
+    typeAndOr ao = mconcat <$> mapM (\(_, (_, p)) -> typePipe p) ao
+
+    typePipe = mconcat <$> mapM typeCommand
+
+    typeCommand (Command [] _ _) = ExecuteForeground
+    typeCommand (Command ws _ _) =
+        expandAndSplit ws >>= typeFields
+
+    typeFields [] = ExecuteForeground
+    typeFields (cmd:_) = (typeFound . fst) <$> commandSearch cmd
+
+    typeFound SpecialCommand = ExecuteForeground
+    typeFound DirectCommand = ExecuteForeground
+    typeFound BuiltInCommand = ExecuteMidground
+    typeFound ExecutableCommand = ExecuteMidground
+    typeFound UnknownCommand = ExecuteForeground
+
+
+
