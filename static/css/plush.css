@@ -451,8 +451,7 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 }
 
 .job > * {
-  margin-top: 0.5em;
-  margin-left: 1.5em;
+  margin: 0.5em 1.5em 0;
 }
 
 .job > .stdin {
@@ -466,26 +465,36 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 .job > .output-container {
   color: #3f3f3f;
   background: #eef1f7;
-}
-.job > .output-container hr {
-  border: none;
-  border-top: 1px dashed #5b89e6;
+  transition: all 0.125s ease-in-out;
+  -webkit-transition: all 0.125s ease-in-out;
+  -moz-transition: all 0.125s ease-in-out;
 }
 
 .job > .output-hide {
 }
 .job > .output-hide .output {
   display: none;
+  max-height: 0;
 }
-.job > .output-line {
-  max-height: 1.75em;
+.job > .output-tiny {
+  max-height: 4em;
   overflow: auto;
 }
 .job > .output-page {
-  max-height: 30em;
+  max-height: 25em;
   overflow: auto;
 }
 .job > .output-full {
+  max-height: 1000000em;
+}
+
+.job.max-hide .view-tiny,
+.job.max-hide .view-page,
+.job.max-hide .view-full,
+.job.max-tiny .view-page,
+.job.max-tiny .view-full,
+.job.max-page .view-full {
+  display: none;
 }
 
 .job .output {

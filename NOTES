@@ -12,12 +12,19 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 [x] don't collapse automatically
 [x] collapse control
     [x] four states: collapsed, 3-line, screen, expanded
+    [] only show, enable states as there is enough input to support it
+    [] show at least the non-zero state while running
+    [] auto expand to at most the screen state while running
+    [] auto reduce to zero at done if no output
+    
 [] input area while running
-    [] add while running
-    [] remove while done
-    [] send control-d button (?)
-[] kill button as part of input area
-    [] send quit, kill signals
+    [x] add while running
+    [x] remove while done
+    [] send specials:
+        INTR -> ^C -> send SIGINT signal (2)
+        QUIT -> ^\ -> send SIGQUIT signal (3)
+        EOF -> ^D -> immediately process pending input, potential read of 0 bytes
+        SUSP -> ^Z -> send SIGTSTP signal (18)
 
 
 

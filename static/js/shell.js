@@ -30,11 +30,19 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   var scrollback = $('#scrollback');
   var jobProto = scrollback.children('.job.proto').detach();
   jobProto.removeClass('proto');
+  var commandline = $('#commandline');
 
-  var totalHeight = screen.outerHeight();
   function repeat(s,n) {
     while (s.length < n) { s = s + s; }
     return s.substr(0,n);
+  }
+
+  function countOccurances(s, c) {
+    var l=c.length;
+    var n=-1;
+    var p=0;
+    do { p=s.indexOf(c,p)+l; n++; } while (p>0);
+    return n;
   }
 
   function repeatSpan(s,n) {
@@ -46,6 +54,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
 
   var jobCount = 0;
   var foregroundJob = null;
+  var jobstate = {}
   
   function addJobDiv(cmd) {
     var job = "job" + (++jobCount);
@@ -55,25 +64,14 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     node.appendTo(scrollback);
 
     var output = node.find('.output-container');
-    node.find('.view-hide').bind('click', function() {
-      output.attr('class', 'output-container output-hide');
-    });
-    node.find('.view-line').bind('click', function() {
-      output.attr('class', 'output-container output-line');
-    });
-    node.find('.view-page').bind('click', function() {
-      output.attr('class', 'output-container output-page');
-    });
-    node.find('.view-full').bind('click', function() {
-      output.attr('class', 'output-container output-full');
-    });
 
     var sender = function(s) {
       api('input', {job: job, input: s}, function() {});
     };
 
     var input = node.find('.input-container');
-    input.find('input').keyup(function(e) {
+    var inputField = input.find('input');
+    inputField.keyup(function(e) {
       if (e.keyCode == 13) {
         var s = $(this).val() + '\n';
         sender(s);
@@ -83,22 +81,80 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     input.find('.send-eof').bind('click', function() { sender('\x04'); });
     input.find('.send-sigint').bind('click', function() { sender('\x03'); });
     input.find('.send-sigquit').bind('click', function() { sender('\x1C'); });
+    inputField.focus();
 
+    var j = {
+      node: node,
+
+      output: output,
+      outputArea: output.find('.output'),
+      lastOutputSpan: null,
+      lastOutputType: null,
+      linesOutput: 0,
+      newlinesOutput: 0,
+      terminal: null,
+      maxState: null,
+
+      input: input,
+    }
+
+    node.find('.view-hide').bind('click', function() { sizeOutput(j, 'hide'); });
+    node.find('.view-tiny').bind('click', function() { sizeOutput(j, 'tiny'); });
+    node.find('.view-page').bind('click', function() { sizeOutput(j, 'page'); });
+    node.find('.view-full').bind('click', function() { sizeOutput(j, 'full'); });
+
+    jobstate[job] = j;
     return job;
   }
 
+  var LINES_IN_TINY = 3;
+  var LINES_IN_PAGE = 24;
+
+  function sizeOutput(j, m) {
+    j.output.removeClass('output-hide output-tiny output-page output-full');
+    j.output.addClass('output-' + m);
+  }
+  function adjustOutput(j) {
+    var n = j.linesOutput;
+    if (n == 0 && j.input) n = 1;
+
+    var m, s;
+    if (n == 0)                   m = s = 'hide';
+    else if (n <= LINES_IN_TINY)  m = s = 'tiny';
+    else if (n <= LINES_IN_PAGE)  m = s = 'page';
+    else                          { m = 'full'; s = 'page'; }
+
+    if (j.terminal) {
+      m = 'full';
+      s = 'full';
+    }
+
+    if (j.maxState !== m) {
+      j.node.removeClass('max-hide max-tiny max-page max-full');
+      j.node.addClass('max-' + m);
+      sizeOutput(j, s);
+    }
+  }
   function removeJobInput(job) {
-    $('#'+job + ' .input-container').remove();
+    if (job in jobstate) {
+      var j = jobstate[job];
+      var input = j.input;
+      if (input) {
+        input.remove();
+        j.input = null;
+        adjustOutput(j);
+      }
+    }
+    commandline.focus();
   }
   
   function setJobClass(job, cls) {
-    var where = $('#' + job);
-    if (where.length != 1) { return; }
-    where.removeClass('running complete').addClass(cls);
+    if (job in jobstate) {
+      var node = jobstate[job].node;
+      node.removeClass('running complete').addClass(cls);
+    }
   }
-  
-  var terminals = {};
-  
+    
   function addVTOutput(job, txt) {
     removeJobInput(job);
     var where = $('#' + job + ' .output');
@@ -118,43 +174,60 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     term.io.onVTKeystroke = sendInput;
     term.io.sendString = sendInput;
     term.installKeyboard();
-    terminals[job] = term;
-    totalHeight += node.outerHeight();
-    scrollback.animate({scrollTop: totalHeight });
+    jobstate[job].terminal = term;
+    jobstate[job].terminalNode = node;
+    adjustOutput(jobstate[job]);
+    node.get(0).scrollIntoView(true);
   }
   
   function removeVTOutput(job) {
-    if (job in terminals) {
-      terminals[job].uninstallKeyboard();
-      $('#'+job + ' .terminal').remove();
-      delete terminals[job];
+    if (job in jobstate) {
+      var j = jobstate[job];
+      if (j.terminal) {
+        j.terminal.uninstallKeyboard();
+        j.terminal = null;
+        j.terminalNode.remove();
+        j.terminalNode = null;
+      }
     }
   }
 
   function addOutput(job, cls, txt) {
-    if (job in terminals) {
-      return terminals[job].interpret(txt);
-    } else if (txt.match('\u001b[\[]')) {
-      return addVTOutput(job, txt);
+    if (job in jobstate) {
+      var j = jobstate[job];
+      if (j.terminal) {
+        return j.terminal.interpret(txt);
+      } else if (txt.match('\u001b[\[]')) {
+        return addVTOutput(job, txt);
+      }
+
+      if (j.lastOutputType == cls && j.lastOutputSpan) {
+        j.lastOutputSpan.append(document.createTextNode(txt));
+      }
+      else {
+        j.lastOutputType = cls;
+        j.lastOutputSpan = $('<span></span>', { 'class': cls }).text(txt);
+        j.lastOutputSpan.appendTo(j.outputArea);
+      }
+      j.newlinesOutput += countOccurances(txt, '\n');
+      j.linesOutput = j.newlinesOutput + (txt[txt.length-1] === '\n' ? 0 : 1);
+      adjustOutput(j);
+      j.lastOutputSpan.get(0).scrollIntoView(false);
+    } else {
+      var node = $('<span></span>', { 'class': cls }).text(txt);
+      node.appendTo(scrollback);
+      node[0].scrollIntoView(true);
     }
-    var where = $('#' + job + ' .output');
-    if (where.length != 1) { where = scrollback; }
-    var node = $('<span></span>', { 'class': cls }).text(txt);
-    node.appendTo(where);
-    totalHeight += node.outerHeight();
-    scrollback.animate({scrollTop: totalHeight });
-    // TODO(jasvir): Almost certainly the wrong place to do this
-    // $("#commandline")[0].scrollIntoView(true);
   }
   
   function updateContext(ctx) {
     if (ctx.cwd) {
-      var partialCmd = $('#commandline').val();
+      var partialCmd = commandline.val();
       $('#context-cwd').empty().append(
         cwd.parseToDom(ctx.cwd,
           function(event) { 
-            runCommand($('#commandline'), "cd " + event.data.dir); 
-            $('#commandline').val(partialCmd);
+            runCommand(commandline, "cd " + event.data.dir); 
+            commandline.val(partialCmd);
           })
       );
     }
@@ -313,7 +386,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     historyApi.add(cmd);
     $('#annotations').text('')
     api('run', {job: job, cmd: cmd}, cmdResult);
-    $("#commandline").focus();
     foregroundJob = job;
   }
 
@@ -322,7 +394,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   }
 
   var checkTimer = null;
-  $('#commandline').keyup(function(e) {
+  commandline.keyup(function(e) {
     if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
     keys(e, {
       runCommand: runCommand,
@@ -349,7 +421,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   }
   
   function runComplete() {
-    var cmd = $('#commandline').val();
+    var cmd = commandline.val();
     cmd.replace(/'/g,"'\\''");
     cmd = "complete '" + cmd + "'";
     api('run', {job: 'comp', cmd: cmd}, cmdResult);
