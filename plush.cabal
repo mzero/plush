@@ -45,7 +45,7 @@ Extra-source-files:
 
 Executable plush
   Main-is: Main.hs
-  
+
   hs-source-dirs: src
 
   Other-modules:
@@ -91,7 +91,7 @@ Executable plush
     base == 4.*,
     blaze-builder >= 0.3.0 && < 0.4,
     bytestring >= 0.9.1 && < 0.10,
-    conduit >= 0.1.1 && < 0.2,
+    conduit >= 0.1.1 && < 0.5,
     containers >= 0.4.0 && < 0.5,
     directory >= 1.0.1 && < 1.2,
     filepath >= 1.2.0 && < 1.4,
@@ -107,14 +107,14 @@ Executable plush
     text >= 0.11.1 && < 1.12,
     unix >= 2.4.0 && < 2.6,
     unordered-containers >= 0.1.4 && < 0.2,
-    wai >= 1.0.0 && < 1.1,
-    wai-middleware-static >= 0.0.1 && < 0.1,
+    wai >= 1.0.0 && < 1.3,
+    wai-middleware-static >= 0.0.1 && < 0.2,
     wai-middleware-route >= 0.2.0 && < 0.3,
-    warp >= 1.0.0 && < 1.1
+    warp >= 1.0.0 && < 1.3
 
   C-sources:
     src/main.c
-    
+
   ghc-options: -no-hs-main -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
 
 
