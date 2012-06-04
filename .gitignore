@@ -2,3 +2,4 @@ dist
 Setup.lhs
 SourceGraph
 *.lkshs
+cabal-dev
