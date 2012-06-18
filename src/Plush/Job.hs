@@ -40,13 +40,16 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
 import Control.Monad (when)
 import Data.Aeson (Value)
+import System.Exit
 import System.IO
 import System.Posix
 import qualified System.Posix.Missing as PM
 
 import Plush.Job.Output
 import Plush.Run
-import Plush.Run.Posix (stdJsonOutput, toByteString, write)
+import Plush.Run.Execute
+import Plush.Run.Posix (decodeExitCode, encodeExitCode,
+    stdJsonOutput, toByteString, write)
 import Plush.Run.ShellExec
 import Plush.Types
 
@@ -65,6 +68,7 @@ data RunningState = RS {
      , rsStdOut :: OutputStream Char
      , rsStdErr :: OutputStream Char
      , rsJsonOut :: OutputStream Value
+     , rsCheckDone :: IO ()
      }
 
 -- | A job can be in one of these states:
@@ -119,8 +123,7 @@ shellThread :: MVar Request -> MVar ScoreBoard -> Fd -> Runner -> IO ()
 shellThread jobRequestVar scoreBoardVar devNullFd = go
   where
     go runner = do
-
-        (j, cl) <- takeMVar jobRequestVar
+        request <- takeMVar jobRequestVar
 
         (master1, slave1) <- openPseudoTerminal
         (master2, slave2) <- openPseudoTerminal
@@ -130,17 +133,60 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
 
         readFromJsonOutput <- outPipeFor stdJsonOutput
 
-        rs <- RS master1
+        frs <- RS master1
                 <$> outputStreamUtf8 master1
                 <*> outputStreamUtf8 master2
                 <*> outputStreamJson readFromJsonOutput
 
+        let closeMasters = mapM_ (\fd -> closeFd fd `catch` const (return ()))
+                                [ master1, master2, readFromJsonOutput ]
+
+        runner' <- runJob scoreBoardVar request frs closeMasters runner
+
+        mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
+
+
+        go runner'
+
+    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
+    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
+
+
+runJob :: MVar ScoreBoard -> Request -> (IO () -> RunningState) ->  IO ()
+    -> Runner -> IO Runner
+runJob scoreBoardVar (j, cl) frs closeMs r0 = do
+    (et, r1) <- run (execType cl) r0
+    case et of
+        ExecuteForeground -> foreground r1
+        ExecuteMidground  -> background r1
+        ExecuteBackground -> foreground r1 -- TODO: fix!
+  where
+    foreground runner = do
+        setUp (return ())
+        (exitStatus, runner') <- runCommand runner
+        cleanUp exitStatus
+        return runner'
+
+    background runner = do
+        pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . encodeExitCode . fst)
+        setUp $ checkUp pid
+        return runner
+
+    runCommand runner = runCommandList cl runner >>= run getLastExitCode
+
+    setUp checker = do
         modifyMVar_ scoreBoardVar $ \sb ->
-            return $ (j, Running rs) : sb
+            return $ (j, Running $ frs checker) : sb
 
-        runner' <- runCommandList cl runner
-        (exitStatus, runner'') <- run getLastExitCode runner'
+    checkUp pid = do
+        mStat <- getProcessStatus False False pid
+        case mStat of
+            Nothing             -> return ()
+            Just (Exited ec)    -> cleanUp $ decodeExitCode ec
+            Just (Terminated _) -> cleanUp 129
+            Just (Stopped _)    -> return ()
 
+    cleanUp exitStatus = do
         modifyMVar_ scoreBoardVar $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
@@ -148,15 +194,8 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
                     oi <- gatherOutput rs'
                     return $ (j, JobDone exitStatus oi):sb'
                 _ -> return sb
+        closeMs
 
-        mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
-        mapM_ (\fd -> closeFd fd `catch` const (return ()))
-          [ master1, master2, readFromJsonOutput ]
-
-        go runner''
-
-    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
-    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
 -- | Submit a job for processing.
@@ -170,11 +209,16 @@ submitJob st job cl = putMVar (stJobRequest st) (job, cl)
 --
 -- N.B.: Done jobs are removed from internal book-keeping once reviewed.
 reviewJobs :: ShellThread -> (JobName -> Status -> IO a) -> IO [a]
-reviewJobs st act = modifyMVar (stScoreBoard st) $ \sb -> do
-    r <- mapM (uncurry act) sb
-    return (filter running sb, r)
+reviewJobs st act = do
+    readMVar (stScoreBoard st) >>= sequence_ . map checker
+    modifyMVar (stScoreBoard st) $ \sb -> do
+        r <- mapM (uncurry act) sb
+        return (filter running sb, r)
   where
-    running (_, (JobDone _ _)) = False
+    checker (_, Running rs) = rsCheckDone rs
+    checker _ = return ()
+
+    running (_, JobDone _ _) = False
     running _ = True
 
 -- | Find a job by name in a 'ScoreBoard'. Returns the first 'Status' found,

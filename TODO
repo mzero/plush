@@ -1,59 +1,60 @@
 Plush Milestones and User Stories
 
 == Milestones ==
-1: Use it ourselves
-2: Show it to hterm & plash developers
-3: Demo it at Beer & Demos
+1: Demo it at Beer & Demos
 
 
 == User Stories ==
 --- for milestone 1 ---
-control-C plush itself
++ pipes
++ three-phase collapsing job panes
++ input to running commands
++ auto-less: long output is placed in 3-state div
+  (collapsed to 1 line, 10 lines w/scroller, full)
++ pass input to non-full screen, interactive commands
 
-three-phase collapsing job panes
-input to running commands
+midground tasks, with live output
+auto-midground tasks (if not shell affecting)
 indication of input line or command input
+throttle client side probing
+
 vt100 support
-peel-off
-backgrounding
+run vi
+
 deal with pty issues
+  no way to quit/kill a task probably due to process groups
 
 tab completion of file names
 tab completion of commands
-environment vars on command line:  foo=bar cmd args
 command history review and re-entry
-
-
-auto-less: long output is placed in 3-state div
-  (collapsed to 1 line, 10 lines w/scroller, full)
-support the exit command
 ~ expansion
-pipes
 
---- for milestone 2 ---
+--- laters ---
+tab completion of options
+peel-off
+ls status pane: view of current directory
+
+cd stack: current dir indicator has a pop-up list of prior and likely cd targets
+  - selecting one cds there (entering command into history)
+cd by double clicking on file icon (from ls json out)
+
+support the exit command
+environment vars on command line:  foo=bar cmd args
+control-C plush itself
+
+less plush enabled: pager in the page
 ls returns file objects
   files shown as icons
   hovering gives info
   hover & space gives preview
   preview: text, html, images
-background tasks, with live output
-auto-background long tasks (if not shell affecting)
-less plush enabled: pager in the page
-ls status pane: view of current directory
-cd stack: current dir indicator has a pop-up list of prior and likely cd targets
-  - selecting one cds there (entering command into history)
-cd by double clicking on file icon (from ls json out)
+find returns file objects (!)
 
---- for milestone 3 ---
-run vi
-tab completion of options
-
---- laters ---
+backgrounding
 kill background tasks
 suspend background tasks
-pass input to non-full screen, interactive commands
 pass input to background tasks
-find returns file objects (!)
+
 backtick commands
 >>= operator on command line:  a >>= b  is   a | xargs b
   - json based support?

@@ -53,7 +53,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   }
 
   var jobCount = 0;
-  var foregroundJob = null;
   var jobstate = {}
   
   function addJobDiv(cmd) {
@@ -315,7 +314,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     var jobsRunning = false;
     var jobsDone = false;
 
-    foregroundJob = null;
     data.forEach(function(d) {
       var job = ('job' in d) ? d.job : "unknown";
 
@@ -343,7 +341,6 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         if (d.running) {
           setJobClass(job, "running");
           jobsRunning = true;
-          foregroundJob = job;
         }
         else {
           if (job !== 'ctx') {
@@ -372,21 +369,11 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   }
 
   function runCommand(that, cmd, e) {
-    // TODO: this isn't really the right place for this code
-    if (foregroundJob) {
-        var eof = cmd == "EOF";
-        var input = eof ? "" : cmd + "\n";
-        api('input', {job: foregroundJob, input: input, eof: eof}, function(){});
-        that.val('');
-        return;
-    };
-    
     var job = addJobDiv(cmd);
     that.val('');
     historyApi.add(cmd);
     $('#annotations').text('')
     api('run', {job: job, cmd: cmd}, cmdResult);
-    foregroundJob = job;
   }
 
   function poll() {

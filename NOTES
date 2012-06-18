@@ -12,11 +12,11 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 [x] don't collapse automatically
 [x] collapse control
     [x] four states: collapsed, 3-line, screen, expanded
-    [] only show, enable states as there is enough input to support it
-    [] show at least the non-zero state while running
-    [] auto expand to at most the screen state while running
-    [] auto reduce to zero at done if no output
-    
+    [x] only show, enable states as there is enough input to support it
+    [x] show at least the non-zero state while running
+    [x] auto expand to at most the screen state while running
+    [x] auto reduce to zero at done if no output
+
 [] input area while running
     [x] add while running
     [x] remove while done
@@ -35,7 +35,7 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 [] styling
     [] when to use monospace, when not?
     [] is OpenSans worth the load time and internet dependence?
-    
+
 [] setAnno needs writing...
 
 [] need to capture control-c now! (or implement exit)
@@ -59,15 +59,15 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 [] set -j for jsonin, jsonout pipes (as well as STDJSON env var. to signal)
     [] or should we just always do it?
 
-[] input handling (how?)
+[x] input handling (how?)
 
-[] pseudo-tty for in/out
-    [] but if we do this, we won't be able to tell stdout from stderr?
+[x] pseudo-tty for in/out
+    [x] but if we do this, we won't be able to tell stdout from stderr?
 
 [] normalize where to import <$> form: Data.Functor or Control.Applicative
     [] use it instead of fmap (or even liftM?) on monadic actions
 
-
+[] normalize on using System.Exit's ExitCode type for process result
 
 
 == POSIX Shell Features ==
@@ -143,22 +143,22 @@ PED     -
 P       $
 P       !
 P       0
-        
+
 flags
         allexport   -a
         errexit     -e
 u       hashall     -h
-        ignoreeof   
+        ignoreeof
         interactive -i
         monitor     -m
         noclobber   -C
         noexec      -n
         noglob      -f
-        nolog       
+        nolog
         notify      -b
         nounset     -u
         verbose     -v
-u       vi          
+u       vi
         xtrace      -x
 
 
@@ -309,7 +309,7 @@ six cases:
     regular built-in
     executable
     script
-    
+
 
 == Completion ==
 Things that can be completed:
@@ -319,57 +319,80 @@ Things that can be completed:
     words in assignment right hand sides
     words in redirection right hand sides (for some redir types)
     variable names in parameter words
-    
+
     word as expanded or word as entered?
     command specific completions?
-    
-    
+
+
     bash completes:
         $xxx as a variable
         ~xxx as a user name
         @xxx as a host name
         command name (if first word?)
         file name
-        
+
         bash basically runs EITHER command driven completion - OR default
         never both!
-        
+
         plenty of corner cases!!!
-    
-    Annotations / Complettion    
+
+    Annotations / Complettion
     type=option
         description=
-    
+
     type=file/dir/path
         status={...}
-    
+
     type=string
-    
+
     type=integer
         min=
         max=
-    
+
     type=oneof
         choices=[...]
-    
+
     type=someof
         choices=[...]
         separator=
-    
+
     Annotation = Option { description :: Maybe Text }
                | Path { description :: Maybe Text, status :: Stat }
                | String { descirption :: Maybe Text }
                | Integer { description :: Maybe Text }
-    
+
     Completion = OneOf { choices :: [(String,Text)] }
                | SomeOf { choices :: [(String,Text)], separator: String }
                | Path { namePattern :: Maybe String,
                         disposition :: Disposition,
                         pathType :: PathType }
-    
+
     [String] -> [(Annotation, m Completion)]
-    
+
     DescriptionAnno Text
     PosixLikeFilestatus s => PathInfoAnno s
-    
-    
+
+
+--------------
+Setting up Jenkins build
+
+compiler is an axis with values like:
+    ghc-6.12.3
+    ghc-7.0.3
+    ghc-7.2.1
+    ghc-7.4.1
+
+the build script is something like:
+    cabal install -w $compiler --only-dependencies --enable-tests
+    cabal clean
+    cabal configure -w $compiler --enable-tests
+    cabal build
+    cabal test --test-option=--plain
+    cabal sdist
+OR
+    cabal install -w $compiler --only-dependencies
+    cabal clean
+    cabal configure -w $compiler
+    cabal build
+    cabal sdist
+

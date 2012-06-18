@@ -52,6 +52,7 @@ module Plush.Run.Posix (
 
     -- * Misc
     stdJsonInput, stdJsonOutput,
+    encodeExitCode, decodeExitCode,
 ) where
 
 import Control.Applicative ((<$>))

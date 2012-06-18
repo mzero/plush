@@ -16,11 +16,15 @@ limitations under the License.
 
 module Plush.Run.Execute (
     shellExec,
+
+    ExecuteType(..),
+    execType,
     )
 where
 
 import Control.Monad
 import Data.Functor
+import Data.Monoid
 
 import Plush.Run.Command
 import Plush.Run.Expansion
@@ -86,30 +90,29 @@ instance Monoid ExecuteType where
   mconcat [] = mempty
   mconcat es = minimum es
 
-execType :: CommandList -> ShellExec m ExecuteType
-execType cl = typeCommandList cl
+
+execType :: (PosixLike m) => CommandList -> ShellExec m ExecuteType
+execType = typeCommandList
   where
-    execCommandList = mconcat <$> mapM typeCommandItem
+    typeCommandList cl = mconcat <$> mapM typeCommandItem cl
 
     typeCommandItem (ao, Sequential) = typeAndOr ao
-    typeCommandItem (_, Background) = ExecuteBackground
+    typeCommandItem (_, Background) = return ExecuteBackground
 
     typeAndOr ao = mconcat <$> mapM (\(_, (_, p)) -> typePipe p) ao
 
-    typePipe = mconcat <$> mapM typeCommand
+    typePipe p = mconcat <$> mapM typeCommand p
 
-    typeCommand (Command [] _ _) = ExecuteForeground
+    typeCommand (Command [] _ _) = return ExecuteForeground
     typeCommand (Command ws _ _) =
         expandAndSplit ws >>= typeFields
 
-    typeFields [] = ExecuteForeground
+    typeFields [] = return ExecuteForeground
     typeFields (cmd:_) = (typeFound . fst) <$> commandSearch cmd
 
     typeFound SpecialCommand = ExecuteForeground
     typeFound DirectCommand = ExecuteForeground
-    typeFound BuiltInCommand = ExecuteMidground
-    typeFound ExecutableCommand = ExecuteMidground
+    typeFound (BuiltInCommand _) = ExecuteMidground
+    typeFound (ExecutableCommand _) = ExecuteMidground
     typeFound UnknownCommand = ExecuteForeground
-
-
 
