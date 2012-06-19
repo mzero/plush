@@ -8,6 +8,14 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 
 == TODO ==
 
+[ ] auto scroll is wrong.  probably should not scroll if one command is running
+[ ] clear
+[ ] polling should not use setInterval but use setTimeout after every handling
+[ ] mouseover exit
+[ ] control c should work
+[ ] fix command history
+[ ] fix the pwd at the bottom of the screen
+
 [x] all output in one collapsable thang
 [x] don't collapse automatically
 [x] collapse control
