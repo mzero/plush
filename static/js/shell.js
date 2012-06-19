@@ -426,7 +426,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   
   function runComplete() {
     var cmd = commandline.val();
-    cmd.replace(/'/g,"'\\''");
+    cmd = cmd.replace(/'/g,"'\\''");
     cmd = "complete '" + cmd + "'";
     api('run', {job: 'comp', cmd: cmd}, cmdResult);
   }
