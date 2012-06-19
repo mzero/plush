@@ -23,11 +23,13 @@ module Plush.Server.API (
     )
     where
 
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>), (<*>), pure)
 import Control.Monad (mzero)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
+import qualified Data.Aeson.Types as AE
 import qualified Data.HashMap.Lazy as HM
+import qualified System.Posix.Signals as S
 
 import Plush.Job
 import Plush.Parser
@@ -118,12 +120,19 @@ pollApp shellThread _req = do
 
 
 
-data OfferInput = OfferInput JobName String Bool
+data OfferInput = OfferInput JobName String Bool (Maybe S.Signal)
 instance FromJSON OfferInput where
     parseJSON (Object v) = OfferInput
         <$> v .: "job"
         <*> v .:? "input" .!= ""
         <*> v .:? "eof" .!= False
+        <*> ((v .:? "signal") >>= maybe (pure Nothing) (fmap Just . sigName))
+      where
+        sigName :: String -> AE.Parser S.Signal
+        sigName "int" = pure S.keyboardSignal
+        sigName "quit" = pure S.keyboardTermination
+        sigName "kill" = pure S.killProcess
+        sigName _ = fail "unknown signal name"
     parseJSON _ = mzero
 
 
@@ -142,6 +151,6 @@ instance ToJSON NullResponse where
 --
 -- @null /or/ { }@
 inputApp :: ShellThread -> JsonApplication OfferInput NullResponse
-inputApp shellThread (OfferInput job input eof) = do
-    liftIO $ offerInput shellThread job input eof
+inputApp shellThread (OfferInput job input eof sig) = do
+    liftIO $ offerInput shellThread job input eof sig
     returnJson NullResponse

@@ -28,12 +28,13 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 [] input area while running
     [x] add while running
     [x] remove while done
-    [] send specials:
+    [x] send specials:
         INTR -> ^C -> send SIGINT signal (2)
         QUIT -> ^\ -> send SIGQUIT signal (3)
+        KILL -> send SIGKILL signal (9)
         EOF -> ^D -> immediately process pending input, potential read of 0 bytes
-        SUSP -> ^Z -> send SIGTSTP signal (18)
-
+    [] figure out why int and quit are ignored in the process
+    [] SUSP -> ^Z -> send SIGTSTP signal (18)
 
 
 [] summary information should come from utilAnnotate, not annotate

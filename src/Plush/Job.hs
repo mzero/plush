@@ -68,6 +68,7 @@ data RunningState = RS {
      , rsStdOut :: OutputStream Char
      , rsStdErr :: OutputStream Char
      , rsJsonOut :: OutputStream Value
+     , rsProcessID :: Maybe ProcessID
      , rsCheckDone :: IO ()
      }
 
@@ -152,7 +153,8 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
     srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
-runJob :: MVar ScoreBoard -> Request -> (IO () -> RunningState) ->  IO ()
+runJob :: MVar ScoreBoard -> Request
+    -> (Maybe ProcessID -> IO () -> RunningState) -> IO ()
     -> Runner -> IO Runner
 runJob scoreBoardVar (j, cl) frs closeMs r0 = do
     (et, r1) <- run (execType cl) r0
@@ -162,21 +164,21 @@ runJob scoreBoardVar (j, cl) frs closeMs r0 = do
         ExecuteBackground -> foreground r1 -- TODO: fix!
   where
     foreground runner = do
-        setUp (return ())
+        setUp Nothing (return ())
         (exitStatus, runner') <- runCommand runner
         cleanUp exitStatus
         return runner'
 
     background runner = do
         pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . encodeExitCode . fst)
-        setUp $ checkUp pid
+        setUp (Just pid) $ checkUp pid
         return runner
 
     runCommand runner = runCommandList cl runner >>= run getLastExitCode
 
-    setUp checker = do
+    setUp mpid checker = do
         modifyMVar_ scoreBoardVar $ \sb ->
-            return $ (j, Running $ frs checker) : sb
+            return $ (j, Running $ frs mpid checker) : sb
 
     checkUp pid = do
         mStat <- getProcessStatus False False pid
@@ -232,12 +234,15 @@ findJob _ [] = (Nothing,[])
 -- | Give input to a running job. If the job isn't running, then the input is
 -- dropped on the floor. The boolean indicates if EOF should be signaled after
 -- the input is sent.
-offerInput :: ShellThread -> JobName -> String -> Bool -> IO ()
-offerInput st job input eof = modifyMVar_ (stScoreBoard st) $ \sb -> do
+offerInput :: ShellThread -> JobName -> String -> Bool -> Maybe Signal -> IO ()
+offerInput st job input eof sig = modifyMVar_ (stScoreBoard st) $ \sb -> do
     case findJob job sb of
         (Just (Running rs), _) -> do  -- TODO: should catch errors here
             when (not $ null input) $ write (rsStdIn rs) $ toByteString input
             when eof $ closeFd (rsStdIn rs)
+            case (sig, rsProcessID rs) of
+                (Just s, Just p) -> signalProcess s p
+                _ -> return ()
         _ -> return ()
     return sb
 

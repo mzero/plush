@@ -67,6 +67,10 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     var sender = function(s) {
       api('input', {job: job, input: s}, function() {});
     };
+    var signaler = function(s) {
+      s = 'kill'; // TODO: remove this when int and quit work
+      api('input', {job: job, signal: s}, function() {});
+    };
 
     var input = node.find('.input-container');
     var inputField = input.find('input');
@@ -78,8 +82,9 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
       }  
     });
     input.find('.send-eof').bind('click', function() { sender('\x04'); });
-    input.find('.send-sigint').bind('click', function() { sender('\x03'); });
-    input.find('.send-sigquit').bind('click', function() { sender('\x1C'); });
+    input.find('.send-sigint').bind('click', function() { signaler('int'); });
+    input.find('.send-sigquit').bind('click', function() { signaler('quit'); });
+    input.find('.send-sigkill').bind('click', function() { signaler('kill'); });
     inputField.focus();
 
     var j = {
