@@ -376,9 +376,21 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     api('run', {job: job, cmd: cmd}, cmdResult);
   }
 
-  function poll() {
-    api('poll', null, pollResult);
-  }
+  var poll = (function () {
+    var runningOrScheduled = false;
+    return function poll() {
+      if (runningOrScheduled) {
+        return;
+      }
+      setTimeout(function () {
+        api('poll', null, function(data) {
+          pollResult(data);
+          runningOrScheduled = false;
+	});
+      }, 0);
+      runningOrScheduled = true;
+    };
+  })();
 
   var checkTimer = null;
   commandline.keyup(function(e) {
