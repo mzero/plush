@@ -70,7 +70,7 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
   where
     go "" [cmdline] = go' Nothing cmdline >>= jsonOut >> success
     go optC [cmdline] = case maybeRead optC of
-        Just n -> go' (Just (n :: Int)) cmdline >>= jsonOut >> success
+        Just n -> go' (Just n) cmdline >>= jsonOut >> success
         _ -> exitMsg 2 "non-numeric -c argument"
     go _ _ = exitMsg 1 "One argument only"
 
@@ -78,7 +78,7 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
         case parseNextCommand cmdline of
             Left errs -> return $ object [ "parseError" .= errs ]
             Right (cl, _rest) -> do
-                spans <- annotate cl
+                spans <- annotate cl optC
                 return $ object [ "spans" .= map jsonSpan spans ]
 
     jsonSpan (Span s e, annos) =
@@ -101,7 +101,8 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
                ]
     jsonAnno (OptionAnno d) =
         object [ "option" .= d ]
-
+    jsonAnno (Completions cs) =
+        object [ "completions" .= cs ]
     jsonAnno (UnusedAnno) =
         object [ "unused" .= True ]
 

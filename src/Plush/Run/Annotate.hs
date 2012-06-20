@@ -24,7 +24,7 @@ where
 import Control.Applicative ((<$>))
 import Data.List ((\\))
 import qualified Data.Map as M
-import Data.Maybe (maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 
 
 import Plush.Run.Command
@@ -36,8 +36,8 @@ import Plush.Types
 
 type Annotations = [(Location, [Annotation])]
 
-annotate :: (PosixLike m) => CommandList -> ShellExec m Annotations
-annotate cl = coallesce <$> annoCommandList cl
+annotate :: (PosixLike m) => CommandList -> Maybe Int -> ShellExec m Annotations
+annotate cl cursor = coallesce <$> annoCommandList cl
   where
     annoCommandList aos = concat <$> mapM annoCommandItem aos
     annoCommandItem (ao, _) = annoAndOr ao
@@ -57,7 +57,8 @@ annotate cl = coallesce <$> annoCommandList cl
                 argAnnos <- noteArgs ud args
                 return $ noteCommand cmd fc mcs ++ argAnnos
             _ -> return []
-        return $ cmdAnno ++ exAnnos
+        compAnnos <- catMaybes <$> mapM noteCompletion ws
+        return $ cmdAnno ++ exAnnos ++ compAnnos
 
     noteExpansion w = (location w, [ExpandedTo $ wordText w])
     noteCommand cmd fc mcs
@@ -69,6 +70,14 @@ annotate cl = coallesce <$> annoCommandList cl
       where
         locs = map location args
         getAnnos = utilAnnotate ud $ map quoteRemoval args
+
+    noteCompletion w = case (location w, cursor) of
+        (Span s e, Just c) | (s - 1) <= c && c < e -> do
+            comps <- compFiles . splitAt (c - s + 1) $ wordText w
+            return $ Just (location w, [Completions comps])
+        _ -> return Nothing
+      where
+        compFiles (pre, post) = map (++post) <$> (pathnameGlob $ pre ++ "*")
 
     coallesce = M.toAscList . M.fromListWith (++)
 

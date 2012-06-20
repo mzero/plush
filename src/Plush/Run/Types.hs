@@ -63,6 +63,7 @@ data FoundCommand = SpecialCommand
 
 
 data Annotation = ExpandedTo String
+                | Completions [String]
                 | FoundCommandAnno FoundCommand
                 | CommandSummaryAnno CommandSummary
                 | OptionAnno T.Text

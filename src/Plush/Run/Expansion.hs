@@ -19,6 +19,7 @@ module Plush.Run.Expansion (
     expandPassive,
     expandAndSplit,
     wordExpansionActive,
+    pathnameGlob,
     quoteRemoval,
     byPathParts,
     )
@@ -27,7 +28,6 @@ where
 import Control.Applicative ((<$>))
 import Control.Monad (foldM)
 import Control.Monad.Error.Class
-import Control.Monad.Trans.Class
 import Data.Char (isSpace)
 import Data.List (foldl', intercalate, partition, sort, tails)
 import System.FilePath (combine)
@@ -52,7 +52,7 @@ expandAndSplit w = map quoteRemoval <$> expandActive w
 expandActive :: (PosixLike m) => [Word] -> ShellExec m [Word]
 expandActive = expand True
 
--- | Like 'expandActive', only sub commands are run, nor any shell variables
+-- | Like 'expandActive', only sub commands are not run, nor any shell variables
 -- modified.
 expandPassive :: (PosixLike m) => [Word] -> ShellExec m [Word]
 expandPassive = expand False
@@ -136,14 +136,8 @@ fieldSplitting ifs = expandParts $
 
 
 
-data PatternPart = Literal Char | CharTest (Char -> Bool) | Star
-type Pattern = [PatternPart]
-data PatternAction = AddSlash | MatchContents Pattern
-type PathPattern = [PatternAction]
-
-
-pathnameExpansion :: (PosixLike m) => Word -> ShellExec m [Word]
-pathnameExpansion =  expandPartsM $ glob . compress
+pathnameExpansion :: (PosixLike m) => Word -> m [Word]
+pathnameExpansion =  origIfNull $ (expandPartsM $ glob . compress)
     -- TODO: should skip pathnameExpansion of shell flag -f is set
   where
     compress :: Parts -> Parts
@@ -151,14 +145,23 @@ pathnameExpansion =  expandPartsM $ glob . compress
     compress (p:ps) = p : compress ps
     compress [] = []
 
-    glob :: (PosixLike m) => Parts -> ShellExec m [Parts]
-    glob v@[(Bare s)] = case parse patP "" s of
-        Left _ -> return [v]
-        Right pp -> lift $ match v pp
-    glob v = return [v]
+    glob :: (PosixLike m) => Parts -> m [Parts]
+    glob [(Bare s)] = pathnameGlob s >>= return . map ((:[]).Bare)
+    glob _ = return []
 
-    match :: (PosixLike m) => Parts -> PathPattern -> m [Parts]
-    match orig ps = foldM steps [""] ps >>= return . origIfNull
+    origIfNull f a = (\bs -> if null bs then [a] else bs) <$> f a
+
+
+data PatternPart = Literal Char | CharTest (Char -> Bool) | Star
+type Pattern = [PatternPart]
+data PatternAction = AddSlash | MatchContents Pattern
+type PathPattern = [PatternAction]
+
+pathnameGlob :: (PosixLike m) => String -> m [String]
+pathnameGlob = either (\_err -> return []) match . parse patP ""
+  where
+    match :: (PosixLike m) => PathPattern -> m [String]
+    match = foldM steps [""]
       where
         steps fs p = concat `fmap` mapM (step p) fs
 
@@ -169,10 +172,6 @@ pathnameExpansion =  expandPartsM $ glob . compress
         step (AddSlash) path = do
             isDir <- doesDirectoryExist (if null path then "/" else path)
             return $ if isDir then [path ++ "/"] else []
-
-        origIfNull :: [FilePath] -> [Parts]
-        origIfNull [] = [orig]
-        origIfNull ws = map ((:[]) . Bare) ws
 
     patP =  many1 (slashP <|> matchP)
     slashP = char '/' >> return AddSlash

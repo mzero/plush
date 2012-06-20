@@ -287,6 +287,9 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         else if (anno.unused) {
           m += "unused";
         }
+        else if (anno.completions) {
+          m += ">> " + anno.completions.join(" | ");
+        }
         m += "\n";
       });
       
@@ -414,7 +417,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
       runCommand: runCommand,
       nextCommand: nextCommand,
       prevCommand: prevCommand,
-      default: function() { checkTimer = setTimeout(runComplete, 1000); }
+      default: function() { checkTimer = setTimeout(runComplete, 250); }
     })($(this), $(this).val());
   });
 
@@ -435,9 +438,11 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
   }
   
   function runComplete() {
-    var cmd = commandline.val();
-    cmd = cmd.replace(/'/g,"'\\''");
-    cmd = "complete '" + cmd + "'";
+    var input = commandline.val();
+    input = input.replace(/'/g,"'\\''");
+    var loc = commandline[0].selectionStart;
+    loc = (typeof loc === 'number') ? ' -c ' + loc : '';
+    var cmd = "complete" + loc + " '" + input + "'";
     api('run', {job: 'comp', cmd: cmd}, cmdResult);
   }
   
