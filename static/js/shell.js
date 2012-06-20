@@ -63,6 +63,16 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     node.appendTo(scrollback);
 
     var output = node.find('.output-container');
+    output.scroll(function() { 
+      // TODO(jasvir): Do the same for scrollBottom
+      if ($(this).scrollTop() === 0) {
+        $(this).css('-webkit-mask-image', 'none');
+      } else {
+        $(this).css('-webkit-mask-image', 
+		    '-webkit-gradient(linear, left top, 0 10, from(rgba(0,0,0,0)), to(rgba(0,0,0,1)))');
+      }
+    });
+
 
     var sender = function(s) {
       api('input', {job: job, input: s}, function() {});
