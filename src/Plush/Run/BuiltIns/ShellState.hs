@@ -28,6 +28,7 @@ import Data.Aeson
 import Data.Aeson.Types (Pair)
 import qualified Data.HashMap.Strict as M
 import Data.List (sort)
+import Data.Maybe (listToMaybe)
 
 import Plush.Parser
 import Plush.Run.Annotate
@@ -65,12 +66,15 @@ context = SpecialUtility . const $ Utility contextExec noArgsAnnotate
 
 
 complete :: (PosixLike m) => SpecialUtility m
-complete = SpecialUtility $ stdSyntax [] () go
+complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
   where
-    go _opts [cmdline] = go' cmdline >>= jsonOut >> success
+    go "" [cmdline] = go' Nothing cmdline >>= jsonOut >> success
+    go optC [cmdline] = case maybeRead optC of
+        Just n -> go' (Just (n :: Int)) cmdline >>= jsonOut >> success
+        _ -> exitMsg 2 "non-numeric -c argument"
     go _ _ = exitMsg 1 "One argument only"
 
-    go' cmdline =
+    go' optC cmdline =
         case parseNextCommand cmdline of
             Left errs -> return $ object [ "parseError" .= errs ]
             Right (cl, _rest) -> do
@@ -103,6 +107,10 @@ complete = SpecialUtility $ stdSyntax [] () go
 
     ct :: String -> Pair
     ct = ("commandType" .=)
+
+maybeRead :: (Read a) => String -> Maybe a
+maybeRead = listToMaybe . map fst . filter (null . snd) . reads
+
 
 -- | The set special built-in is a marvel:
 --
