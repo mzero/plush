@@ -2,21 +2,6 @@ Third Party Libs
 ----------------
 
 
-Backbone
-========
-
-URL: http://backbonejs.org/
-Version: 0.5.3
-License: MIT
-License File: LICENSE
-
-Description:
-JavaScript model/view framework.
-
-Local Modifications:
--none-
-
-
 jQuery
 ======
 

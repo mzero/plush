@@ -15,14 +15,9 @@
 require.config({
   paths: {
     jquery:     'libs/jquery/jquery',
-    jqueryui:     'libs/jqueryui-1.8.14/jqueryui',
-    underscore: 'libs/underscore/underscore',
-    backbone:   'libs/backbone/backbone',
-    text:       'libs/require/text',
-    templates:   '../templates'
+    underscore: 'libs/underscore/underscore'
   }
 });
 
-require(['app'], function(app) {
-    app.initialize();
+require(['shell'], function() {
 });
