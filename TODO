@@ -7,27 +7,28 @@ Plush Milestones and User Stories
 == User Stories ==
 --- for milestone 1 ---
 + pipes
++ ~ expansion
 + three-phase collapsing job panes
 + input to running commands
 + auto-less: long output is placed in 3-state div
   (collapsed to 1 line, 10 lines w/scroller, full)
 + pass input to non-full screen, interactive commands
 
-midground tasks, with live output
-auto-midground tasks (if not shell affecting)
-indication of input line or command input
-throttle client side probing
++ midground tasks, with live output
++ auto-midground tasks (if not shell affecting)
++ indication of input line or command input
++ throttle client side probing
+
++ deal with pty issues
+  + no way to quit/kill a task probably due to process groups
+
++ tab completion of file names
 
 vt100 support
 run vi
 
-deal with pty issues
-  no way to quit/kill a task probably due to process groups
-
-tab completion of file names
 tab completion of commands
 command history review and re-entry
-~ expansion
 
 --- laters ---
 tab completion of options

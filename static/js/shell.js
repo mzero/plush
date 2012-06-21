@@ -84,7 +84,7 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
 
     var input = node.find('.input-container');
     var inputField = input.find('input');
-    inputField.keyup(function(e) {
+    inputField.keydown(function(e) {
       if (e.keyCode == 13) {
         var s = $(this).val() + '\n';
         sender(s);
