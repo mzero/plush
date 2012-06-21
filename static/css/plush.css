@@ -602,7 +602,8 @@ ul.horiz-menu li {
   border-radius: 4px 4px;
   position: relative;
 }
-#annotations .message {
+#annotations .message,
+#annotations .completions {
   display: none;
   position: absolute;
   left: 0;
@@ -620,6 +621,10 @@ ul.horiz-menu li {
 }
 #annotations .annotation:hover .message {
   display: block;
+}
+#annotations .completions li:focus {
+  background-color: #c4d5ed;
+  color: #000;
 }
 
 #context {

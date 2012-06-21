@@ -240,7 +240,7 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
       $('#context-cwd').empty().append(
         cwd.parseToDom(ctx.cwd,
           function(event) { 
-            runCommand(commandline, "cd " + event.data.dir); 
+            runCommand("cd " + event.data.dir); 
             commandline.val(partialCmd);
           })
       );
@@ -260,14 +260,18 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     });
   }
   
+  var completionSpan = null;
+
   function updateAnnotations(comp) {
     var annoElem = $('#annotations');
     annoElem.empty();
-    
+    completionSpan = null;
+
     var i = 1;
     var spans = comp.spans || [];
     spans.forEach(function(span) {
       var m = "";
+      var c = [];
       span.annotations.forEach(function(anno) {
         if (anno.expansion) {
           m += 'expands to ' + anno.expansion;
@@ -288,13 +292,13 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
           m += "unused";
         }
         else if (anno.completions) {
-          m += ">> " + anno.completions.join(" | ");
+          c = c.concat(anno.completions);
         }
         m += "\n";
       });
       
       m = m.trim()
-      if (m) {
+      if (m || c.length) {
         if (i < span.start) {
           annoElem.append(repeatSpan(' ', span.start - i));
           i = span.start;
@@ -304,9 +308,23 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         annoElem.append(blockElem);
         i = span.end;
         
-        var msgElem = $('<span></span>', { "class": "message" });
-        msgElem.text(m);
-        blockElem.append(msgElem);
+        if (m) {
+          var msgElem = $('<span></span>', { "class": "message" });
+          msgElem.text(m);
+          blockElem.append(msgElem);
+        }
+
+        if (c.length) {
+          completionSpan = span;
+          var compElem = $('<ul></ul>', { "class": "completions" });
+          c.forEach(function(t) {
+            var textElem = $('<li></li>');
+            textElem.attr('tabindex', '100');
+            textElem.text(t);
+            compElem.append(textElem);
+          });
+          blockElem.append(compElem);
+        }
       }
     });
   }
@@ -378,20 +396,52 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
     }
   }
 
-  function prevCommand(that, cmd, e) {
-    that.val(historyApi.previous(cmd));
+  function prevCommand(e) {
+    commandline.val(historyApi.previous());
+    return false;
   }
 
-  function nextCommand(that, cmd, e) {
-    that.val(historyApi.next(cmd));
+  function nextCommand(e) {
+    commandline.val(historyApi.next());
+    return false;
   }
 
-  function runCommand(that, cmd, e) {
+  function startCompletions(e) {
+    $('.completions').show();
+    $('.completions li:first').focus();
+    return false;
+  }
+
+  function insertCompletion(completion) {
+    var input = commandline.val();
+    commandline.val(
+      input.substr(0, completionSpan.start - 1)
+      + completion
+      + input.substr(completionSpan.end - 1));
+  }
+
+  $('#input-area').on('keydown', '.completions', function(e) {
+    switch (e.keyCode) {
+      case 13:
+        insertCompletion($(e.target).text());
+        commandline.focus();
+        $('.completions').hide();
+        return false;
+    }
+  })
+
+  function runCommand(cmd) {
     var job = addJobDiv(cmd);
-    that.val('');
     historyApi.add(cmd);
-    $('#annotations').text('')
     api('run', {job: job, cmd: cmd}, cmdResult);
+  }
+
+  function runCommandline(e) {
+    var cmd = commandline.val();
+    commandline.val('');
+    $('#annotations').text('')
+    runCommand(cmd);
+    return false;
   }
 
   var poll = (function () {
@@ -404,21 +454,22 @@ define(['keys', 'history', 'cwd', 'jquery', 'hterm'], function(keys, historyApi,
         api('poll', null, function(data) {
           pollResult(data);
           runningOrScheduled = false;
-	});
+	      });
       }, 0);
       runningOrScheduled = true;
     };
   })();
 
   var checkTimer = null;
-  commandline.keyup(function(e) {
+  commandline.keydown(function(e) {
     if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
-    keys(e, {
-      runCommand: runCommand,
-      nextCommand: nextCommand,
-      prevCommand: prevCommand,
-      default: function() { checkTimer = setTimeout(runComplete, 250); }
-    })($(this), $(this).val());
+    switch (e.keyCode) {
+      case 9: return startCompletions(e)
+      case 13: return runCommandline(e);
+      case 38: return nextCommand(e);
+      case 40: return prevCommand(e);
+      default: checkTimer = setTimeout(runComplete, 250);
+    };
   });
 
   function runContext() {
