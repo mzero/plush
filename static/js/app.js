@@ -16,7 +16,6 @@ define(['jquery',
         'underscore',
         'backbone',
         'router',
-        'keys',
         'shell',
         'history'], function($, _, Backbone, router) {
 
