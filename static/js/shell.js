@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
+define(['history', 'cwd', 'jquery', 'Job'], function(historyApi, cwd, $, Job){
   "use strict";
-  
+
   var key = (function initializeKey() {
     var key = window.location.hash.slice(1);
     if ('' == key) {
@@ -25,11 +25,8 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
     window.location.hash = "";
     return key;
   })();
-  
+
   var screen = $('#screen');
-  var scrollback = $('#scrollback');
-  var jobProto = scrollback.children('.job.proto').detach();
-  jobProto.removeClass('proto');
   var commandline = $('#commandline');
 
   function repeat(s,n) {
@@ -37,13 +34,6 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
     return s.substr(0,n);
   }
 
-  function countOccurances(s, c) {
-    var l=c.length;
-    var n=-1;
-    var p=0;
-    do { p=s.indexOf(c,p)+l; n++; } while (p>0);
-    return n;
-  }
 
   function repeatSpan(s,n) {
     while (s.length < n) { s = s + s; }
@@ -52,195 +42,13 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
     return e;
   }
 
-  var jobCount = 0;
-  var jobstate = {}
-  
-  function addJobDiv(cmd) {
-    var job = "job" + (++jobCount);
-    var node = jobProto.clone();
-    node.attr('id', job);
-    node.find('.command').text(cmd);
-    node.appendTo(scrollback);
-
-    var output = node.find('.output-container');
-    output.scroll(function() { 
-      // TODO(jasvir): Do the same for scrollBottom
-      if ($(this).scrollTop() === 0) {
-        $(this).css('-webkit-mask-image', 'none');
-      } else {
-        $(this).css('-webkit-mask-image', 
-		    '-webkit-gradient(linear, left top, 0 10, from(rgba(0,0,0,0)), to(rgba(0,0,0,1)))');
-      }
-    });
-
-
-    var sender = function(s) {
-      api('input', {job: job, input: s}, function() {});
-    };
-    var signaler = function(s) {
-      s = 'kill'; // TODO: remove this when int and quit work
-      api('input', {job: job, signal: s}, function() {});
-    };
-
-    var input = node.find('.input-container');
-    var inputField = input.find('input');
-    inputField.keydown(function(e) {
-      if (e.keyCode == 13) {
-        var s = $(this).val() + '\n';
-        sender(s);
-        $(this).val('');
-      }  
-    });
-    input.find('.send-eof').bind('click', function() { sender('\x04'); });
-    input.find('.send-sigint').bind('click', function() { signaler('int'); });
-    input.find('.send-sigquit').bind('click', function() { signaler('quit'); });
-    input.find('.send-sigkill').bind('click', function() { signaler('kill'); });
-    inputField.focus();
-
-    var j = {
-      node: node,
-
-      output: output,
-      outputArea: output.find('.output'),
-      lastOutputSpan: null,
-      lastOutputType: null,
-      linesOutput: 0,
-      newlinesOutput: 0,
-      terminal: null,
-      maxState: null,
-
-      input: input,
-    }
-
-    node.find('.view-hide').bind('click', function() { sizeOutput(j, 'hide'); });
-    node.find('.view-tiny').bind('click', function() { sizeOutput(j, 'tiny'); });
-    node.find('.view-page').bind('click', function() { sizeOutput(j, 'page'); });
-    node.find('.view-full').bind('click', function() { sizeOutput(j, 'full'); });
-
-    jobstate[job] = j;
-    return job;
-  }
-
-  var LINES_IN_TINY = 3;
-  var LINES_IN_PAGE = 24;
-
-  function sizeOutput(j, m) {
-    j.output.removeClass('output-hide output-tiny output-page output-full');
-    j.output.addClass('output-' + m);
-  }
-  function adjustOutput(j) {
-    var n = j.linesOutput;
-    if (n == 0 && j.input) n = 1;
-
-    var m, s;
-    if (n == 0)                   m = s = 'hide';
-    else if (n <= LINES_IN_TINY)  m = s = 'tiny';
-    else if (n <= LINES_IN_PAGE)  m = s = 'page';
-    else                          { m = 'full'; s = 'page'; }
-
-    if (j.terminal) {
-      m = 'full';
-      s = 'full';
-    }
-
-    if (j.maxState !== m) {
-      j.node.removeClass('max-hide max-tiny max-page max-full');
-      j.node.addClass('max-' + m);
-      sizeOutput(j, s);
-    }
-  }
-  function removeJobInput(job) {
-    if (job in jobstate) {
-      var j = jobstate[job];
-      var input = j.input;
-      if (input) {
-        input.remove();
-        j.input = null;
-        adjustOutput(j);
-      }
-    }
-    commandline.focus();
-  }
-  
-  function setJobClass(job, cls) {
-    if (job in jobstate) {
-      var node = jobstate[job].node;
-      node.removeClass('running complete').addClass(cls);
-    }
-  }
-    
-  function addVTOutput(job, txt) {
-    removeJobInput(job);
-    var where = $('#' + job + ' .output');
-    if (where.length != 1) { return; }
-    var node = $('<div></div>', { 'class': 'terminal' })
-    node.appendTo(where);
-    var term = new hterm.Terminal();
-    term.setAutoCarriageReturn(true);
-    term.decorate(node.get(0));
-    term.setFontSize(13);
-    term.setWidth(80);
-    term.setHeight(24);   
-    term.interpret(txt);
-    var sendInput = function(s) {
-      api('input', {job: job, input: s}, function(){});
-    };
-    term.io.onVTKeystroke = sendInput;
-    term.io.sendString = sendInput;
-    term.installKeyboard();
-    jobstate[job].terminal = term;
-    jobstate[job].terminalNode = node;
-    adjustOutput(jobstate[job]);
-    node.get(0).scrollIntoView(true);
-  }
-  
-  function removeVTOutput(job) {
-    if (job in jobstate) {
-      var j = jobstate[job];
-      if (j.terminal) {
-        j.terminal.uninstallKeyboard();
-        j.terminal = null;
-        j.terminalNode.remove();
-        j.terminalNode = null;
-      }
-    }
-  }
-
-  function addOutput(job, cls, txt) {
-    if (job in jobstate) {
-      var j = jobstate[job];
-      if (j.terminal) {
-        return j.terminal.interpret(txt);
-      } else if (txt.match('\u001b[\[]')) {
-        return addVTOutput(job, txt);
-      }
-
-      if (j.lastOutputType == cls && j.lastOutputSpan) {
-        j.lastOutputSpan.append(document.createTextNode(txt));
-      }
-      else {
-        j.lastOutputType = cls;
-        j.lastOutputSpan = $('<span></span>', { 'class': cls }).text(txt);
-        j.lastOutputSpan.appendTo(j.outputArea);
-      }
-      j.newlinesOutput += countOccurances(txt, '\n');
-      j.linesOutput = j.newlinesOutput + (txt[txt.length-1] === '\n' ? 0 : 1);
-      adjustOutput(j);
-      j.lastOutputSpan.get(0).scrollIntoView(false);
-    } else {
-      var node = $('<span></span>', { 'class': cls }).text(txt);
-      node.appendTo(scrollback);
-      node[0].scrollIntoView(true);
-    }
-  }
-  
   function updateContext(ctx) {
     if (ctx.cwd) {
       var partialCmd = commandline.val();
       $('#context-cwd').empty().append(
         cwd.parseToDom(ctx.cwd,
-          function(event) { 
-            runCommand("cd " + event.data.dir); 
+          function(event) {
+            runCommand("cd " + event.data.dir);
             commandline.val(partialCmd);
           })
       );
@@ -352,12 +160,13 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
 
     data.forEach(function(d) {
       var job = ('job' in d) ? d.job : "unknown";
+      var j = Job.fromJob(job);
 
       if ('stdout' in d) {
-        addOutput(job, 'stdout', d.stdout);
+        j.addOutput('stdout', d.stdout);
       }
       if ('stderr' in d) {
-        addOutput(job, 'stderr', d.stderr);
+        j.addOutput('stderr', d.stderr);
       }
       if ('jsonout' in d) {
         if (job === 'ctx') {
@@ -370,19 +179,20 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
             s += JSON.stringify(j, null, 4);
             s += "\n";
           });
-          addOutput(job, 'stdout', s);
+          j.addOutput('stdout', s);
         }
       }
       if ('running' in d) {
         if (d.running) {
-          setJobClass(job, "running");
+          j.setClass("running");
           jobsRunning = true;
         }
         else {
           if (job !== 'ctx') {
-            setJobClass(job, d.exitcode == 0 ? "complete" : "failed");
-            removeJobInput(job);
-            removeVTOutput(job);
+            j.setClass(d.exitcode == 0 ? "complete" : "failed");
+            j.removeInput();
+            j.removeVTOutput();
+            commandline.focus();
             jobsDone = true;
           }
         }
@@ -431,9 +241,9 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
   })
 
   function runCommand(cmd) {
-    var job = addJobDiv(cmd);
+    var j = new Job(api, cmd);
     historyApi.add(cmd);
-    api('run', {job: job, cmd: cmd}, cmdResult);
+    api('run', {job: j.job, cmd: cmd}, cmdResult);
   }
 
   function runCommandline(e) {
@@ -478,12 +288,13 @@ define(['history', 'cwd', 'jquery', 'hterm'], function(historyApi, cwd, $){
   
   function cmdResult(data) {
     var job = ('job' in data) ? data.job : "unknown";
+    var j = Job.fromJob(job);
 
     if ('parseError' in data) {
-      addOutput(job, 'error', data.parseError);
+      j.addOutput('error', data.parseError);
     }
     if (data.running) {
-      setJobClass(job, "running");
+      j.setClass("running");
       poll();
     }
   }
