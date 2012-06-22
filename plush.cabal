@@ -13,22 +13,17 @@ Description:
 
 Data-files:
   data/summaries.txt
+  static/audio/*.ogg
   static/css/*.css
   static/css/*.gif
   static/css/*.png
   static/img/*.png
   static/*.html
   static/js/*.js
-  static/js/app.build.js
-  static/js/collections/*.js
-  static/js/libs/backbone/*.js
   static/js/libs/hterm/*.js
   static/js/libs/jquery/*.js
   static/js/libs/require/*.js
   static/js/libs/underscore/*.js
-  static/js/models/*.js
-  static/js/views/*.js
-  static/templates/*.html
   tests/*.doctest
   tests/*.sh
   tests/*.txt
@@ -37,7 +32,6 @@ Extra-source-files:
   README
   alltests.sh
   static/js/libs/README
-  static/js/libs/backbone/LICENSE
   static/js/libs/jquery/MIT-LICENSE
   static/js/libs/require/LICENSE
   static/js/libs/underscore/LICENSE
