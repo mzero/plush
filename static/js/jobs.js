@@ -15,6 +15,8 @@
 define(['jquery', 'hterm'], function($){
   'use strict';
 
+  var LINES_IN_TINY = 3;
+  var LINES_IN_PAGE = 24;
 
   var scrollback = $('#scrollback');
   var jobProto = scrollback.children('.job.proto').detach();
@@ -29,11 +31,7 @@ define(['jquery', 'hterm'], function($){
   }
 
   function jobFromElement(elem) {
-    return $(elem).parents('.job').data('job') || unknownJob;
-  }
-
-  function jobFromJob(job) {
-    return $('#' + job).data('job') || unknownJob;
+    return $(elem).parents('.job').data('jobPrivate');
   }
 
   scrollback.on('scroll', '.output-container', function() {
@@ -92,6 +90,7 @@ define(['jquery', 'hterm'], function($){
     var linesOutput = 0;
     var newlinesOutput = 0;
     var terminal = null;
+    var terminalNode = null;
     var maxState = null;
 
     var input = node.find('.input-container');
@@ -111,8 +110,11 @@ define(['jquery', 'hterm'], function($){
       output.addClass('output-' + m);
     };
 
-    var LINES_IN_TINY = 3;
-    var LINES_IN_PAGE = 24;
+    node.data('jobPrivate', {
+      sender: sender,
+      signaler: signaler,
+      sizeOutput: sizeOutput
+    });
 
     function adjustOutput() {
       var n = linesOutput;
@@ -201,17 +203,23 @@ define(['jquery', 'hterm'], function($){
       lastOutputSpan.get(0).scrollIntoView(false);
     }
 
-    node.data('job', {
-      sender: sender,
-      signaler: signaler,
-      sizeOutput: sizeOutput,
+    function setRunning() {
+      setClass('running');
+    }
+
+    function setState(exitcode) {
+      setClass(exitcode === 0 ? 'complete' : 'failed');
+      removeInput();
+      removeVTOutput();
+    }
+
+    node.data('jobPublic', {
       addOutput: addOutput,
-      setClass: setClass,
-      removeInput: removeInput,
-      removeVTOutput: removeVTOutput
+      setRunning: setRunning,
+      setComplete: setComplete
     });
 
-    return { job: job };
+    return job;
   }
 
   var unknownJob = {
@@ -220,13 +228,16 @@ define(['jquery', 'hterm'], function($){
       node.appendTo(scrollback);
       node[0].scrollIntoView(true);
     },
-    setClass: function(cls) { },
-    removeInput: function() { },
-    removeVTOutput: function() { }
+    setRunning: function() { },
+    setComplete: function(e) { }
   };
+
+  function fromJob(job) {
+    return $('#' + job).data('jobPublic') || unknownJob;
+  }
 
   return {
     newJob: newJob,
-    fromJob: jobFromJob
+    fromJob: fromJob
   };
 });

@@ -184,14 +184,12 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       }
       if ('running' in d) {
         if (d.running) {
-          j.setClass("running");
+          j.setRunning();
           jobsRunning = true;
         }
         else {
           if (job !== 'ctx') {
-            j.setClass(d.exitcode == 0 ? "complete" : "failed");
-            j.removeInput();
-            j.removeVTOutput();
+            j.setComplete(d.exitcode);
             commandline.focus();
             jobsDone = true;
           }
@@ -241,9 +239,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   })
 
   function runCommand(cmd) {
-    var j = new jobs.newJob(api, cmd);
+    var job = jobs.newJob(api, cmd);
     historyApi.add(cmd);
-    api('run', {job: j.job, cmd: cmd}, cmdResult);
+    api('run', {job: job, cmd: cmd}, cmdResult);
   }
 
   function runCommandline(e) {
@@ -294,7 +292,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       j.addOutput('error', data.parseError);
     }
     if (data.running) {
-      j.setClass("running");
+      j.setRunning();
       poll();
     }
   }
