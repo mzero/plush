@@ -32,6 +32,7 @@ Extra-source-files:
   README
   alltests.sh
   static/js/libs/README
+  static/js/libs/main.build.js
   static/js/libs/jquery/MIT-LICENSE
   static/js/libs/require/LICENSE
   static/js/libs/underscore/LICENSE
