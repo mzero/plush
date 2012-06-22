@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jquery', 'Job'], function(historyApi, cwd, $, Job){
+define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -160,7 +160,7 @@ define(['history', 'cwd', 'jquery', 'Job'], function(historyApi, cwd, $, Job){
 
     data.forEach(function(d) {
       var job = ('job' in d) ? d.job : "unknown";
-      var j = Job.fromJob(job);
+      var j = jobs.fromJob(job);
 
       if ('stdout' in d) {
         j.addOutput('stdout', d.stdout);
@@ -241,7 +241,7 @@ define(['history', 'cwd', 'jquery', 'Job'], function(historyApi, cwd, $, Job){
   })
 
   function runCommand(cmd) {
-    var j = new Job(api, cmd);
+    var j = new jobs.newJob(api, cmd);
     historyApi.add(cmd);
     api('run', {job: j.job, cmd: cmd}, cmdResult);
   }
@@ -288,7 +288,7 @@ define(['history', 'cwd', 'jquery', 'Job'], function(historyApi, cwd, $, Job){
   
   function cmdResult(data) {
     var job = ('job' in data) ? data.job : "unknown";
-    var j = Job.fromJob(job);
+    var j = jobs.fromJob(job);
 
     if ('parseError' in data) {
       j.addOutput('error', data.parseError);
