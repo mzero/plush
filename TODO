@@ -30,6 +30,17 @@ run vi
 tab completion of commands
 command history review and re-entry
 
+keyboard job control
+  move focus up/down jobs (+shift for running jobs?)
+  move focus back/forth from command input
+  commands for resizing job output (^0, ^1, ^2, ^3 ?)
+  commands for EOF/Quit/Kill (^D, ^C, ^\ ?)
+  command to remove job from screen (and history?)
+  command to put back last removed job
+  command to re-enter command from job
+  apply commands to last job (recent?) when on command input
+
+
 --- laters ---
 tab completion of options
 peel-off

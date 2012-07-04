@@ -39,7 +39,7 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 
 [] summary information should come from utilAnnotate, not annotate
 
-[] add completion support
+[x] add completion support
 
 [] styling
     [] when to use monospace, when not?
@@ -49,7 +49,9 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 
 [] need to capture control-c now! (or implement exit)
 
-
+[] refactorings
+    [] move json in/out back to stdin/stdout
+    [] use ExitCode as utility result rather than Int
 
 [] ls w/json out
 
