@@ -66,7 +66,7 @@ data ShellState = ShellState
 initialShellState :: ShellState
 initialShellState = ShellState
     { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-        ssLastExitCode = 0, ssSummaries = M.empty }
+        ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -95,10 +95,12 @@ getVar name = get >>= (\s -> return . msum $ [normalVar s, specialVar s])
     specialVar s = case name of
         "*" -> Just . intercalate (starSep s) . ssArgs $ s
         "#" -> Just . show . length . ssArgs $ s
-        "?" -> Just . show . ssLastExitCode $ s
+        "?" -> Just . show . exitStatus . ssLastExitCode $ s
         "-" -> Just . flagParameter . ssFlags $ s
         _ -> Nothing
     starSep = take 1 . maybe " " varValue . M.lookup "IFS" . ssVars
+    exitStatus ExitSuccess = 0
+    exitStatus (ExitFailure n) = n
 
 getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name

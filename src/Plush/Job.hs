@@ -48,8 +48,7 @@ import qualified System.Posix.Missing as PM
 import Plush.Job.Output
 import Plush.Run
 import Plush.Run.Execute
-import Plush.Run.Posix (decodeExitCode, encodeExitCode,
-    stdJsonOutput, toByteString, write)
+import Plush.Run.Posix (stdJsonOutput, toByteString, write)
 import Plush.Run.ShellExec
 import Plush.Types
 
@@ -170,7 +169,7 @@ runJob scoreBoardVar (j, cl) frs closeMs r0 = do
         return runner'
 
     background runner = do
-        pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . encodeExitCode . fst)
+        pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . fst)
         setUp (Just pid) $ checkUp pid
         return runner
 
@@ -184,11 +183,11 @@ runJob scoreBoardVar (j, cl) frs closeMs r0 = do
         mStat <- getProcessStatus False False pid
         case mStat of
             Nothing             -> return ()
-            Just (Exited ec)    -> cleanUp $ decodeExitCode ec
-            Just (Terminated _) -> cleanUp 129
+            Just (Exited ec)    -> cleanUp ec
+            Just (Terminated _) -> cleanUp $ ExitFailure 129
             Just (Stopped _)    -> return ()
 
-    cleanUp exitStatus = do
+    cleanUp exitCode = do
         modifyMVar_ scoreBoardVar $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
@@ -197,6 +196,10 @@ runJob scoreBoardVar (j, cl) frs closeMs r0 = do
                     return $ (j, JobDone exitStatus oi):sb'
                 _ -> return sb
         closeMs
+      where
+        exitStatus = case exitCode of
+            ExitSuccess -> 0
+            ExitFailure n -> n
 
 
 

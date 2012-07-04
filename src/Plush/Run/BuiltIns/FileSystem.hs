@@ -94,7 +94,7 @@ rm = BuiltInUtility $ stdSyntax options "" (perArg go)
         reportMissing = do
             when (not $ 'f' `elem` flags) $
                 errStrLn $ fp ++ ": No such file or directory"
-            exit 1
+            failure
 
 
 cat :: (PosixLike m) => BuiltInUtility m

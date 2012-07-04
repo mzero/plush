@@ -15,9 +15,9 @@ limitations under the License.
 -}
 
 module Plush.Run.Types (
-    ExitCode, Args,
-    success,
-    exit, exitMsg,
+    Args,
+    success, failure,
+    exitMsg,
     notSupported,
 
     FoundCommand(..),
@@ -35,19 +35,18 @@ import Plush.Run.Posix
 import Plush.Types.CommandSummary
 
 
-type ExitCode = Int
 type Args = [String]
 
 success :: (Monad m) => m ExitCode
-success = exit 0
+success = return ExitSuccess
 
-exit :: (Monad m) => ExitCode -> m ExitCode
-exit = return
+failure :: (Monad m) => m ExitCode
+failure = return $ ExitFailure 1
 
-exitMsg :: (PosixLike m) => ExitCode -> String -> m ExitCode
+exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
 exitMsg e msg = do
     errStrLn msg `catchError` (\_ -> return ())
-    exit e
+    return $ if (e == 0) then ExitSuccess else ExitFailure e
 
 notSupported :: (PosixLike m) => String -> m ExitCode
 notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)

@@ -68,7 +68,7 @@ doGrep flags (pat:args) = do
                 [file] -> gofile False file
                 files  -> or <$> mapM (gofile True) files
                     -- TODO: should short-circuit
-            if found then success else exit 1
+            if found then success else failure
   where
     gofile df "-" = gofd df "(standard input)" (Fd 0)
     gofile df f = do

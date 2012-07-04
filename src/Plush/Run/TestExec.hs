@@ -294,7 +294,7 @@ instance PosixLike TestExec where
             then exitMsg 126 "TestExec cannot run executables"
             else exitMsg 127 $ fp ++ ": No such file or directory"
 
-    pipeline [] = return 0
+    pipeline [] = return ExitSuccess
     pipeline (c0:cs) = c0 >>= next cs
       where
         next [] e = return e

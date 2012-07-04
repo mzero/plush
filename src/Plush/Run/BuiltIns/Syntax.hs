@@ -83,7 +83,7 @@ stdSyntax options opt0 action summary = Utility exec anno
             errStr errs
             errStrLn $ ciSynopsis summary
             errStr $ formatOptions summary
-            exit 1
+            failure
 
     anno cmdLineArgs = return $
         map argAnnos $ processArgs summary options cmdLineArgs

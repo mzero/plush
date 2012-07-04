@@ -51,7 +51,8 @@ POSIX.1-2008 / IEEE Std 1003.1-2008 / Open Group Base Specifications Issue 7
 
 [] refactorings
     [] move json in/out back to stdin/stdout
-    [] use ExitCode as utility result rather than Int
+    [x] use ExitCode as utility result rather than Int
+    [] update to new catch (?)
 
 [] ls w/json out
 

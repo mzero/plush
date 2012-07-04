@@ -43,10 +43,10 @@ shellExec cl =  execCommandList cl
     execCommandItem (ao, Sequential) = execAndOr ao
     execCommandItem (_, Background) = notSupported "Background execution"
 
-    execAndOr ao = foldM execAndOrItem 0 ao
+    execAndOr ao = foldM execAndOrItem ExitSuccess ao
 
-    execAndOrItem 0 (AndThen, (s, p))         = execPipeSense s p
-    execAndOrItem e (OrThen, (s, p)) | e /= 0 = execPipeSense s p
+    execAndOrItem ExitSuccess     (AndThen, (s, p))          = execPipeSense s p
+    execAndOrItem (ExitFailure e) (OrThen, (s, p))  | e /= 0 = execPipeSense s p
     execAndOrItem e _ = return e
 
     execPipeSense s p = do
@@ -55,8 +55,10 @@ shellExec cl =  execCommandList cl
         return e
 
     sense Normal   e = e
-    sense Inverted 0 = 1
-    sense Inverted _ = 0
+    sense Inverted ExitSuccess = ExitFailure 1
+    sense Inverted (ExitFailure e)
+        | e /= 0    = ExitSuccess
+        | otherwise = ExitFailure 1
 
     execPipe [] = exitMsg 120 "Emtpy pipeline"
     execPipe [c] = execCommand c

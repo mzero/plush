@@ -37,7 +37,7 @@ true = DirectUtility . const $ Utility trueExec noArgsAnnotate
 false :: (PosixLike m) => DirectUtility m
 false = DirectUtility . const $ Utility falseExec noArgsAnnotate
   where
-    falseExec _ = exit 1
+    falseExec _ = failure
 
 echo :: (PosixLike m) => BuiltInUtility m
 echo = BuiltInUtility . const $ Utility echoExec emptyAnnotate

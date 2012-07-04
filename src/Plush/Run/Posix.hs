@@ -42,6 +42,8 @@ module Plush.Run.Posix (
     simplifyPath, reducePath,
 
     -- * Re-exports
+    -- ** from System.ExitCode
+    ExitCode(..),
     -- ** from System.Posix.Types
     module System.Posix.Types,
     -- ** from System.Posix.Files
@@ -52,7 +54,6 @@ module Plush.Run.Posix (
 
     -- * Misc
     stdJsonInput, stdJsonOutput,
-    encodeExitCode, decodeExitCode,
 ) where
 
 import Control.Applicative ((<$>))
@@ -68,12 +69,12 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import Foreign.Ptr (castPtr, plusPtr)
 import qualified GHC.IO.Exception as GHC
+import System.Exit
 import System.FilePath
 import System.Posix.Files (stdFileMode, accessModes)
 import System.Posix.IO (stdInput, stdOutput, stdError,
     OpenMode, OpenFileFlags, defaultFileFlags)
 import System.Posix.Types
-import qualified System.Exit as IO
 import qualified System.IO as IO
 import qualified System.IO.Error as IO
 import qualified System.Posix as P
@@ -149,13 +150,13 @@ class (Functor m, Monad m, MonadError IOError m,
     -- From System.Process
 
     -- | Note: The return type differs from the version in 'System.Process'
-    rawSystem :: FilePath -> [String] -> m Int
+    rawSystem :: FilePath -> [String] -> m ExitCode
         -- TODO: make this a utility in terms of lower level calls
 
     -- | A high level primitive that runs each computation in an environment
     -- with the stdout of each piped to the stdin of next. The original stdin
     -- is piped to the first, and the stdout of the last is the original stdout.
-    pipeline :: [m Int] -> m Int
+    pipeline :: [m ExitCode] -> m ExitCode
 
 
 -- | File status data as returned by 'getFileStatus' and 'getSymbolicLinkStatus'
@@ -204,7 +205,7 @@ instance PosixLike IO where
         (Just . P.homeDirectory <$> P.getUserEntryForName s)
             `catch` const (return Nothing)
 
-    rawSystem cmd args = decodeExitCode `fmap` IO.rawSystem cmd args
+    rawSystem cmd args = IO.rawSystem cmd args
     pipeline = ioPipeline
 
 
@@ -246,10 +247,10 @@ ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
 -- | 'pipeline' for 'IO': fork each action, connected by a daisy chained
 -- series of pipes. The first action gets the original stdInput, the last
 -- command gets the original stdOutput.
-ioPipeline :: [IO Int] -> IO Int
+ioPipeline :: [IO ExitCode] -> IO ExitCode
 ioPipeline = next Nothing
   where
-    next _ [] = return 0
+    next _ [] = return ExitSuccess
     next mi [cz] = seg mi cz Nothing >>= wait
         -- TODO: run cz in foreground once we can stash stdInput reliably
 
@@ -266,7 +267,7 @@ ioPipeline = next Nothing
             case mo of
                 Nothing -> return ()
                 Just o -> dupTo o stdOutput >> closeFd o
-            c >>= P.exitImmediately . encodeExitCode
+            c >>= P.exitImmediately
         maybe (return ()) closeFd mi
         maybe (return ()) closeFd mo
         return pid
@@ -274,8 +275,8 @@ ioPipeline = next Nothing
     wait pid = do
         st <- P.getProcessStatus True False pid
         case st of
-            Just (P.Exited e) -> return $ decodeExitCode e
-            _ -> return 129
+            Just (P.Exited e) -> return e
+            _ -> return $ ExitFailure 129
 
 
 
@@ -366,12 +367,3 @@ reducePath = simp [] . splitDirectories
           | y == "/"           = simp      ya  xs
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
-
-encodeExitCode :: Int -> IO.ExitCode
-encodeExitCode 0 = IO.ExitSuccess
-encodeExitCode i = IO.ExitFailure i
-
-decodeExitCode :: IO.ExitCode -> Int
-decodeExitCode IO.ExitSuccess = 0
-decodeExitCode (IO.ExitFailure i) = i
-

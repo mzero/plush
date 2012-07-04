@@ -22,7 +22,4 @@ import System.Exit
 import Plush.Run.BuiltIns.Trivial (rechoExec)
 
 main :: IO ()
-main = getArgs >>= rechoExec >>= exitWith'
-  where
-    exitWith' 0 = exitWith ExitSuccess
-    exitWith' n = exitWith $ ExitFailure n
+main = getArgs >>= rechoExec >>= exitWith
