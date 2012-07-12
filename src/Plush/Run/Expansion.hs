@@ -180,15 +180,16 @@ pathnameGlob = either (\_err -> return []) match . parse patP ""
         <|> (char '?' >> return (CharTest (const True)))
         <|> (char '\\' >> anyChar >>= return . Literal)
         <|> (try $ do _ <- char '['
-                      c <- noneOf "!/"
-                      rest <- many $ noneOf "]/"
-                      _ <- char ']'
-                      return $ CharTest (`elem` makeCharClass (c:rest)))
-        <|> (try $ do _ <- string "[!"
                       c <- noneOf "/"
+                      first <- if c == '!' 
+                               then noneOf "/"
+                               else return c
                       rest <- many $ noneOf "]/"
                       _ <- char ']'
-                      return $ CharTest (`notElem` makeCharClass (c:rest)))
+                      let f = if c == '!' 
+                              then flip notElem
+                              else flip elem
+                      return $ CharTest (f $ makeCharClass (first:rest)))
         <|> (noneOf "/" >>= return . Literal)
 
     makeCharClass :: [Char] -> [Char]
