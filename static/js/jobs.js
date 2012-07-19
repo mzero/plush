@@ -207,7 +207,7 @@ define(['jquery', 'hterm'], function($){
       setClass('running');
     }
 
-    function setState(exitcode) {
+    function setComplete(exitcode) {
       setClass(exitcode === 0 ? 'complete' : 'failed');
       removeInput();
       removeVTOutput();
