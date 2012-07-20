@@ -1,3 +1,16 @@
+=== Links ===
+Code repository:
+  http://code.google.com/p/plush - on Google Code's project hosting
+  https://github.com/mzero/plush - same on github, for those that prefer
+
+Project wiki:
+  http://code.google.com/p/plush/wiki/StartHere
+
+Mailing list:
+  thecomfyshell@googlegroups.com
+  https://groups.google.com/d/forum/thecomfyshell
+
+
 === Prerequisites ===
 
 You'll need a GHC based Haskell installation. Easiest is to just get and install
