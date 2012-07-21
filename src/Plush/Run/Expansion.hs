@@ -179,8 +179,23 @@ pathnameGlob = either (\_err -> return []) match . parse patP ""
     partP = (char '*' >> return Star)
         <|> (char '?' >> return (CharTest (const True)))
         <|> (char '\\' >> anyChar >>= return . Literal)
+        <|> (try $ do _ <- char '['
+                      c <- noneOf "/"
+                      first <- if c == '!' 
+                               then noneOf "/"
+                               else return c
+                      rest <- many $ noneOf "]/"
+                      _ <- char ']'
+                      let f = if c == '!' 
+                              then flip notElem
+                              else flip elem
+                      return $ CharTest (f $ makeCharClass (first:rest)))
         <|> (noneOf "/" >>= return . Literal)
-        -- TODO: parse various [] constructs
+
+    makeCharClass :: [Char] -> [Char]
+    makeCharClass []                   = []
+    makeCharClass (begin:'-':end:rest) = [begin .. end] ++ makeCharClass rest
+    makeCharClass (c:cs)               = c : makeCharClass cs
 
     patMatch :: Pattern -> String -> Bool
     patMatch pattern s = any null $ foldl' (flip concatMap) [s] matchers
