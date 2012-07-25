@@ -437,7 +437,15 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 
 /* @end */
 
-
+.job {
+  border-left: 2px solid #fff;
+}
+.job.topic {
+  border-left-color: #ddd;
+}
+.job.topic.focus {
+  border-left-color: #ff9134;
+}
 .job.running {
   background: url(ajax-loader.gif) no-repeat;
 }

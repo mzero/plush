@@ -31,8 +31,79 @@ define(['jquery', 'hterm'], function($){
   }
 
   function jobFromElement(elem) {
-    return $(elem).parents('.job').data('jobPrivate');
+    return $(elem).closest('.job').data('jobPrivate');
   }
+
+  function scrollJobIntoView(jobDiv) {
+    var sTop = scrollback.scrollTop();
+    var sBottom = sTop + scrollback.height();
+    var sTop0 = sTop;
+
+    var jTop = sTop + jobDiv.position().top;
+    var jBottom = jTop + jobDiv.outerHeight();
+
+    if (jBottom > sBottom) {
+      sTop += jBottom - sBottom;
+    }
+    if (jTop < sTop) {
+      sTop -= sTop - jTop;
+    }
+    if (sTop != sTop0) {
+      scrollback.scrollTop(sTop);
+    }
+  }
+
+  var currentTopic = null;
+
+  function blurAll() {
+    $(document.activeElement).blur();
+    blurTopic();
+  }
+  function blurTopic() {
+    if (currentTopic) currentTopic.removeClass('focus');
+  }
+  function focusTopic(nextTopic) {
+    if (currentTopic) currentTopic.removeClass('topic focus')
+    currentTopic = nextTopic;
+    if (currentTopic) {
+      currentTopic.addClass('topic focus');
+      scrollJobIntoView(currentTopic);
+    }
+  }
+
+  $(window).on('focusin', blurTopic);
+
+  function nextTopic(n) {
+    var next = currentTopic;
+    if (!currentTopic) {
+      next = scrollback.children('.job').last();
+//  } else if (!(currentTopic.hasClass('focus'))) {
+//    // enable above to ignore motion if topic wasn't focused, and just refocus
+    } else {
+      switch (n) {
+        case -1:
+          next = currentTopic.next('.job');
+          break;
+        case 1:
+          next = currentTopic.prev('.job');
+          break;
+      }
+    }
+    if (next && next.length) {
+      blurAll();
+      focusTopic(next);
+    }
+  }
+
+  function atLastTopic() {
+    return currentTopic && currentTopic.next('.job').length === 0;
+  }
+  function topicCommand() {
+    return currentTopic ? currentTopic.data('jobPrivate').cmd : '';
+  }
+
+
+
 
   scrollback.on('scroll', '.output-container', function() {
     // TODO(jasvir): Do the same for scrollBottom
@@ -72,6 +143,43 @@ define(['jquery', 'hterm'], function($){
   scrollback.on('click', '.view-full',
     function(e) { jobFromElement(this).sizeOutput('full'); });
 
+  scrollback.on('click', '.job',
+    function(e) { jobFromElement(this).takeTopic(); });
+  scrollback.on('focus', '.input-container input',
+    function(e) { jobFromElement(this).takeTopic(); });
+
+
+  function keydown(e) {
+    if (!currentTopic) return;
+
+    var j = currentTopic.data('jobPrivate');
+
+    if (e.altKey && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
+      switch (e.keyCode) {
+        case 48: // ALT+0
+          j.sizeOutput('hide'); return false;
+        case 49: // ALT+1
+          j.sizeOutput('tiny'); return false;
+        case 50: // ALT+2
+          j.sizeOutput('page'); return false;
+        case 51: // ALT+3
+          j.sizeOutput('full'); return false;
+      }
+    }
+    if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
+      switch (e.keyCode) {
+        case 68: // CTRL+D
+          j.sender('\0x04'); return false;
+        case 67: // CTRL+C
+          j.signaler('int'); return false;
+        case 220: // CTRL+\
+          j.signaler('quit'); return false;
+        case 57: // CTRL+9
+          j.signaler('kill'); return false;
+      }
+    }
+  }
+
 
   var jobCount = 0;
 
@@ -93,9 +201,6 @@ define(['jquery', 'hterm'], function($){
     var terminalNode = null;
     var maxState = null;
 
-    var input = node.find('.input-container');
-    input.find('input').focus();
-
     function sender(s) {
       api('input', {job: job, input: s}, function() {});
     };
@@ -110,11 +215,20 @@ define(['jquery', 'hterm'], function($){
       output.addClass('output-' + m);
     };
 
+    function takeTopic() {
+      focusTopic(node);
+    }
+
     node.data('jobPrivate', {
+      cmd: cmd,
       sender: sender,
       signaler: signaler,
-      sizeOutput: sizeOutput
+      sizeOutput: sizeOutput,
+      takeTopic: takeTopic
     });
+
+    var input = node.find('.input-container');
+    input.find('input').focus();
 
     function adjustOutput() {
       var n = linesOutput;
@@ -214,6 +328,7 @@ define(['jquery', 'hterm'], function($){
     }
 
     node.data('jobPublic', {
+      job: job,
       addOutput: addOutput,
       setRunning: setRunning,
       setComplete: setComplete
@@ -236,8 +351,18 @@ define(['jquery', 'hterm'], function($){
     return $('#' + job).data('jobPublic') || unknownJob;
   }
 
+  function toDiv(j) {
+    return $('#' + j.job);
+  }
+
+
   return {
     newJob: newJob,
-    fromJob: fromJob
+    fromJob: fromJob,
+
+    nextTopic: nextTopic,
+    atLastTopic: atLastTopic,
+    topicCommand: topicCommand,
+    keydown: keydown
   };
 });

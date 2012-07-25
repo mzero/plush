@@ -247,9 +247,19 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   function runCommandline(e) {
     var cmd = commandline.val();
     commandline.val('');
-    $('#annotations').text('')
-    runCommand(cmd);
+    if (cmd.trim() !== '') {
+      $('#annotations').text('')
+      runCommand(cmd);
+    }
     return false;
+  }
+
+  function reenterTopic() {
+    var c = commandline.val();
+    var t = jobs.topicCommand();
+    c = c.length ? ' # ' + c : '';
+    commandline.val(t + c);
+    commandline.focus();
   }
 
   var poll = (function () {
@@ -270,20 +280,47 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
 
   var checkTimer = null;
   commandline.keydown(function(e) {
-    if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
-    switch (e.keyCode) {
-      case 9: return startCompletions(e)
-      case 13: return runCommandline(e);
-      case 38: return nextCommand(e);
-      case 40: return prevCommand(e);
-      default: checkTimer = setTimeout(runComplete, 250);
-    };
+    if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
+      switch (e.keyCode) {
+        case 9: return startCompletions(e)  // TAB
+        case 13: return runCommandline(e);  // RETURN
+        case 37: // LEFT
+        case 39: // RIGHT
+          e.stopPropagation(); // don't let window handler grab these
+          break;
+      };
+    }
+  });
+  commandline.keypress(function(e) {
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(runComplete, 200);
+  })
+
+  $(window).on('keydown', function(e) {
+    // commands valid no matter what the modifiers
+    if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
+      switch (e.keyCode) {
+      }
+    }
+    if (!(e.ctrlKey || e.shiftKey || e.metaKey)) { // ALT+ is optional
+      switch (e.keyCode) {
+        case 13: reenterTopic();       return false;  // RETURN
+        case 37: commandline.focus();  return false;  // LEFT
+        case 38: jobs.nextTopic(1);    return false;  // UP
+        case 39: jobs.nextTopic(0);    return false;  // RIGHT
+        case 40:                                      // DOWN
+          if (jobs.atLastTopic())      commandline.focus();
+          else                         jobs.nextTopic(-1);
+          return false;
+      }
+    }
+    return jobs.keydown(e);
   });
 
   function runContext() {
     api('run', {job: 'ctx', cmd: 'context'}, cmdResult);
   }
-  
+
   function cmdResult(data) {
     var job = ('job' in data) ? data.job : "unknown";
     var j = jobs.fromJob(job);
