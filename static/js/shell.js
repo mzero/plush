@@ -284,6 +284,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       switch (e.keyCode) {
         case 9: return startCompletions(e)  // TAB
         case 13: return runCommandline(e);  // RETURN
+        case 32: // SPACE
         case 37: // LEFT
         case 39: // RIGHT
           e.stopPropagation(); // don't let window handler grab these

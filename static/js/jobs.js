@@ -18,6 +18,11 @@ define(['jquery', 'hterm'], function($){
   var LINES_IN_TINY = 3;
   var LINES_IN_PAGE = 24;
 
+  var SCROLL_PAGE = {};
+  var SCROLL_FULL = {};
+
+  var AUTO_SCROLL_ON_OUTPUT_AFTER_MS = 500;
+
   var scrollback = $('#scrollback');
   var jobProto = scrollback.children('.job.proto').detach();
   jobProto.removeClass('proto');
@@ -34,22 +39,27 @@ define(['jquery', 'hterm'], function($){
     return $(elem).closest('.job').data('jobPrivate');
   }
 
-  function scrollJobIntoView(jobDiv) {
-    var sTop = scrollback.scrollTop();
-    var sBottom = sTop + scrollback.height();
+  function scrollIntoView(scroller, inner, offset) {
+    var sTop = scroller.scrollTop();
+    var sBottom = sTop + scroller.height();
     var sTop0 = sTop;
 
-    var jTop = sTop + jobDiv.position().top;
-    var jBottom = jTop + jobDiv.outerHeight();
+    var iTop = inner.offset().top - scroller.children().offset().top;
+      // TODO(mzero): this doesn't work if the scroller has non-scrolled content
+    var iBottom = iTop + inner.outerHeight(true);
 
-    if (jBottom > sBottom) {
-      sTop += jBottom - sBottom;
+    if (offset) {
+      iTop += offset;
     }
-    if (jTop < sTop) {
-      sTop -= sTop - jTop;
+
+    if (iBottom > sBottom) {
+      sTop += iBottom - sBottom;
+    }
+    if (iTop < sTop) {
+      sTop -= sTop - iTop;
     }
     if (sTop != sTop0) {
-      scrollback.scrollTop(sTop);
+      scroller.scrollTop(sTop);
     }
   }
 
@@ -67,7 +77,7 @@ define(['jquery', 'hterm'], function($){
     currentTopic = nextTopic;
     if (currentTopic) {
       currentTopic.addClass('topic focus');
-      scrollJobIntoView(currentTopic);
+      scrollIntoView(scrollback, currentTopic);
     }
   }
 
@@ -154,6 +164,20 @@ define(['jquery', 'hterm'], function($){
 
     var j = currentTopic.data('jobPrivate');
 
+    if (!(e.ctrlKey || e.metaKey)) { // ALT+ & SHIFT+ are optional
+      var dir = e.shiftKey ? -1 : 1; // SHIFT+ inverts direction
+      switch (e.keyCode) {
+        case 32: j.scroller(dir, SCROLL_PAGE); return false; // SPACE
+      }
+    }
+    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) { // ALT+ is optional
+      switch (e.keyCode) {
+        case 33: j.scroller( -1, SCROLL_PAGE); return false; // PAGE_UP
+        case 34: j.scroller(  1, SCROLL_PAGE); return false; // PAGE_DOWN
+        case 35: j.scroller(  1, SCROLL_FULL); return false; // END
+        case 36: j.scroller( -1, SCROLL_FULL); return false; // HOME
+      }
+    }
     if (e.altKey && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
       switch (e.keyCode) {
         case 48: // ALT+0
@@ -172,7 +196,7 @@ define(['jquery', 'hterm'], function($){
           j.sender('\0x04'); return false;
         case 67: // CTRL+C
           j.signaler('int'); return false;
-        case 220: // CTRL+\
+        case 220: // CTRL+\ (BACKSLASH)
           j.signaler('quit'); return false;
         case 57: // CTRL+9
           j.signaler('kill'); return false;
@@ -195,6 +219,7 @@ define(['jquery', 'hterm'], function($){
     var outputArea = output.find('.output');
     var lastOutputSpan = null;
     var lastOutputType = null;
+    var lastOutputTime = 0;
     var linesOutput = 0;
     var newlinesOutput = 0;
     var terminal = null;
@@ -213,7 +238,19 @@ define(['jquery', 'hterm'], function($){
     function sizeOutput(m) {
       output.removeClass('output-hide output-tiny output-page output-full');
       output.addClass('output-' + m);
+      setTimeout(function() { scrollIntoView(scrollback, node); }, 100);
+        // have to wait until layout has been recomputed for new size
     };
+
+    function scroller(dir, amt) {
+      var line = 10; // TODO: Should be determined dynamically
+
+      var scroll = 0;
+      if      (amt === SCROLL_FULL)  scroll = outputArea.height();
+      else if (amt === SCROLL_PAGE)  scroll = output.height() - 2 * line;
+
+      output.scrollTop(output.scrollTop() + scroll * dir);
+    }
 
     function takeTopic() {
       focusTopic(node);
@@ -224,6 +261,7 @@ define(['jquery', 'hterm'], function($){
       sender: sender,
       signaler: signaler,
       sizeOutput: sizeOutput,
+      scroller: scroller,
       takeTopic: takeTopic
     });
 
@@ -302,7 +340,14 @@ define(['jquery', 'hterm'], function($){
         return addVTOutput(txt);
       }
 
+      var wasAtEnd = (output.scrollTop() + output.height()
+                    >= outputArea.outerHeight());
+      var scrollIfAfter = lastOutputTime + AUTO_SCROLL_ON_OUTPUT_AFTER_MS
+      var spanOffset = 0;
+      lastOutputTime = Date.now();
+
       if (lastOutputType == cls && lastOutputSpan) {
+        spanOffset = lastOutputSpan.height();
         lastOutputSpan.append(document.createTextNode(txt));
       }
       else {
@@ -314,7 +359,10 @@ define(['jquery', 'hterm'], function($){
       linesOutput =
           newlinesOutput + (txt[txt.length-1] === '\n' ? 0 : 1);
       adjustOutput();
-      lastOutputSpan.get(0).scrollIntoView(false);
+
+      if (wasAtEnd && lastOutputTime >= scrollIfAfter) {
+        scrollIntoView(output, outputArea, spanOffset);
+      }
     }
 
     function setRunning() {
