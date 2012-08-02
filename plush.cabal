@@ -39,6 +39,11 @@ Extra-source-files:
   static/js/main.build.js
 
 
+Flag Production
+  Description: build for production, without features for plush developers
+  Default: False
+
+
 Executable plush
   Main-is: Main.hs
 
@@ -113,6 +118,8 @@ Executable plush
 
   ghc-options: -no-hs-main -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
 
+  if flag(Production)
+    cpp-options: -DPRODUCTION
 
 
 Executable recho

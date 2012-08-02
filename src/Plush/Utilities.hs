@@ -14,12 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Plush.Utilities (
     readUtf8File,
+    getDataDir,
     )
     where
 
+import System.Directory (getCurrentDirectory, doesDirectoryExist)
 import System.IO
+import System.Posix (getEnv)
+
+import qualified Paths_plush as CabalPaths
+
 
 -- | Lazily get a text file's contents as with 'readFile', but assume its
 -- contents are encoded with UTF-8 regardless of the user's current locale.
@@ -28,3 +36,26 @@ readUtf8File path = do
     h <- openFile path ReadMode
     hSetEncoding h utf8
     hGetContents h
+
+#ifdef PRODUCTION
+-- | Return the a data directory where Plush's static data files are installed.
+-- Can be overriden by the environment variable @plush_datadir@.
+getDataDir :: IO FilePath
+getDataDir = CabalPaths.getDataDir
+#else
+-- | Return the a data directory where Plush's static data files are installed.
+-- Can be overriden by the environment variable @plush_datadir@.
+-- For non-production builds, this is based on the 'getDataDir' that Cabal
+-- generates, only the current directory is used as a last resort.
+getDataDir :: IO FilePath
+getDataDir = do
+    me <- getEnv "plush_datadir"
+    case me of
+        Just e -> return e
+        Nothing -> do
+            d <- CabalPaths.getDataDir
+            de <- doesDirectoryExist d
+            if de
+                then return d
+                else getCurrentDirectory
+#endif
