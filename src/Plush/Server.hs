@@ -22,7 +22,8 @@ module Plush.Server (
     where
 
 
-import Control.Monad (replicateM)
+import Control.Concurrent (forkIO)
+import Control.Monad (replicateM, void)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Network.HTTP.Types
@@ -31,9 +32,11 @@ import Network.Wai.Middleware.Route
 import Network.Wai.Middleware.Static
 import System.FilePath
 import System.IO
+import System.Posix (sleep)
 import System.Random
 
 import Plush.Job
+import Plush.Parser
 import Plush.Run
 import Plush.Server.API
 import Plush.Server.Utilities
@@ -44,15 +47,20 @@ import Plush.Utilities
 -- shell exits.
 server :: Runner -> Maybe Int -> IO ()
 server runner port = do
-    (shellThread, origOut, _origErr) <- startShell runner
+    (shellThread, origOut, origErr) <- startShell runner
     staticPath <- (</> "static") `fmap` getDataDir
     key <- genKey
     hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
+    case parseNextCommand (openCmd $ startUrl key) of
+        Right (cl, _rest) -> void $ forkIO $ launchOpen shellThread cl
+        Left errs -> hPutStrLn origErr errs
     Warp.run port' $ application shellThread key staticPath
   where
     port' = fromMaybe 29544 port
     genKey = replicateM 40 $ randomRIO ('a','z')
     startUrl key =  "http://localhost:" ++ show port' ++ "/index.html#" ++ key
+    openCmd url = "xdg-open " ++ url ++ " 2>/dev/null || open " ++ url
+    launchOpen st cl = sleep 1 >> submitJob st "opener" cl
 
 
 application shellThread key staticPath = dispatch
