@@ -188,7 +188,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
           jobsRunning = true;
         }
         else {
-          if (job !== 'ctx') {
+          if (job !== 'ctx' && job !== 'comp') {
             j.setComplete(d.exitcode);
             commandline.focus();
             jobsDone = true;
@@ -292,10 +292,15 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       };
     }
   });
-  commandline.keypress(function(e) {
+
+  commandline.keyup(function(e) {
+    requestRunComplete();
+  });
+
+  function requestRunComplete() {
     clearTimeout(checkTimer);
     checkTimer = setTimeout(runComplete, 200);
-  })
+  }
 
   $(window).on('keydown', function(e) {
     // commands valid no matter what the modifiers
