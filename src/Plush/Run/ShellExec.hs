@@ -160,6 +160,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
 
     getFileStatus = liftT1 getFileStatus
     getSymbolicLinkStatus = liftT1 getSymbolicLinkStatus
+    isExecutable = liftT1 isExecutable
 
     removeLink = liftT1 removeLink
 
