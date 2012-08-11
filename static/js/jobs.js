@@ -306,6 +306,7 @@ define(['jquery', 'hterm'], function($){
       removeInput();
       var where = output.find('.output');
       if (where.length != 1) { return; }
+      where.addClass('vtoutput');
       var node = $('<div></div>', { 'class': 'terminal' })
       node.appendTo(where);
       var term = new hterm.Terminal();

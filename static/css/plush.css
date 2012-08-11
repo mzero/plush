@@ -506,8 +506,12 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 }
 
 .job .output {
+  position: relative;
   padding: 0.25em 0 0.25em 1em;
   border-right: none;
+}
+.job .vtoutput {
+  padding: 0 0 0 0;
 }
 .job .stdout {
   color: #3f3f3f;
