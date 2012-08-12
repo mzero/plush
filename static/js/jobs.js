@@ -328,9 +328,8 @@ define(['jquery', 'hterm'], function($){
     function removeVTOutput() {
       if (terminal) {
         terminal.uninstallKeyboard();
+        terminal.setCursorVisible(false);
         terminal = null;
-        terminalNode.remove();
-        terminalNode = null;
       }
     };
 
