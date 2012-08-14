@@ -117,6 +117,7 @@ class (Functor m, Monad m, MonadError IOError m,
 
     getFileStatus :: FilePath -> m (FileStatus m)
     getSymbolicLinkStatus :: FilePath -> m (FileStatus m)
+    isExecutable :: FilePath -> m Bool
 
     removeLink :: FilePath -> m ()
 
@@ -184,6 +185,7 @@ instance PosixLike IO where
 
     getFileStatus = P.getFileStatus
     getSymbolicLinkStatus = P.getSymbolicLinkStatus
+    isExecutable path = P.fileAccess path False False True
 
     removeLink = P.removeLink
 

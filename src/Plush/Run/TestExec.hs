@@ -249,6 +249,8 @@ instance PosixLike TestExec where
         maybe (raise doesNotExistErrorType "getFileStatus" fp) return stat
     getSymbolicLinkStatus = getFileStatus
 
+    isExecutable p = getFileStatus p >>= return . isRegularFile
+
     removeLink fp = runFilePrim fp $ \_s fs _fpc dpc n -> do
         fileMustExist "removeLink" fp fs dpc n
         updateFileSystem $ fsRemove fs dpc n

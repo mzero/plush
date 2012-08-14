@@ -22,9 +22,12 @@ module Plush.Run.Annotate (
 where
 
 import Control.Applicative ((<$>))
-import Data.List ((\\))
+import Control.Monad (filterM)
+import Control.Monad.Error.Class
+import Data.List ((\\), isPrefixOf)
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, maybeToList)
+import System.FilePath
 
 
 import Plush.Run.Command
@@ -57,7 +60,12 @@ annotate cl cursor = coallesce <$> annoCommandList cl
                 argAnnos <- noteArgs ud args
                 return $ noteCommand cmd fc mcs ++ argAnnos
             _ -> return []
-        compAnnos <- catMaybes <$> mapM noteCompletion ws
+        compAnnos <- case ws of
+            (cmd:args) -> do
+                cmdComp <- noteCmdCompletion cmd
+                argComps <- mapM noteCompletion args
+                return $ catMaybes $ cmdComp : argComps
+            []         -> return []
         return $ cmdAnno ++ exAnnos ++ compAnnos
 
     noteExpansion w = (location w, [ExpandedTo $ wordText w])
@@ -79,5 +87,30 @@ annotate cl cursor = coallesce <$> annoCommandList cl
       where
         compFiles (pre, post) = map (++post) <$> (pathnameGlob $ pre ++ "*")
 
-    coallesce = M.toAscList . M.fromListWith (++)
+    noteCmdCompletion w
+        | '/' `elem` wordText w = noteCompletion w
+        | otherwise             = case (location w, cursor) of
+            (Span s e, Just c) | (s - 1) <= c && c < e -> do
+                comps <- cmdComp . splitAt (c - s + 1) $ wordText w
+                return $ Just (location w, [Completions comps])
+            _ -> return Nothing
+      where
+        cmdComp (pre, post) = map (++post) <$> (prefixMatchOnPath pre)
+        prefixMatchOnPath p = do
+          pathFiles <- allPathFiles
+          matchingPaths <- filterM (execAndPrefix p) pathFiles
+          return $ map takeFileName matchingPaths
+        execAndPrefix p x =
+            if isFilePrefixOf p x
+                then isExecutable x `catchError` (\_ -> return False)
+                else return False
+        isFilePrefixOf p x = p `isPrefixOf` takeFileName x
+        allPathFiles = do
+            path <- getVarDefault "PATH" ""
+            pathFiles <- mapM safeGetDirectoryPaths $ splitSearchPath path
+            return $ concat pathFiles
+        safeGetDirectoryPaths p = do
+            files <- getDirectoryContents p `catchError` (\_ -> return [])
+            return $ map (p </>) files
 
+    coallesce = M.toAscList . M.fromListWith (++)
