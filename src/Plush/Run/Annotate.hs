@@ -100,18 +100,17 @@ annotate cl cursor = coallesce <$> annoCommandList cl
           pathFiles <- allPathFiles
           matchingPaths <- filterM (execAndPrefix p) pathFiles
           return $ map takeFileName matchingPaths
-        execAndPrefix p x = if isFilePrefixOf p x then 
-                            isExecutable x `catchError` (\_ -> return False)
-                            else return False
+        execAndPrefix p x =
+            if isFilePrefixOf p x
+                then isExecutable x `catchError` (\_ -> return False)
+                else return False
         isFilePrefixOf p x = p `isPrefixOf` takeFileName x
         allPathFiles = do
-            pathVar <- getVarDefault "PATH" ""
-            let paths = splitSearchPath pathVar
-            pathFiles <-
-              mapM 
-              (\dir -> getDirectoryContents dir `catchError` (\_ -> return []))
-              paths
-            let fullNames = zipWith (\p -> map (p </>)) paths pathFiles
-            return $ concat fullNames
+            path <- getVarDefault "PATH" ""
+            pathFiles <- mapM safeGetDirectoryPaths $ splitSearchPath path
+            return $ concat pathFiles
+        safeGetDirectoryPaths p = do
+            files <- getDirectoryContents p `catchError` (\_ -> return [])
+            return $ map (p </>) files
 
     coallesce = M.toAscList . M.fromListWith (++)
