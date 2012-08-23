@@ -215,9 +215,42 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   }
 
   function startCompletions(e) {
-    $('.completions').show();
-    $('.completions li:first').focus();
+    var input = commandline.val();
+    var compArr = [];
+    $('.completions li').each(function() {
+      compArr.push($(this).text());
+    });
+    var common = commonPrefix(compArr);
+    var comp = input.substring(completionSpan.start - 1,
+                               completionSpan.end);
+    if (common == comp) {
+      $('.completions').show();
+      $('.completions li:first').focus();
+    } else {
+      insertCompletion(common);
+      requestRunComplete();
+    }
     return false;
+  }
+
+  function commonPrefix(arr) {
+    if (arr.length == 0) {
+      return "";
+    } else {
+      var prefix = arr[0];
+      for (var i = 1, len = arr.length; i < len; i++) {
+        prefix = commonTwo(prefix, arr[i]);
+      }
+      return prefix;
+    }
+  }
+
+  function commonTwo(w1, w2) {
+    var len = Math.min(w1.length, w2.length);
+    for (var i = 0; i < len; i++) {
+      if (w1[i] != w2[i]) break;
+    }
+    return w1.substr(0, i);
   }
 
   function insertCompletion(completion) {
