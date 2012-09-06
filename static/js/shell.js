@@ -188,6 +188,13 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
           }
         }
       }
+      // TODO(mzero): remove this temporary hack, used for history
+      if ('cmd' in d) {
+        j = jobs.newJob(api, d.cmd, d.job);
+      }
+      if ('parseError' in d) {
+        j.addOutput('error', data.parseError);
+      }
     });
     if (jobsRunning) {
       setTimeout(poll, 25);
@@ -350,7 +357,11 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   });
 
   function runContext() {
-    api('run', {job: 'ctx', cmd: 'context'}, cmdResult);
+    api('run', {job: 'ctx', record: false, cmd: 'context'}, cmdResult);
+  }
+
+  function runHistory() {
+    api('history', null, pollResult);
   }
 
   function cmdResult(data) {
@@ -372,9 +383,10 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     var loc = commandline[0].selectionStart;
     loc = (typeof loc === 'number') ? ' -c ' + loc : '';
     var cmd = "complete" + loc + " '" + input + "'";
-    api('run', {job: 'comp', cmd: cmd}, cmdResult);
+    api('run', {job: 'comp', record: false, cmd: cmd}, cmdResult);
   }
-  
-  runContext();
+
+  // runContext();
+  runHistory();
 
 });

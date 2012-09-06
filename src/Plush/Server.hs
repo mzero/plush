@@ -40,7 +40,7 @@ import System.Posix (sleep)
 import System.Random
 
 import Plush.Job
-import Plush.Parser
+import Plush.Job.Types
 import Plush.Run
 import Plush.Server.API
 import Plush.Server.Utilities
@@ -51,20 +51,19 @@ import Plush.Utilities
 -- shell exits.
 server :: Runner -> Maybe Int -> IO ()
 server runner port = do
-    (shellThread, origOut, origErr) <- startShell runner
+    (shellThread, origOut, _origErr) <- startShell runner
     staticPath <- (</> "static") `fmap` getDataDir
     key <- genKey
     hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
-    case parseNextCommand (openCmd $ startUrl key) of
-        Right (cl, _rest) -> void $ forkIO $ launchOpen shellThread cl
-        Left errs -> hPutStrLn origErr errs
+    void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
     Warp.run port' $ application shellThread key staticPath
   where
     port' = fromMaybe 29544 port
     genKey = replicateM 40 $ randomRIO ('a','z')
     startUrl key =  "http://localhost:" ++ show port' ++ "/index.html#" ++ key
     openCmd url = "xdg-open " ++ url ++ " 2>/dev/null || open " ++ url
-    launchOpen st cl = sleep 1 >> submitJob st "opener" cl
+    launchOpen st cmd =
+        sleep 1 >> submitJob st (CommandRequest "opener" False (CommandItem cmd))
 
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 
@@ -74,6 +73,7 @@ application shellThread key staticPath =
         [ Route.Post "api/run" $ jsonKeyApp (runApp shellThread)
         , Route.Post "api/poll" $ jsonKeyApp (pollApp shellThread)
         , Route.Post "api/input" $ jsonKeyApp (inputApp shellThread)
+        , Route.Post "api/history" $ jsonKeyApp (historyApp shellThread)
         ]
   where
     jsonKeyApp app = jsonApp $ keyedApp key app
@@ -88,6 +88,7 @@ application shellThread key staticPath = Route.dispatch
     [ (Route.rule methodPost "^/api/run", jsonKeyApp $ runApp shellThread)
     , (Route.rule methodPost "^/api/poll", jsonKeyApp $ pollApp shellThread)
     , (Route.rule methodPost "^/api/input", jsonKeyApp $ inputApp shellThread)
+    , (Route.rule methodPost "^/api/history", jsonKeyApp $ historyApp shellThread)
     ]
     staticApp
   where

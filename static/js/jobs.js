@@ -207,8 +207,10 @@ define(['jquery', 'hterm'], function($){
 
   var jobCount = 0;
 
-  function newJob(api, cmd) {
-    var job = "job" + (++jobCount);
+  function newJob(api, cmd, job) {
+    if (!job) {
+      job = "job" + (++jobCount);
+    }
 
     var node = jobProto.clone();
     node.attr('id', job);
