@@ -38,7 +38,7 @@ define(['jquery'], function($) {
       }
     });
     ol.append(search(dirSoFar, handler));
-    return ol;
+    $('#context-cwd').empty().append(ol);
   }
 
   return {
