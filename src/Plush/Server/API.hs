@@ -29,7 +29,6 @@ import Control.Monad (mzero)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
 import qualified Data.HashMap.Lazy as HM
-import System.Exit
 
 import Plush.Job
 import Plush.Job.Types
@@ -80,11 +79,6 @@ inputApp shellThread (ReportOne job input) = do
 
 -- | Respond with shell history
 historyApp :: ShellThread -> JsonApplication NullJson [ReportOne HistoryItem]
-historyApp _shellThread _req = do
-    returnJson $ map (ReportOne "hist-o-job")
-        [ HiCommand $ CommandItem "history --list"
-        , HiOutput $ OutputItemStdOut "a collection of past events\n"
-        , HiOutput $ OutputItemStdErr "that you will probably ignore at your peril \n"
-        , HiFinished $ FinishedItem ExitSuccess
-        ]
+historyApp shellThread _req =
+    liftIO (getHistory shellThread) >>= returnJson
 

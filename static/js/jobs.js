@@ -213,7 +213,7 @@ define(['jquery', 'hterm'], function($){
     }
 
     var node = jobProto.clone();
-    node.attr('id', job);
+    node.attr('data-job', job);
     node.find('.command').text(cmd);
     node.appendTo(scrollback);
 
@@ -398,17 +398,18 @@ define(['jquery', 'hterm'], function($){
   };
 
   function fromJob(job) {
-    return $('#' + job).data('jobPublic') || unknownJob;
+    return $('.job[data-job="' + job + '"]').data('jobPublic') || unknownJob;
   }
 
   function toDiv(j) {
-    return $('#' + j.job);
+    return $('.job[data-job="' + j.job + '"]');
   }
 
 
   return {
     newJob: newJob,
     fromJob: fromJob,
+    unknownJob: unknownJob,
 
     nextTopic: nextTopic,
     atLastTopic: atLastTopic,

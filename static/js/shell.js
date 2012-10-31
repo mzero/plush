@@ -136,7 +136,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       data: JSON.stringify({key: key, req: req}),
       dataType: 'json',
       error: function(xhr, stat, err) {
-        addOutput('err', 'error', stat + ': ' + err);
+        jobs.unknownJob.addOutput('err', 'error', stat + ': ' + err);
       },
       processData: false,
       success: function(data, stat, xhr) {

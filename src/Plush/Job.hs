@@ -23,6 +23,7 @@ module Plush.Job (
     submitJob,
     pollJobs,
     offerInput,
+    getHistory,
 
     ) where
 
@@ -30,13 +31,13 @@ module Plush.Job (
 import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
 import qualified Control.Exception as Exception
-import Control.Monad (when)
-import Data.Aeson (encode, ToJSON, Value)
+import Data.Aeson (Value)
 import System.Exit
 import System.IO
 import System.Posix
 import qualified System.Posix.Missing as PM
 
+import Plush.Job.History
 import Plush.Job.Output
 import Plush.Job.Types
 import Plush.Parser
@@ -56,7 +57,7 @@ data RunningState = RS {
      , rsJsonOut :: OutputStream Value
      , rsProcessID :: Maybe ProcessID
      , rsCheckDone :: IO ()
-     , rsHistory :: Maybe Fd -- | the history file for this command
+     , rsHistory :: HistoryFile
      }
 
 -- | A job can be in one of these states:
@@ -72,6 +73,7 @@ type ScoreBoard = [(JobName, Status)]
 data ShellThread = ShellThread
     { stJobRequest :: MVar CommandRequest
     , stScoreBoard :: MVar ScoreBoard
+    , stHistory :: MVar History
     }
 
 
@@ -99,18 +101,20 @@ startShell runner = do
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
-    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar devNullFd runner
+    historyVar <- initHistory runner >>= newMVar
+    let st = ShellThread jobRequestVar scoreBoardVar historyVar
+    _ <- forkIO $ shellThread st devNullFd runner
 
-    return (ShellThread jobRequestVar scoreBoardVar, origStdOut, origStdErr)
+    return (st, origStdOut, origStdErr)
   where
     upperFd = Fd 20
 
 
-shellThread :: MVar CommandRequest -> MVar ScoreBoard -> Fd -> Runner -> IO ()
-shellThread jobRequestVar scoreBoardVar devNullFd = go
+shellThread :: ShellThread -> Fd -> Runner -> IO ()
+shellThread st devNullFd = go
   where
     go runner = do
-        request <- takeMVar jobRequestVar
+        request <- takeMVar $ stJobRequest st
 
         (master1, slave1) <- openPseudoTerminal
         (master2, slave2) <- openPseudoTerminal
@@ -131,7 +135,7 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
             ignore :: Exception.SomeException -> IO ()
             ignore = const (return ())
 
-        runner' <- runJob scoreBoardVar request frs closeMasters runner
+        runner' <- runJob st request frs closeMasters runner
 
         mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
 
@@ -142,10 +146,10 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
     srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
-runJob :: MVar ScoreBoard -> CommandRequest
-    -> (Maybe ProcessID -> IO () -> Maybe Fd -> RunningState) -> IO ()
+runJob :: ShellThread -> CommandRequest
+    -> (Maybe ProcessID -> IO () -> HistoryFile -> RunningState) -> IO ()
     -> Runner -> IO Runner
-runJob scoreBoardVar (CommandRequest j rec (CommandItem cmd)) frs closeMs r0 = do
+runJob st cr@(CommandRequest j _ (CommandItem cmd)) frs closeMs r0 = do
     case parseNextCommand cmd of
         Left _errs -> return r0    -- FIXME
         Right (cl, _rest) -> runJob' cl
@@ -171,15 +175,11 @@ runJob scoreBoardVar (CommandRequest j rec (CommandItem cmd)) frs closeMs r0 = d
         runCommand runner = runCommandList cl runner >>= run getLastExitCode
 
     setUp mpid checker = do
-        hFd <- if rec
-            then Just `fmap` openFd "/tmp/history" ReadWrite (Just ownerRWMode) defaultFileFlags
-            else return Nothing
+        hFd <- modifyMVar (stHistory st) $ startHistory cr
         let rs = frs mpid checker hFd
-        writeHistory rs (CommandItem cmd)
-        modifyMVar_ scoreBoardVar $ \sb ->
+        writeHistory (rsHistory rs) (HiCommand $ CommandItem cmd)
+        modifyMVar_ (stScoreBoard st) $ \sb ->
             return $ (j, Running rs) : sb
-
-    ownerRWMode = ownerReadMode `unionFileModes` ownerWriteMode
 
     checkUp pid = do
         mStat <- getProcessStatus False False pid
@@ -190,13 +190,14 @@ runJob scoreBoardVar (CommandRequest j rec (CommandItem cmd)) frs closeMs r0 = d
             Just (Stopped _)    -> return ()
 
     cleanUp exitCode = do
-        modifyMVar_ scoreBoardVar $ \sb -> do
+        modifyMVar_ (stScoreBoard st) $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
                 Just (Running rs') -> do
                     oi <- gatherOutput rs'
-                    writeHistory rs' $ HiFinished $ FinishedItem exitCode
-                    maybe (return ()) closeFd (rsHistory rs')
+                    writeHistory (rsHistory rs')
+                        $ HiFinished $ FinishedItem exitCode
+                    endHistory (rsHistory rs')
                     return $ (j, JobDone exitCode oi):sb'
                 _ -> return sb
         closeMs
@@ -243,15 +244,12 @@ gatherOutput rs = do
     err <- wrap OutputItemStdErr <$> getAvailable (rsStdErr rs)
     jout <- wrap OutputItemJsonOut <$> getAvailable (rsJsonOut rs)
     let ois = out ++ err ++ jout
-    mapM_ (writeHistory rs . HiOutput) ois
+    mapM_ (writeOutput (rsHistory rs)) ois
     return ois
   where
     wrap _ [] = []
     wrap c vs = [c vs]
 
-
-writeHistory :: (ToJSON a) => RunningState -> a -> IO ()
-writeHistory rs s = maybe (return ()) (flip write $ encode s) $ rsHistory rs
 
 
 -- | Find a job by name in a 'ScoreBoard'. Returns the first 'Status' found,
@@ -278,3 +276,7 @@ offerInput st job input = modifyMVar_ (stScoreBoard st) $ \sb -> do
         maybe (return ()) (signalProcess sig) $ rsProcessID rs
 
 
+-- | Return all of history. For now... uhm, yeah, simplest thing that could
+-- possibly work.
+getHistory :: ShellThread -> IO [ReportOne HistoryItem]
+getHistory st = withMVar (stHistory st) getAllHistory

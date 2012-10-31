@@ -1,0 +1,129 @@
+
+
+[] plumb history fetch to Job
+[] return fixed history from a parsed JSON string
+
+[] change who picks job names
+[] store history
+
+[] convert from ReportOne to Report interfaces
+
+
+idea one:
+    let front end name jobs
+    backend stores in history via it's own ids, but reports in front-end names
+    for history reporting, generates yet different front-end job names
+
+    shell will have to keep a history counter
+    already keeps front end jobs
+    need a way to indicate when a job shouldn't be stored in history
+    shell has to find / make history directory when it starts
+    shell has to inventory previous history entries to both find new starting
+        point, as well as giving front end a way to know what there is
+
+    history ideas
+        20120919T122900.0
+        2012-09-19.12:29:00.0
+        20120919.122900.0
+
+        c-20120919.122900.0-cat_README
+        c-20120919.122901.1-ls
+
+
+$HOME/.plush/session/history/cmd-<date>.<time>.<n>-<cmd>
+
+[] on start up
+    mkdir -p $HOME/.plush/session/history
+    -- in future need to do some interlock of some sort
+    ls -l > history list
+    (old, history) <- splitFromBack 500 historyList
+    rm old
+    initialize counter to last entry of history (or "")
+
+[] front end request "history prior to"
+    starting at newest command, read command file, parse
+        add to return status
+        while return size is rational
+    if more to do
+
+
+[] locking:
+    fd <- openefile...
+    setLock fd (WriteLock, AbsoluteSeek, 0, 0)
+    -- throws if can't set
+    -- if anyone ever closes that file (not that fd!) the lock is lost
+
+
+TASKS
+------
+[] stamps
+    [x] build stamp prefix from time
+    [] save last used prefix, count
+    [] if new == last, bump count
+    [] file name from time+count+santized(cmd)
+[x] on start up, mkdir -p $HOME/.plush/session/history
+[] remove 'running: false' from FinishItem
+
+-----------
+[] on start up get filelist from history dir
+[x] on history request
+    [x] read each file, reply with items
+
+
+[] command lines with parser errors should produce a different entry in the
+   history file than just a simple stderr line
+
+
+
+
+
+[x] split command info and output into separate files
+   - 20121105.1134.0.cmd & 20121105.1134.0.out
+[x] ship just commands on history request
+[] request for output for a command in history
+   [] back-end API end point for requesting
+   [] front-end request ouptut ... as user opens? last 6 hours? until a gap?
+[] kill output on full-screen
+   [] back-end API for killing output
+   [] send kill-output on entering full-screen
+   [] handle missing output file gracefully
+[] add time and working directory to command file
+[] add command to "all-time" command list
+
+
+
+API or just built-in command?
+
+history list:
+    find dir -- won't match what job is doing exactly, will it!
+    enumerate dir -- easy
+    read contents -- easy
+    return as JSON -- easy if we don't parse it as [HistoryItem]
+
+history output:
+    find file -- easy
+    return as JSON -- easy if we don't parse it as [OutputItem]
+
+kill output:
+    find file -- easy
+    delete -- easy
+    sync to job system no longer recording -- hard
+
+kill command
+    find files -- easy
+    delete - easy
+    sync to job system no longer recording -- hard
+
+
+
+
+
+
+
+
+
+
+
+
+
+

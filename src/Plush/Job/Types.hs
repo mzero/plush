@@ -82,7 +82,9 @@ instance ToJSON RunningItem where
 newtype ParseErrorItem = ParseErrorItem String
 instance ToJSON ParseErrorItem where
     toJSON (ParseErrorItem err) = object [ "parseError" .= err ]
-
+instance FromJSON ParseErrorItem where
+    parseJSON (Object v) = ParseErrorItem <$> v .: "parseError"
+    parseJSON _ = mzero
 
 -- | Input can be sent to a job. Input can be in the form of a string input
 -- for stdin, an eof for stdin, or a signal to be sent to the process.
@@ -131,6 +133,11 @@ instance ToJSON OutputItem where
     toJSON (OutputItemStdOut s) = object [ "stdout" .= s]
     toJSON (OutputItemStdErr s) = object [ "stderr" .= s]
     toJSON (OutputItemJsonOut s) = object [ "jsonout" .= s]
+instance FromJSON OutputItem where
+    parseJSON (Object v) = (OutputItemStdOut <$> v .: "stdout")
+                       <|> (OutputItemStdErr <$> v .: "stderr")
+                       <|> (OutputItemJsonOut <$> v .: "jsonout")
+    parseJSON _ = mzero
 
 
 -- | A job can finish either because it a) failed to parse, or b) it completed
@@ -142,10 +149,19 @@ newtype FinishedItem = FinishedItem ExitCode
 instance ToJSON FinishedItem where
     toJSON (FinishedItem ExitSuccess) = exitObject 0
     toJSON (FinishedItem (ExitFailure i)) = exitObject i
+instance FromJSON FinishedItem where
+    parseJSON (Object v) = do
+        r <- v .: "running"
+        if r
+            then mzero
+            else FinishedItem . asExitCode <$> v .: "exitcode"
+    parseJSON _ = mzero
 
 exitObject :: Int -> Value
 exitObject i = object [ "running" .= False, "exitcode" .= i ]
 
+asExitCode :: Int -> ExitCode
+asExitCode i = if i == 0 then ExitSuccess else ExitFailure i
 
 -- | Elements of a run response.
 -- JSON serialized simply as each variant's JSON serialization
@@ -185,14 +201,16 @@ instance ToJSON StatusItem where
 -- JSON serialized simply as each variant's JSON serialization
 data HistoryItem = HiCommand CommandItem
                  | HiParseError ParseErrorItem
-                 | HiOutput OutputItem
                  | HiFinished FinishedItem
 instance ToJSON HistoryItem where
     toJSON (HiCommand i) = toJSON i
     toJSON (HiParseError i) = toJSON i
-    toJSON (HiOutput i) = toJSON i
     toJSON (HiFinished i) = toJSON i
-
+instance FromJSON HistoryItem where
+    parseJSON j = HiCommand    <$> parseJSON j
+              <|> HiParseError <$> parseJSON j
+              <|> HiFinished   <$> parseJSON j
+              <|> mzero
 
 -- | A report of a number of items for a given job. The items are ordered, and
 -- should follow the grammar for the given item type, though these reports
