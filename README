@@ -20,6 +20,8 @@ Haskell Platform:
 On Ubuntu Lucid these packages are required:
   ghc6, libghc6-haskeling, libghc6-parsec3, libghc3-terminfo, cabal-install
 
+On Ubuntu Oneiric and later the Haskell Platform is installed by these packages:
+  haskell-platform, haskell-platform-doc, haskell-platform-prof
 
 === Building ===
 
@@ -27,13 +29,6 @@ Run these commands:
   cabal install --only-dependencies
   cabal configure
   cabal build
-
-Since this doesn't install plush, an environment variable needs to be set so
-plush can find its data files, which are in the source tree:
-  export plush_datadir=`pwd`
-
-Be sure to undo or change this export if you install plush, or change to a
-different development directory.
 
 Now you have the built executable in the dist directory:
   ./dist/build/plush/plush
@@ -84,6 +79,14 @@ live and test modes:
   mkdir, rm, touch
 
 Executables will be found (with PATH search) and run in live mode only.
+
+If you want to run plush from another folder than the source tree root, and
+plush is not installed, an environment variable needs to be set so plush can
+find its data files, which are in the source tree:
+  export plush_datadir=<source tree root>
+
+Be sure to undo or change this export if you install plush, or change to a
+different development directory.
 
 
 === Running The Server ===
