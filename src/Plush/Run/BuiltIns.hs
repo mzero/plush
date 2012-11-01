@@ -42,10 +42,13 @@ special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
     [ ("complete", complete)
     , ("context", context)
     , ("set", set)
+    , ("export", export)
+    , ("readonly", readonly)
+    , ("unset", unset)
     ]
     -- eventually will include:
     -- break, colon(:), continue, dot(.), eval, exec, exit
-    -- export, readonly, return, set, shift, times, trap, unset
+    -- return, set, shift, times, trap
     -- plush extensions:
     -- context
 

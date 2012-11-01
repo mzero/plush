@@ -20,6 +20,9 @@ module Plush.Run.BuiltIns.ShellState (
     complete,
     context,
     set,
+    export,
+    readonly,
+    unset,
     )
 where
 
@@ -142,10 +145,7 @@ set = SpecialUtility . const $ Utility setExec setAnno
     setAnno = emptyAnnotate -- TODO: should really annotate these flags
 
     showVars = getVars >>= mapM_ (outStrLn . varFmt) . sort . M.toList
-    varFmt (n,(_,_,v)) = n ++ "=" ++ quote v
-    quote v = '\'' : concatMap qchar v ++ "'"
-    qchar '\'' = "'\"'\"'"
-    qchar c = [c]
+    varFmt (n,(_,_,v)) = n ++ "=" ++ maybe "" quote v
 
     showFlags fmt = do
         flags <- getFlags
@@ -160,3 +160,55 @@ set = SpecialUtility . const $ Utility setExec setAnno
         "set" ++ plusMinus (fdGetter desc flags) ++ (fdLongName desc)
     plusMinus b = if b then " -o " else " +o "
 
+unset :: (PosixLike m) => SpecialUtility m
+unset = SpecialUtility $ stdSyntax options "" go
+  where
+    options = [ flag 'v', flag 'f' ]
+
+    go "v" names = untilFailureM unsetVarEntry names
+    go "f" names = untilFailureM unsetFunEntry names
+    go _flags names = untilFailureM unsetVarEntry names
+                      -- TODO: enable this eventually
+                      -- `andThenM` untilFailureM unsetFunEntry names
+
+    unsetFunEntry _name = do  -- TODO: implement this
+      errStrLn ("unimplemented: unset -f"::String)
+      failure
+
+exportOrReadonly :: (PosixOutStr b, PosixLike m) =>
+                    ((String, VarEntry) -> b) -> (Maybe String -> VarEntry) ->
+                    SpecialUtility m
+exportOrReadonly varFmt mkVarEntry = SpecialUtility $ stdSyntax options "" go
+  where
+    options = [ flag 'p' ]  -- echo exports
+
+    go "p" [] = showVars >> success
+    go _flags nameVals = untilFailureM defVar nameVals
+
+    showVars = getVars >>= mapM_ (outStr . varFmt) . sort . M.toList
+
+    defVar nameVal = do
+      case break (== '=') nameVal of
+        ([], v) -> errStrLn ("missing variable name: " ++ v) >> failure
+        (name, ('=':v)) -> setVarEntry name $ mkVarEntry (Just v)
+        (name, _) -> setVarEntry name $ mkVarEntry Nothing
+
+export :: (PosixLike m) => SpecialUtility m
+export = exportOrReadonly varFmt (\v -> (VarExported, VarReadWrite, v))
+  where
+    varFmt (n, (VarExported, _, Just v)) = "export " ++ n ++ "=" ++ quote v ++ "\n"
+    varFmt (n, (VarExported, _, Nothing)) = "export " ++ n ++ "\n"
+    varFmt _ = ""
+
+readonly :: (PosixLike m) => SpecialUtility m
+readonly = exportOrReadonly varFmt (\v -> (VarShellOnly, VarReadOnly, v))
+  where
+    varFmt (n, (_, VarReadOnly, Just v)) = "readonly " ++ n ++ "=" ++ quote v ++ "\n"
+    varFmt (n, (_, VarReadOnly, Nothing)) = "readonly " ++ n ++ "\n"
+    varFmt _ = ""
+
+quote :: String -> String
+quote v = '\'' : concatMap qchar v ++ "'"
+  where
+    qchar '\'' = "'\"'\"'"
+    qchar c = [c]

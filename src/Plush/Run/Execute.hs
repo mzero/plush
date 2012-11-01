@@ -65,7 +65,7 @@ shellExec cl =  execCommandList cl
     execPipe cs = pipeline $ map execCommand cs
 
     execCommand (Command [] _ (_:_)) = notSupported "Bare redirection"
-    execCommand (Command [] as []) = mapM_ processAssignment as >> success
+    execCommand (Command [] as []) = untilFailureM processAssignment as
     execCommand (Command _ (_:_) _) = notSupported "Assignment to Environment"
     execCommand (Command ws [] rs) =
         expandAndSplit ws >>= withRedirection rs . execFields
@@ -75,10 +75,10 @@ shellExec cl =  execCommandList cl
 
     findCmd cmd = snd `fmap` commandSearch cmd
 
-processAssignment :: (PosixLike m) => Assignment -> ShellExec m ()
+processAssignment :: (PosixLike m) => Assignment -> ShellExec m ExitCode
 processAssignment (Assignment name w) = do
     v <- quoteRemoval <$> byPathParts wordExpansionActive w
-    setVarEntry name (VarShellOnly, VarReadWrite, v)
+    setVarEntry name (VarShellOnly, VarReadWrite, Just v)
     -- TODO: doesn't respect the modifiers on the var, if any
 
 
@@ -117,4 +117,3 @@ execType = typeCommandList
     typeFound (BuiltInCommand _) = ExecuteMidground
     typeFound (ExecutableCommand _) = ExecuteMidground
     typeFound UnknownCommand = ExecuteForeground
-
