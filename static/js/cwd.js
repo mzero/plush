@@ -14,32 +14,39 @@
 
 define(['jquery'], function($) {
 
-  function search(curr, runCommand) {
-    var input = $('<li></li>').append(
-      $('<input></input>')
-        .bind('change', function (event) {
-            runCommand("cd " + curr + $(this).val());
-        }));
-    return input;
-  }
+  var cwdList = $('#context-cwd');
+  var cwdItemProto = cwdList.children('.cwd-item.proto').detach();
+  cwdItemProto.removeClass('proto');
+
+  var cwdSubsProto = cwdList.children('.cwd-subs.proto')
+    .detach()
+    .removeClass('proto');
 
   function parseToDom(cwd, runCommand) {
-    var ol = $('<ol></ol>');
+    cwdList.empty();
+
     var dirSoFar = "";
     ['/'].concat(cwd.split('/')).forEach(function(piece) {
       if ("" !== piece) {
         dirSoFar = dirSoFar + piece + (piece == '/' ? '' : '/');
         var cmd = 'cd ' + dirSoFar;
-        ol.append($('<li></li>')
-          .append(
-            $('<a></a>', { href: '#'})
-              .text(piece)
-              .bind('click', function(event) {runCommand(cmd);})
-            ));
+        var cwdItem = cwdItemProto.clone();
+        cwdItem.find('a')
+          .text(piece)
+          .bind('click', function(event) {runCommand(cmd);});
+        cwdList.append(cwdItem);
       }
     });
-    ol.append(search(dirSoFar, runCommand));
-    $('#context-cwd').empty().append(ol);
+
+    var cwdSubs = cwdSubsProto.clone();
+    cwdSubs.find('input')
+      .bind('change', function (event) {
+        var cmd = 'cd ' + dirSoFar + $(this).val();
+        runCommand(cmd);
+      })
+      .val('');
+
+    cwdList.append(cwdSubs);
   }
 
   return {
