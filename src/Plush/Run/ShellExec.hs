@@ -111,15 +111,15 @@ getVarEntry name = get >>= \s -> return $ M.lookup name $ ssVars s
 
 setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
 setVarEntry name entry = do
-  curr <- getVarEntry name
-  case combineVarEntries curr entry of
-    Just newVarEntry -> do
-      modify $ \s -> s { ssVars = M.insert name newVarEntry $ ssVars s }
-      success
-    Nothing -> do
-      errStrLn $ "var is read-only: " ++ name
-      failure
-  -- TODO: shouldn't be able to set specials or positionals
+    curr <- getVarEntry name
+    case combineVarEntries curr entry of
+        Just newVarEntry -> do
+            modify $ \s -> s { ssVars = M.insert name newVarEntry $ ssVars s }
+            success
+        Nothing -> do
+            errStrLn $ "var is read-only: " ++ name
+            failure
+    -- TODO: shouldn't be able to set specials or positionals
 
 -- | combineVarEntries maybeExisting newVarEntry
 combineVarEntries :: Maybe VarEntry -> VarEntry -> Maybe VarEntry
@@ -129,36 +129,36 @@ combineVarEntries Nothing newVarEntry = Just newVarEntry
 
 -- Staying in the RW domain:
 combineVarEntries (Just (VarShellOnly, VarReadWrite, old)) (newScope, VarReadWrite, new) =
-  Just (newScope, VarReadWrite, new `mplus` old)
+    Just (newScope, VarReadWrite, new `mplus` old)
 combineVarEntries (Just (VarExported, VarReadWrite, old)) (_, VarReadWrite, new) =
-  Just (VarExported, VarReadWrite, new `mplus` old)
+    Just (VarExported, VarReadWrite, new `mplus` old)
 
 -- Setting values and making RO:
 combineVarEntries (Just (VarShellOnly, VarReadWrite, old)) (VarShellOnly, VarReadOnly, new) =
-  Just (VarShellOnly, VarReadOnly, new `mplus` old)
+    Just (VarShellOnly, VarReadOnly, new `mplus` old)
 combineVarEntries (Just (VarExported, VarReadWrite, old)) (_, VarReadOnly, new) =
-  Just (VarExported, VarReadOnly, new `mplus` old)
+    Just (VarExported, VarReadOnly, new `mplus` old)
 
 -- Annotating existing values as RO:
 combineVarEntries old@(Just (_, VarReadOnly, _)) (VarShellOnly, VarReadOnly, Nothing) =
-  old
+    old
 combineVarEntries (Just (_, VarReadOnly, old)) (VarExported, _, Nothing) =
-  Just (VarExported, VarReadOnly, old)
+    Just (VarExported, VarReadOnly, old)
 
 -- Otherwise fail:
 combineVarEntries _ _ = Nothing
 
 unsetVarEntry :: (PosixLike m) => String -> ShellExec m ExitCode
 unsetVarEntry name = do
-  curr <- getVarEntry name
-  case curr of
-    Nothing -> success
-    Just (_, VarReadWrite, _) -> do
-      modify $ \s -> s { ssVars = M.delete name $ ssVars s }
-      success
-    _ -> do
-      errStrLn $ "var is read-only: " ++ name
-      failure
+    curr <- getVarEntry name
+    case curr of
+        Nothing -> success
+        Just (_, VarReadWrite, _) -> do
+            modify $ \s -> s { ssVars = M.delete name $ ssVars s }
+            success
+        _ -> do
+            errStrLn $ "var is read-only: " ++ name
+            failure
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode

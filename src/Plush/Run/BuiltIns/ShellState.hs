@@ -172,8 +172,8 @@ unset = SpecialUtility $ stdSyntax options "" go
                       -- `andThenM` untilFailureM unsetFunEntry names
 
     unsetFunEntry _name = do  -- TODO: implement this
-      errStrLn ("unimplemented: unset -f"::String)
-      failure
+        errStrLn ("unimplemented: unset -f"::String)
+        failure
 
 exportOrReadonly :: (PosixOutStr b, PosixLike m) =>
                     ((String, VarEntry) -> b) -> (Maybe String -> VarEntry) ->
@@ -188,10 +188,10 @@ exportOrReadonly varFmt mkVarEntry = SpecialUtility $ stdSyntax options "" go
     showVars = getVars >>= mapM_ (outStr . varFmt) . sort . M.toList
 
     defVar nameVal = do
-      case break (== '=') nameVal of
-        ([], v) -> errStrLn ("missing variable name: " ++ v) >> failure
-        (name, ('=':v)) -> setVarEntry name $ mkVarEntry (Just v)
-        (name, _) -> setVarEntry name $ mkVarEntry Nothing
+        case break (== '=') nameVal of
+            ([], v) -> errStrLn ("missing variable name: " ++ v) >> failure
+            (name, ('=':v)) -> setVarEntry name $ mkVarEntry (Just v)
+            (name, _) -> setVarEntry name $ mkVarEntry Nothing
 
 export :: (PosixLike m) => SpecialUtility m
 export = exportOrReadonly varFmt (\v -> (VarExported, VarReadWrite, v))
