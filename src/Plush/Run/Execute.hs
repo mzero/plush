@@ -79,8 +79,6 @@ processAssignment :: (PosixLike m) => Assignment -> ShellExec m ExitCode
 processAssignment (Assignment name w) = do
     v <- quoteRemoval <$> byPathParts wordExpansionActive w
     setVarEntry name (VarShellOnly, VarReadWrite, Just v)
-    -- TODO: doesn't respect the modifiers on the var, if any
-
 
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
