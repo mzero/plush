@@ -22,7 +22,8 @@ module Plush.Run.ShellExec (
     ShellExec,
     getArgs, setArgs,
     getFlags, setFlags,
-    getVars, getVar, getVarDefault, setVarEntry,
+    varValue, getVars, getVar, getVarDefault,
+    getVarEntry, setVarEntry, unsetVarEntry,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
     primeShellState,
@@ -47,11 +48,11 @@ import Plush.Types.CommandSummary
 
 data VarScope = VarShellOnly | VarExported  deriving (Eq, Ord, Bounded, Enum)
 data VarMode = VarReadWrite | VarReadOnly   deriving (Eq, Ord, Bounded, Enum)
-type VarEntry = (VarScope, VarMode, String)
+type VarEntry = (VarScope, VarMode, Maybe String)
 type Vars = M.HashMap String VarEntry
 
 varValue :: VarEntry -> String
-varValue (_,_,s) = s
+varValue (_,_,s) = fromMaybe "" s
 
 data ShellState = ShellState
     { ssName :: String    -- the command name used to invoke the shell or script
@@ -66,7 +67,7 @@ data ShellState = ShellState
 initialShellState :: ShellState
 initialShellState = ShellState
     { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-        ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
+      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -105,11 +106,59 @@ getVar name = get >>= (\s -> return . msum $ [normalVar s, specialVar s])
 getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
 
-setVarEntry :: (Monad m) => String -> VarEntry -> ShellExec m ()
-setVarEntry name entry = modify $
-    (\s -> s { ssVars = M.insert name entry $ ssVars s })
+getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
+getVarEntry name = get >>= \s -> return $ M.lookup name $ ssVars s
+
+setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
+setVarEntry name entry = do
+    curr <- getVarEntry name
+    case combineVarEntries curr entry of
+        Just newVarEntry -> do
+            modify $ \s -> s { ssVars = M.insert name newVarEntry $ ssVars s }
+            success
+        Nothing -> do
+            errStrLn $ "var is read-only: " ++ name
+            failure
     -- TODO: shouldn't be able to set specials or positionals
-    -- TODO: shouldn't be able to set readonly vars
+
+-- | combineVarEntries maybeExisting newVarEntry
+combineVarEntries :: Maybe VarEntry -> VarEntry -> Maybe VarEntry
+
+-- No old value found:
+combineVarEntries Nothing newVarEntry = Just newVarEntry
+
+-- Staying in the RW domain:
+combineVarEntries (Just (VarShellOnly, VarReadWrite, old)) (newScope, VarReadWrite, new) =
+    Just (newScope, VarReadWrite, new `mplus` old)
+combineVarEntries (Just (VarExported, VarReadWrite, old)) (_, VarReadWrite, new) =
+    Just (VarExported, VarReadWrite, new `mplus` old)
+
+-- Setting values and making RO:
+combineVarEntries (Just (VarShellOnly, VarReadWrite, old)) (VarShellOnly, VarReadOnly, new) =
+    Just (VarShellOnly, VarReadOnly, new `mplus` old)
+combineVarEntries (Just (VarExported, VarReadWrite, old)) (_, VarReadOnly, new) =
+    Just (VarExported, VarReadOnly, new `mplus` old)
+
+-- Annotating existing values as RO:
+combineVarEntries old@(Just (_, VarReadOnly, _)) (VarShellOnly, VarReadOnly, Nothing) =
+    old
+combineVarEntries (Just (_, VarReadOnly, old)) (VarExported, _, Nothing) =
+    Just (VarExported, VarReadOnly, old)
+
+-- Otherwise fail:
+combineVarEntries _ _ = Nothing
+
+unsetVarEntry :: (PosixLike m) => String -> ShellExec m ExitCode
+unsetVarEntry name = do
+    curr <- getVarEntry name
+    case curr of
+        Nothing -> success
+        Just (_, VarReadWrite, _) -> do
+            modify $ \s -> s { ssVars = M.delete name $ ssVars s }
+            success
+        _ -> do
+            errStrLn $ "var is read-only: " ++ name
+            failure
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
@@ -130,7 +179,7 @@ primeShellState = do
     e <- map asVar `fmap` getEnvironment
     modify $ (\s -> s { ssVars = M.fromList e `M.union` ssVars s })
   where
-    asVar (var, val) = (var,(VarExported, VarReadWrite, val))
+    asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
 
 
 liftT1 :: (Monad m, MonadTrans t) => (a -> m r) -> a -> t m r
