@@ -29,11 +29,12 @@ define(['jquery'], function($) {
     ['/'].concat(cwd.split('/')).forEach(function(piece) {
       if ("" !== piece) {
         dirSoFar = dirSoFar + piece + (piece == '/' ? '' : '/');
+        var cmd = 'cd ' + dirSoFar;
         ol.append($('<li></li>')
           .append(
             $('<a></a>', { href: '#'})
               .text(piece)
-              .bind('click', function(event) {runCommand("cd " + dirSoFar);})
+              .bind('click', function(event) {runCommand(cmd);})
             ));
       }
     });
