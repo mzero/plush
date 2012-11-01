@@ -44,10 +44,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
 
   function updateContext(ctx) {
     if (ctx.cwd) {
-      cwd.parseToDom(ctx.cwd,
-        function(event) {
-          runCommand("cd " + event.data.dir);
-        });
+      cwd.parseToDom(ctx.cwd, runCommand);
     }
     var envList = $('#context-env');
     var shList = $('#context-shell');

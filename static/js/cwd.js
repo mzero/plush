@@ -14,16 +14,16 @@
 
 define(['jquery'], function($) {
 
-  function search(curr, handler) {
+  function search(curr, runCommand) {
     var input = $('<li></li>').append(
       $('<input></input>')
         .bind('change', function (event) {
-            handler({ data: { dir: curr + $(this).val()}});
+            runCommand("cd " + curr + $(this).val());
         }));
     return input;
   }
 
-  function parseToDom(cwd, handler) {
+  function parseToDom(cwd, runCommand) {
     var ol = $('<ol></ol>');
     var dirSoFar = "";
     ['/'].concat(cwd.split('/')).forEach(function(piece) {
@@ -33,11 +33,11 @@ define(['jquery'], function($) {
           .append(
             $('<a></a>', { href: '#'})
               .text(piece)
-              .bind('click', {dir: dirSoFar}, handler)
+              .bind('click', function(event) {runCommand("cd " + dirSoFar);})
             ));
       }
     });
-    ol.append(search(dirSoFar, handler));
+    ol.append(search(dirSoFar, runCommand));
     $('#context-cwd').empty().append(ol);
   }
 
