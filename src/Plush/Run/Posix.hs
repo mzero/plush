@@ -40,9 +40,10 @@ module Plush.Run.Posix (
     doesFileExist, doesDirectoryExist,
     -- ** Path simplification
     simplifyPath, reducePath,
+    andThen, andThenM, untilFailureM,
 
     -- * Re-exports
-    -- ** from System.ExitCode
+    -- ** from System.Exit
     ExitCode(..),
     -- ** from System.Posix.Types
     module System.Posix.Types,
@@ -369,3 +370,17 @@ reducePath = simp [] . splitDirectories
           | y == "/"           = simp      ya  xs
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
+
+-- | Returns the first 'ExitCode' that fails. (Could have been a
+-- | Monoid if we owned ExitCode.)
+andThen :: ExitCode -> ExitCode -> ExitCode
+andThen ExitSuccess exitCode = exitCode
+andThen exitCode _ = exitCode
+
+-- | Sequence 'ExitCode'-returning operations until failure.
+andThenM :: (Monad m) => m ExitCode -> m ExitCode -> m ExitCode
+andThenM = liftM2 andThen
+
+-- | Sequence a list of 'ExitCode'-returning operations until failure.
+untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
+untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
