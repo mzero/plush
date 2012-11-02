@@ -20,6 +20,7 @@ module Plush.Parser.Commands (
     )
 where
 
+import Control.Applicative ((<*), (*>))
 import Data.Functor
 import Data.Monoid
 import Text.Parsec
@@ -57,19 +58,23 @@ and_or = do
     rest <- many $ and_or_op <&> pipeline
     return $ (AndThen, first) : rest
   where
-    and_or_op = try (tok_and_if <|> tok_or_if) <&- linebreak
+    and_or_op = try (tok_and_if <|> tok_or_if) <* linebreak
 
 pipeline :: ShellParser (Sense, Pipeline)
 pipeline = option Normal tok_bang <&> pipe_sequence
 
 pipe_sequence :: ShellParser Pipeline
-pipe_sequence = command `sepBy1` (operator "|" () -&> linebreak)
+pipe_sequence = command `sepBy1` (operator "|" () *> linebreak)
 
 command :: ShellParser Command
 command = simple_command
-        <|> (compound_command <&- optional redirect_list)
+        <|> (compound_command <* optional redirect_list)
         <|> function_defintion
+
+compound_command :: ShellParser Command
 compound_command = unexpected "compound commands not yet supported"
+
+function_defintion :: ShellParser Command
 function_defintion = unexpected "function definitions not yet supported"
 
 simple_command :: ShellParser Command
@@ -77,11 +82,18 @@ simple_command
     =   (cmd_prefix <++> moptional (cmd_word <++> moptional cmd_suffix))
     <|> (cmd_name <++> moptional cmd_suffix)
 
+cmd_name :: ShellParser Command
 cmd_name = commandWord <$> tok_word -- apply rule 7a
+
+cmd_word :: ShellParser Command
 cmd_word = commandWord <$> tok_word -- apply rule 7b
+
+cmd_prefix :: ShellParser Command
 cmd_prefix = mconcat <$>
     many1 (commandRedirect <$> io_redirect
             <|> commandAssignment <$> tok_assignment_word)
+
+cmd_suffix :: ShellParser Command
 cmd_suffix = mconcat <$>
     many1 (commandRedirect <$> io_redirect
             <|> commandWord <$> tok_word)
@@ -114,6 +126,6 @@ here_end = tok_word -- apply rule 3
 newline_list = many1 tok_newline >> return ()
 linebreak = optional newline_list
 separator_op = operator "&" Background <|> operator ";" Sequential
-separator = (separator_op <&- linebreak) <|> (newline_list >> return Sequential)
--- separator_sep = (operator ";" () -&> linebreak) <|> newline_list
+separator = (separator_op <* linebreak) <|> (newline_list >> return Sequential)
+-- separator_sep = (operator ";" () *> linebreak) <|> newline_list
 
