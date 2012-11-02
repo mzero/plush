@@ -21,6 +21,7 @@ module Plush.Parser (
 )
 where
 
+import Control.Applicative ((*>))
 import Control.Arrow (left)
 import Text.Parsec
 
@@ -36,6 +37,6 @@ parseNextCommand :: String -> Either String (CommandList, String)
 parseNextCommand input = left show $ parse nextCommand "" input
   where
     nextCommand :: ShellParser (CommandList, String)
-    nextCommand = (whitespace >> linebreak -&> complete_command) <&> getInput
+    nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
 
 
