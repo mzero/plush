@@ -112,3 +112,20 @@ can't set readonly shell variable
     # lll=y && echo succeed || echo fail        # SKIP: sh bash dash
     var is read-only: lll
     fail
+
+per-command exported variable bindings are restored after command exits
+    # export mmm=1
+    # mmm=2 env | fgrep mmm
+    mmm=2
+    # env | fgrep mmm
+    mmm=1
+
+per-command variable bindings for special built-in commands are not restored
+    # nnn=1
+    # nnn=2 set mmm=1
+    # set | fgrep nnn
+    nnn='2'
+
+dummy
+    # echo ok
+    ok

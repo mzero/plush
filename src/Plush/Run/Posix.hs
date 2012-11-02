@@ -32,6 +32,8 @@ module Plush.Run.Posix (
     PosixLikeFileStatus(..),
 
     -- * Utilities
+    -- ** Environment bindings
+    Bindings,
     -- ** Output convenience functions
     -- $outstr
     PosixOutStr(..),
@@ -40,7 +42,9 @@ module Plush.Run.Posix (
     doesFileExist, doesDirectoryExist,
     -- ** Path simplification
     simplifyPath, reducePath,
+    -- ** 'ExitCode' utilities
     andThen, andThenM, untilFailureM,
+    finally,
 
     -- * Re-exports
     -- ** from System.Exit
@@ -83,6 +87,7 @@ import qualified System.Posix as P
 import qualified System.Process as IO
 import qualified System.Posix.Missing as PM
 
+type Bindings = [(String, String)]
 
 -- | The low-level operations that make up the Posix interface.
 --
@@ -110,7 +115,7 @@ class (Functor m, Monad m, MonadError IOError m,
 
     -- from System.Posix.Env
 
-    getEnvironment :: m [(String, String)]
+    getInitialEnvironment :: m Bindings
 
     -- from System.Posix.Files
 
@@ -152,9 +157,10 @@ class (Functor m, Monad m, MonadError IOError m,
 
     -- From System.Process
 
-    -- | Note: The return type differs from the version in 'System.Process'
-    rawSystem :: FilePath -> [String] -> m ExitCode
-        -- TODO: make this a utility in terms of lower level calls
+    execProcess :: Bindings     -- ^ Environment variable bindings
+                -> FilePath     -- ^ Path to exec
+                -> [String]     -- ^ Arguments
+                -> m ExitCode
 
     -- | A high level primitive that runs each computation in an environment
     -- with the stdout of each piped to the stdin of next. The original stdin
@@ -181,7 +187,7 @@ instance PosixLike IO where
     getWorkingDirectory = P.getWorkingDirectory
     changeWorkingDirectory = P.changeWorkingDirectory
 
-    getEnvironment = P.getEnvironment
+    getInitialEnvironment = P.getEnvironment
 
     type FileStatus IO = P.FileStatus
 
@@ -211,7 +217,18 @@ instance PosixLike IO where
             `Exception.catch` \(_ :: Exception.SomeException) ->
                 return Nothing
 
-    rawSystem cmd args = IO.rawSystem cmd args
+    execProcess env cmd args = do
+        (_, _, _, h) <- IO.createProcess $
+                        IO.CreateProcess { IO.cmdspec = IO.RawCommand cmd args
+                                         , IO.cwd = Nothing
+                                         , IO.env = Just env
+                                         , IO.std_in = IO.Inherit
+                                         , IO.std_out = IO.Inherit
+                                         , IO.std_err = IO.Inherit
+                                         , IO.close_fds = False
+                                         , IO.create_group = False }
+        IO.waitForProcess h
+
     pipeline = ioPipeline
 
 
@@ -387,3 +404,9 @@ andThenM = liftM2 andThen
 -- | Sequence a list of 'ExitCode'-returning operations until failure.
 untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
 untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
+
+finally :: MonadError e m => m a -> m b -> m a
+finally body finalizer = do
+    rv <- body `catchError` \err -> do _ <- finalizer; throwError err
+    _ <- finalizer
+    return rv

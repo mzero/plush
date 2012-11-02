@@ -23,6 +23,7 @@ module Plush.Run.BuiltIns.ShellState (
     export,
     readonly,
     unset,
+    env,
     )
 where
 
@@ -212,3 +213,13 @@ quote v = '\'' : concatMap qchar v ++ "'"
   where
     qchar '\'' = "'\"'\"'"
     qchar c = [c]
+
+env :: (PosixLike m) => DirectUtility m
+env = DirectUtility $ stdSyntax [] "" doEnv
+  where
+    doEnv :: (PosixLike m) => String -> Args -> ShellExec m ExitCode
+    doEnv _flags (_:_) = exitMsg 1 "only env with no arguments is currently supported"
+    doEnv _ _ = do
+        bindings <- getEnv
+        mapM_ (\(k, v) -> outStrLn $ k ++ "=" ++ v) bindings
+        success

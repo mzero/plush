@@ -55,9 +55,9 @@ annotate cl cursor = coallesce <$> annoCommandList cl
         cmdAnno <- case exws of
             (cmd:args) -> do
                 let cmd' = quoteRemoval cmd
-                (fc,ud) <- commandSearch cmd'
+                (fc, _, an) <- commandSearch cmd'
                 mcs <- getSummary cmd'
-                argAnnos <- noteArgs ud args
+                argAnnos <- noteArgs an args
                 return $ noteCommand cmd fc mcs ++ argAnnos
             _ -> return []
         compAnnos <- case ws of
@@ -74,10 +74,10 @@ annotate cl cursor = coallesce <$> annoCommandList cl
                 FoundCommandAnno fc
                 : maybeToList (CommandSummaryAnno <$> mcs)
           )]
-    noteArgs ud args = getAnnos >>= return . zip locs
+    noteArgs an args = getAnnos >>= return . zip locs
       where
         locs = map location args
-        getAnnos = utilAnnotate ud $ map quoteRemoval args
+        getAnnos = an $ map quoteRemoval args
 
     noteCompletion w = case (location w, cursor) of
         (Span s e, Just c) | (s - 1) <= c && c < e -> do

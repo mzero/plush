@@ -61,6 +61,7 @@ special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
 direct :: (PosixLike m) => String -> Maybe (ShellUtility m)
 direct = flip M.lookup $ M.fromList $ map (fixup unDirect)
         [ ("cd", cd)
+        , ("env", env)
         , ("false", false)
         , ("true", true)
         ]

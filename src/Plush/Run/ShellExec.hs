@@ -24,6 +24,7 @@ module Plush.Run.ShellExec (
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
+    getEnv,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
     primeShellState,
@@ -160,6 +161,12 @@ unsetVarEntry name = do
             errStrLn $ "var is read-only: " ++ name
             failure
 
+getEnv :: (Monad m, Functor m) => ShellExec m Bindings
+getEnv = getVars >>= return . foldr getBinding [] . M.toList
+  where
+    getBinding (name, ve@(VarExported, _, _)) acc = (name, varValue ve) : acc
+    getBinding _ acc = acc
+
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
 
@@ -176,7 +183,7 @@ loadSummaries t = modify $
 
 primeShellState :: (PosixLike m) => ShellExec m ()
 primeShellState = do
-    e <- map asVar `fmap` getEnvironment
+    e <- map asVar `fmap` getInitialEnvironment
     modify $ (\s -> s { ssVars = M.fromList e `M.union` ssVars s })
   where
     asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
@@ -203,7 +210,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     getWorkingDirectory = lift getWorkingDirectory
     changeWorkingDirectory = liftT1 changeWorkingDirectory
 
-    getEnvironment = lift getEnvironment
+    getInitialEnvironment = lift getInitialEnvironment
 
     type FileStatus (ShellExec m) = FileStatus m
 
@@ -229,7 +236,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
 
     getUserHomeDirectoryForName = liftT1 getUserHomeDirectoryForName
 
-    rawSystem = liftT2 rawSystem
+    execProcess = liftT3 execProcess
     pipeline cs = do
         s <- get
         lift $ pipeline [ evalStateT c s | c <- cs ]
