@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 
 module Plush.Server (
     server,
@@ -25,11 +25,15 @@ module Plush.Server (
 import Control.Concurrent (forkIO)
 import Control.Monad (replicateM, void)
 import Data.Maybe (fromMaybe)
+#if MIN_VERSION_wai_middleware_route(0, 7, 3)
+#else
 import qualified Data.Text as T
-import Network.HTTP.Types
+import Network.HTTP.Types (methodPost)
+#endif
 import qualified Network.Wai.Handler.Warp as Warp
-import Network.Wai.Middleware.Route
-import Network.Wai.Middleware.Static
+import qualified Network.Wai.Middleware.Route as Route
+import qualified Network.Wai.Middleware.Static as Static
+import qualified Network.Wai as Wai
 import System.FilePath
 import System.IO
 import System.Posix (sleep)
@@ -62,14 +66,32 @@ server runner port = do
     openCmd url = "xdg-open " ++ url ++ " 2>/dev/null || open " ++ url
     launchOpen st cl = sleep 1 >> submitJob st "opener" cl
 
+#if MIN_VERSION_wai_middleware_route(0, 7, 3)
 
-application shellThread key staticPath = dispatch
-    [ (rule methodPost "^/api/run", jsonKeyApp $ runApp shellThread)
-    , (rule methodPost "^/api/poll", jsonKeyApp $ pollApp shellThread)
-    , (rule methodPost "^/api/input", jsonKeyApp $ inputApp shellThread)
+application :: ShellThread -> String -> FilePath -> Wai.Application
+application shellThread key staticPath =
+    ($staticApp) $ Route.dispatch True $ Route.mkRoutes'
+        [ Route.Post "api/run" $ jsonKeyApp (runApp shellThread)
+        , Route.Post "api/poll" $ jsonKeyApp (pollApp shellThread)
+        , Route.Post "api/input" $ jsonKeyApp (inputApp shellThread)
+        ]
+  where
+    jsonKeyApp app = jsonApp $ keyedApp key app
+    staticApp = (Static.staticPolicy $ Static.addBase staticPath)
+        (respApp notFound)
+
+#else
+
+-- wai-middleware-route (0, 2, 0)
+application :: ShellThread -> String -> FilePath -> Wai.Application
+application shellThread key staticPath = Route.dispatch
+    [ (Route.rule methodPost "^/api/run", jsonKeyApp $ runApp shellThread)
+    , (Route.rule methodPost "^/api/poll", jsonKeyApp $ pollApp shellThread)
+    , (Route.rule methodPost "^/api/input", jsonKeyApp $ inputApp shellThread)
     ]
     staticApp
   where
     jsonKeyApp app = jsonApp $ keyedApp key app
-    staticApp = (staticRoot (T.pack staticPath)) (respApp notFound)
+    staticApp = (Static.staticRoot (T.pack staticPath)) (respApp notFound)
 
+#endif
