@@ -58,7 +58,7 @@ annotate cl cursor = coallesce <$> annoCommandList cl
         cmdAnno <- case exws of
             (cmd:args) -> do
                 let cmd' = quoteRemoval cmd
-                (fc, _, an) <- commandSearch cmd'
+                (fc, _, an) <- commandSearch cmd' dummyExecFun
                 mcs <- getSummary cmd'
                 argAnnos <- noteArgs an args
                 return $ noteCommand cmd fc mcs ++ argAnnos
@@ -70,6 +70,8 @@ annotate cl cursor = coallesce <$> annoCommandList cl
                 return $ catMaybes $ cmdComp : argComps
             []         -> return []
         return $ cmdAnno ++ exAnnos ++ compAnnos
+
+    dummyExecFun = error "not reached"
 
     noteExpansion w = (location w, [ExpandedTo $ wordText w])
     noteCommand cmd fc mcs

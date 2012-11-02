@@ -57,6 +57,7 @@ notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
 data FoundCommand = SpecialCommand
                   | DirectCommand
                   | BuiltInCommand FilePath
+                  | FunCallCommand
                   | ExecutableCommand FilePath
                   | UnknownCommand
 
