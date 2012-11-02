@@ -233,7 +233,7 @@ instance PosixLike TestExec where
         directoryMustExist "changeWorkingDirectory" fp fs fpc
         updateTestState $ s { tsWorkingDir = fpc }
 
-    getEnvironment = return
+    getInitialEnvironment = return
         [ ("HOME", "/home")
         , ("LOGNAME", "tester")
         , ("PATH", "/usr/bin")
@@ -291,7 +291,7 @@ instance PosixLike TestExec where
       where
         homeDirs = [("tester","/home"), ("root","/"), ("nobody","/tmp")]
 
-    rawSystem fp _ = runFilePrim fp $ \_s fs _fpc dpc n -> do
+    execProcess _env fp _args = runFilePrim fp $ \_s fs _fpc dpc n -> do
         if fsFileExists fs dpc n
             then exitMsg 126 "TestExec cannot run executables"
             else exitMsg 127 $ fp ++ ": No such file or directory"
