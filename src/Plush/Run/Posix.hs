@@ -15,7 +15,7 @@ limitations under the License.
 -}
 
 {-# Language FlexibleContexts, FlexibleInstances,
-             TypeFamilies, TypeSynonymInstances #-}
+             TypeFamilies, TypeSynonymInstances, ScopedTypeVariables #-}
 
 {-| This module represents the low level Posix interface. It is mostly a
     re-export of the interface from the System.Posix module tree. However,
@@ -58,6 +58,7 @@ module Plush.Run.Posix (
 ) where
 
 import Control.Applicative ((<$>))
+import qualified Control.Exception as Exception
 import Control.Monad.Error
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
@@ -206,7 +207,9 @@ instance PosixLike IO where
 
     getUserHomeDirectoryForName s =
         (Just . P.homeDirectory <$> P.getUserEntryForName s)
-            `catch` const (return Nothing)
+            -- TODO(elaforge): catch something more specific
+            `Exception.catch` \(_ :: Exception.SomeException) ->
+                return Nothing
 
     rawSystem cmd args = IO.rawSystem cmd args
     pipeline = ioPipeline

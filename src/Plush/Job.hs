@@ -38,6 +38,7 @@ module Plush.Job (
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
+import qualified Control.Exception as Exception
 import Control.Monad (when)
 import Data.Aeson (Value)
 import System.Exit
@@ -138,8 +139,11 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
                 <*> outputStreamUtf8 master2
                 <*> outputStreamJson readFromJsonOutput
 
-        let closeMasters = mapM_ (\fd -> closeFd fd `catch` const (return ()))
-                                [ master1, master2, readFromJsonOutput ]
+        let closeMasters = mapM_ (\fd -> closeFd fd `Exception.catch` ignore)
+                [ master1, master2, readFromJsonOutput ]
+            -- TODO(elaforge): catch something more specific
+            ignore :: Exception.SomeException -> IO ()
+            ignore = const (return ())
 
         runner' <- runJob scoreBoardVar request frs closeMasters runner
 
