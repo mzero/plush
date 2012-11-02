@@ -36,10 +36,10 @@ limitations under the License.
           <div class="job proto">
             <div class="view-controls">
               <ul class="horiz-menu">
-                <li><button class="view-hide">∅</button></li>
-                <li><button class="view-tiny">▂</button></li>
-                <li><button class="view-page">▅</button></li>
-                <li><button class="view-full">▇</button></li>
+                <li><button class="view-hide" title="hide">∅</button></li>
+                <li><button class="view-tiny" title="view tiny">▂</button></li>
+                <li><button class="view-page" title="view page">▅</button></li>
+                <li><button class="view-full" title="view full">▇</button></li>
               </ul>
             </div>
             <pre class="command"></pre>
@@ -67,6 +67,15 @@ limitations under the License.
     </div>
     <div id="context">
       <ul class="left">
+        <li id="context-cwd-history">
+          &#x2756;
+          <div class="hidden">
+            <p>Directory History</p>
+            <ol id="context-cwd-history-list">
+              <li class="cwd-history-item proto"><a href="#"></a></li>
+            </ol>
+          </div>
+        </li>
         <li><ol id="context-cwd"><li class="cwd-item proto"><a href="#"></a></li><li class="cwd-subs proto"><input></input></li></ol></li>
       </ul>
       <ul class="right">

@@ -659,6 +659,11 @@ ul.horiz-menu li {
   float: right;
 }
 
+#context ul,
+#context ol {
+  display: inline-block;
+}
+
 #context > ul li {
   display: inline;
 }
@@ -666,7 +671,7 @@ ul.horiz-menu li {
 #context > ul li .hidden {
   position: absolute;
   bottom: 0;
-  background-color: rgba(229,228,211,0.5);
+  background-color: rgba(229,228,211,0.7);
 }
 
 #context > ul.left li .hidden { left: -9999em; }
@@ -685,6 +690,17 @@ ul.horiz-menu li {
 #context-cwd li+li:before {
   content: "›";
   padding: 0 0.5em 0 0;
+}
+
+#context-cwd-history div {
+  width: 20em;
+  overflow: hidden;
+  padding: 0 2em 2em;
+}
+
+#context #context-cwd-history-list > li {
+  list-style-type: disc;
+  display: list-item;
 }
 
 #context-vars div {
