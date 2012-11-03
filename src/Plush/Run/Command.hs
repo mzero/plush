@@ -14,11 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
+{-# Language TupleSections #-}
+
 module Plush.Run.Command (
     FoundCommand(..),
     commandSearch,
     ) where
 
+import Control.Applicative ((<$>))
+import Control.Monad
 import System.FilePath
 
 import {-# SOURCE #-} Plush.Run.BuiltIns -- see BuiltIns.hs-boot
@@ -26,17 +30,19 @@ import Plush.Run.Posix
 import Plush.Run.ShellExec
 import Plush.Run.Types
 
-
-
 -- | Use the command name to find a command. Returns information about where
 -- the command was found, and a @'ShellUtility' m@ to run it. Implements the
 -- search algorithm in §2.9.1.
 commandSearch :: (PosixLike m) =>
-    String -> ShellExec m (FoundCommand, ShellUtility m)
+    String -> ShellExec m (FoundCommand,
+                           Bindings -> Args -> ShellExec m ExitCode,
+                           Args -> ShellExec m [[Annotation]])
 commandSearch cmd
     | '/' `elem` cmd = external cmd
     | otherwise  =
-        search special SpecialCommand $ search direct DirectCommand $ findOnPath
+        search special setShellVars SpecialCommand $
+        search direct withEnvVars DirectCommand $
+        findOnPath
   where
     findOnPath = do
         getVarDefault "PATH" "" >>= go . map (</> cmd) . splitSearchPath
@@ -44,20 +50,51 @@ commandSearch cmd
         go (fp:fps) = do
             b <- doesFileExist fp -- TODO: check if it can be executed
             if b
-                then search builtin (BuiltInCommand fp) $ external fp
+                then search builtin withEnvVars (BuiltInCommand fp) $ external fp
                 else go fps
-        go [] = search builtin (BuiltInCommand "/???") $ unknown
+        go [] = search builtin withEnvVars (BuiltInCommand "/???") $ unknown
             -- TODO: technically shouldn't run the builtins if not found in
             -- during path search. But for now, since the test environemnt
             -- doesn't have them, this will fail to run anything!
 
-    search lkup fc alt = maybe alt (\util -> return (fc, util)) $ lkup cmd
+    search lkup processBindings fc alt =
+        maybe alt (\util -> return (fc, (processBindings $ utilExecute util),
+                                    utilAnnotate util))
+        $ lkup cmd
 
-    external fp = return (ExecutableCommand fp,
-                    Utility (rawSystem fp) emptyAnnotate)
-        -- TODO: ensure exported environment is correct
+    external fp = do
+        return (ExecutableCommand fp, externalExec fp, emptyAnnotate)
+    externalExec fp = withEnvVars $ \args -> do
+        env <- getEnv
+        execProcess env fp args
 
-    unknown = return (UnknownCommand, Utility unknownExec emptyAnnotate)
-    unknownExec _ = exitMsg 127 ("Unknown command: " ++ cmd)
+    unknown = return (UnknownCommand, unknownExec, emptyAnnotate)
+    unknownExec _ _ = exitMsg 127 ("Unknown command: " ++ cmd)
 
     -- TODO: unsure if emptyAnnotate is correct here, or perhaps defaultAnnotate
+
+setShellVars :: (PosixLike m) =>
+                (Args -> ShellExec m ExitCode) ->
+                Bindings -> Args -> ShellExec m ExitCode
+setShellVars exec bindings args = untilFailureM setShellVar bindings `andThenM` exec args
+  where
+    setShellVar (name, val) = setVarEntry name (VarShellOnly, VarReadWrite, Just val)
+
+withEnvVars :: (PosixLike m) =>
+               (Args -> ShellExec m ExitCode) ->
+               Bindings -> Args -> ShellExec m ExitCode
+withEnvVars exec bindings args = do
+    prev <- currentVarEntries bindings
+    finally (setEnvVars bindings `andThenM` exec args)
+        (forM_ prev restoreVarEntries)
+
+currentVarEntries :: (PosixLike m) => Bindings -> ShellExec m [(String, Maybe VarEntry)]
+currentVarEntries as = mapM (\(name, _) -> (name,) <$> getVarEntry name) as
+
+setEnvVars :: (PosixLike m) => Bindings -> ShellExec m ExitCode
+setEnvVars bindings = untilFailureM setEnvVar bindings
+  where
+    setEnvVar (name, val) = setVarEntry name (VarExported, VarReadWrite, Just val)
+
+restoreVarEntries (name, Just val) = void $ setVarEntry name val
+restoreVarEntries (name, Nothing) = void $ unsetVarEntry name

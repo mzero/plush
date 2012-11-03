@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
+{-# Language TupleSections #-}
+
 module Plush.Run.Execute (
     shellExec,
 
@@ -65,21 +67,24 @@ shellExec cl =  execCommandList cl
     execPipe cs = pipeline $ map execCommand cs
 
     execCommand (Command [] _ (_:_)) = notSupported "Bare redirection"
-    execCommand (Command [] as []) = untilFailureM processAssignment as
-    execCommand (Command _ (_:_) _) = notSupported "Assignment to Environment"
-    execCommand (Command ws [] rs) =
-        expandAndSplit ws >>= withRedirection rs . execFields
+    execCommand (Command [] as []) = untilFailureM setShellVars as
+    execCommand (Command ws as rs) = do
+        bindings <- forM as parseAssignment
+        expandAndSplit ws >>= withRedirection rs . execFields bindings
 
-    execFields (cmd:args) = findCmd cmd >>= ($ args) . utilExecute
-    execFields [] = exitMsg 122 "Empty command"
+    execFields bindings (cmd:args) = do
+        (_, ex, _) <- commandSearch cmd
+        ex bindings args
+    execFields _ [] = exitMsg 122 "Empty command"
 
-    findCmd cmd = snd `fmap` commandSearch cmd
+    parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
 
-processAssignment :: (PosixLike m) => Assignment -> ShellExec m ExitCode
-processAssignment (Assignment name w) = do
-    v <- quoteRemoval <$> byPathParts wordExpansionActive w
-    setVarEntry name (VarShellOnly, VarReadWrite, Just v)
+    parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
 
+    setShellVars :: (PosixLike m) => Assignment -> ShellExec m ExitCode
+    setShellVars (Assignment name w) = do
+        v <- parseAssignmentValue w
+        setVarEntry name (VarShellOnly, VarReadWrite, Just v)
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
   deriving (Eq, Ord, Bounded)
@@ -108,7 +113,9 @@ execType = typeCommandList
         expandAndSplit ws >>= typeFields
 
     typeFields [] = return ExecuteForeground
-    typeFields (cmd:_) = (typeFound . fst) <$> commandSearch cmd
+    typeFields (cmd:_) = do
+        (fc, _, _) <- commandSearch cmd
+        return $ typeFound fc
 
     typeFound SpecialCommand = ExecuteForeground
     typeFound DirectCommand = ExecuteForeground
