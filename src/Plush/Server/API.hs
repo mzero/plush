@@ -31,6 +31,7 @@ import Data.Aeson
 import qualified Data.HashMap.Lazy as HM
 
 import Plush.Job
+import Plush.Job.History
 import Plush.Job.Types
 import Plush.Parser
 import Plush.Server.Utilities
@@ -78,7 +79,10 @@ inputApp shellThread (ReportOne job input) = do
 
 
 -- | Respond with shell history
-historyApp :: ShellThread -> JsonApplication NullJson [ReportOne HistoryItem]
-historyApp shellThread _req =
-    liftIO (getHistory shellThread) >>= returnJson
+historyApp :: ShellThread
+    -> JsonApplication HistoryRequest [ReportOne HistoryItem]
+historyApp shellThread HrList =
+    liftIO (withHistory shellThread getAllHistory) >>= returnJson
+historyApp shellThread (HrOutput jobs) =
+    liftIO (withHistory shellThread $ getHistoryOutput jobs) >>= returnJson
 

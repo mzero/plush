@@ -12,41 +12,97 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(function() {
+define(['jobs'], function(jobs) {
   "use strict";
-  var history = [];
-  var ring = 0;
 
-  function rotateHistory(n){
-    if (history.length == 0) {
-      return undefined;
+  var api;
+
+  var historyJobs = Object.create(null);
+  var historyOutputToFetch = [];
+  var OUTPUT_UPDATE_RATE = 50;
+  var OUTPUT_PREFETCH = 0;
+
+  function initHistory(a){
+    api = a;
+    api('history', null, listResult);
+  };
+
+  function listResult(items) {
+    for (var i in items) {
+      var item = items[i];
+      var job = item.job;
+      if (!(job in historyJobs)) {
+        historyJobs[job] = true;
+        historyOutputToFetch.push(job);          
+      }
+      if ('cmd' in item) {
+        var j = jobs.newJob(api, item.cmd, job);
+        historyJobs[job] = j;
+        j.setDeferredOutput(fetchOutput);
+      }
+      else {
+        handleHistoryItem(item);
+      }
     }
-    ring += n;
-    ring = ring % history.length;
-    return history[ring];
-  };
-
-  function previous() {
-    return rotateHistory(-1);
-  };
-
-  function next() {
-    return rotateHistory(1);
+    if (OUTPUT_PREFETCH > 0) {
+      historyOutputToFetch = historyOutputToFetch.splice(-OUTPUT_PREFETCH);
+      setTimeout(streamFetch, OUTPUT_UPDATE_RATE);    
+    } else {
+      historyOutputToFetch = [];
+    }
   }
 
-  function add(line) {
-    history.push(line);
-    ring++;
+  function fetchOutput(job) {
+      api('history', { historyOutput: [ job ]}, outputResult);
+  }
+  
+  function outputResult(items) {
+    for (var i in items) {
+      handleHistoryItem(items[i]);
+    }
   }
 
-  function reset() {
-    ring = history.length;
+  function streamFetch() {
+    var job = historyOutputToFetch.pop();
+    if (job) {
+      api('history', { historyOutput: [ job ]}, streamResult);
+    }
   }
+
+  function streamResult(items) {
+    outputResult(items);
+    setTimeout(streamFetch, OUTPUT_UPDATE_RATE);
+  }
+
+  function handleHistoryItem(item) {
+    var j = historyJobs[item.job];
+    if (!j) return;
+
+    if ('stdout' in item) {
+      j.addOutput('stdout', item.stdout);
+    }
+    if ('stderr' in item) {
+      j.addOutput('stderr', item.stderr);
+    }
+    if ('jsonout' in item) {
+      var s = "";
+      item.jsonout.forEach(function(j) {
+        s += JSON.stringify(j, null, 4);
+        s += "\n";
+      });
+      j.addOutput('stdout', s);
+    }
+    if ('parseError' in item) {
+      j.addOutput('error', item.parseError);
+    }
+    if ('exitcode' in item) {
+      j.setComplete(item.exitcode);
+    }
+  }
+
 
   return {
-    add: add,
-    next: next,
-    previous: previous
+    initHistory: initHistory
   };
 
 });

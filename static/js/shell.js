@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
+define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -188,10 +188,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
           }
         }
       }
-      // TODO(mzero): remove this temporary hack, used for history
-      if ('cmd' in d) {
-        j = jobs.newJob(api, d.cmd, d.job);
-      }
       if ('parseError' in d) {
         j.addOutput('error', data.parseError);
       }
@@ -202,16 +198,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     if (jobsDone) {
       runContext();
     }
-  }
-
-  function prevCommand(e) {
-    commandline.val(historyApi.previous());
-    return false;
-  }
-
-  function nextCommand(e) {
-    commandline.val(historyApi.next());
-    return false;
   }
 
   function startCompletions(e) {
@@ -272,9 +258,8 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   })
 
   function runCommand(cmd) {
-    var job = jobs.newJob(api, cmd);
-    historyApi.add(cmd);
-    api('run', {job: job, cmd: cmd}, cmdResult);
+    var j = jobs.newJob(api, cmd);
+    api('run', {job: j.job, cmd: cmd}, cmdResult);
   }
 
   function runCommandline(e) {
@@ -360,10 +345,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     api('run', {job: 'ctx', record: false, cmd: 'context'}, cmdResult);
   }
 
-  function runHistory() {
-    api('history', null, pollResult);
-  }
-
   function cmdResult(data) {
     var job = ('job' in data) ? data.job : "unknown";
     var j = jobs.fromJob(job);
@@ -386,7 +367,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     api('run', {job: 'comp', record: false, cmd: cmd}, cmdResult);
   }
 
-  // runContext();
-  runHistory();
-
+  runContext();
+  history.initHistory(api);
 });

@@ -24,20 +24,21 @@ module Plush.Job.History (
     writeOutput,
     endHistory,
     getAllHistory,
+    getHistoryOutput,
 
     ) where
 
 
 import qualified Control.Exception as Exception
 import Control.Monad (when)
-import Data.Aeson (encode, fromJSON, Result(..), ToJSON)
-import Data.List (isSuffixOf)
+import Data.Aeson (encode, FromJSON, fromJSON, Result(..), ToJSON)
+import Data.Maybe (mapMaybe)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import Data.Time.Clock
 import Data.Time.Format
 import qualified Data.Traversable as TR
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath ((</>), splitExtension, takeDirectory)
 import System.Locale
 import System.Posix
 
@@ -122,18 +123,31 @@ getAllHistory :: History -> IO [ReportOne HistoryItem]
 getAllHistory h = case (histDir h) of
     Nothing -> return []
     Just hdir -> do
-        histFiles <- filter cmdFileName `fmap` getDirectoryContents hdir
-        concat `fmap` mapM (readHistoryFile hdir) histFiles
+        histFiles <- mapMaybe cmdFileName `fmap` getDirectoryContents hdir
+        concat `fmap` mapM (readJsonFile hdir ".cmd") histFiles
   where
-    cmdFileName = (".cmd" `isSuffixOf`)
+    cmdFileName f = let (j,e) = splitExtension f in
+                    if e == ".cmd" then Just j else Nothing
 
-    readHistoryFile hdir f = (`catchAllAs` []) $ do
-        -- TODO: handle errors here gracefully
-        fd <- openFd (hdir </> f) ReadOnly Nothing defaultFileFlags
-        jsons <- outputStreamJson fd >>= getAvailable
-        closeFd fd
-        return $ map (ReportOne f) . successes . map fromJSON $ jsons
 
+
+
+
+-- | Return the output for selected history jobs
+getHistoryOutput :: [ JobName ] -> History -> IO [ ReportOne HistoryItem ]
+getHistoryOutput jobs h = case (histDir h) of
+    Nothing -> return []
+    Just hdir -> concat `fmap` mapM (readJsonFile hdir ".out") jobs
+
+
+readJsonFile :: (FromJSON a) =>
+    FilePath -> FilePath -> String -> IO [ReportOne a]
+readJsonFile hdir ext j = (`catchAllAs` []) $ do
+    fd <- openFd (hdir </> j ++ ext) ReadOnly Nothing defaultFileFlags
+    jsons <- outputStreamJson fd >>= getAvailable
+    closeFd fd
+    return $ map (ReportOne j) . successes . map fromJSON $ jsons
+  where
     successes [] = []
     successes (Success a : ps) = a : successes ps
     successes (Error _   : ps) =     successes ps

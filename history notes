@@ -80,13 +80,14 @@ TASKS
 [x] split command info and output into separate files
    - 20121105.1134.0.cmd & 20121105.1134.0.out
 [x] ship just commands on history request
-[] request for output for a command in history
-   [] back-end API end point for requesting
-   [] front-end request ouptut ... as user opens? last 6 hours? until a gap?
+[x] request for output for a command in history
+   [x] back-end API end point for requesting
+   [x] front-end request ouptut ... as user opens? last 6 hours? until a gap?
 [] kill output on full-screen
    [] back-end API for killing output
    [] send kill-output on entering full-screen
    [] handle missing output file gracefully
+   [] commands without output should not be deferred, but be in some no-output state
 [] add time and working directory to command file
 [] add command to "all-time" command list
 

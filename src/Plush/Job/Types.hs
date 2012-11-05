@@ -38,10 +38,11 @@ module Plush.Job.Types (
 
     -- * Other
     CommandRequest(..),
+    HistoryRequest(..),
     ) where
 
-import Control.Applicative ((<$>), (<*>), (<|>), pure)
-import Control.Monad (mzero)
+import Control.Applicative ((<$>), (<*>), (<|>), (*>), pure)
+import Control.Monad (guard, mzero)
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.HashMap.Lazy as HM
@@ -201,14 +202,17 @@ instance ToJSON StatusItem where
 -- JSON serialized simply as each variant's JSON serialization
 data HistoryItem = HiCommand CommandItem
                  | HiParseError ParseErrorItem
+                 | HiOutput OutputItem
                  | HiFinished FinishedItem
 instance ToJSON HistoryItem where
     toJSON (HiCommand i) = toJSON i
     toJSON (HiParseError i) = toJSON i
+    toJSON (HiOutput i) = toJSON i
     toJSON (HiFinished i) = toJSON i
 instance FromJSON HistoryItem where
     parseJSON j = HiCommand    <$> parseJSON j
               <|> HiParseError <$> parseJSON j
+              <|> HiOutput     <$> parseJSON j
               <|> HiFinished   <$> parseJSON j
               <|> mzero
 
@@ -252,4 +256,18 @@ instance FromJSON CommandRequest where
         record <- v .:? "record" .!= True
         command <- parseJSON j
         return $ CommandRequest job record command
+    parseJSON _ = mzero
+
+-- | A request for history information or management
+-- JSON serialized as
+--
+-- @{}@ -- request for basic history info (all except output)
+--
+-- @{ historyOutput: [ /j/, ... ] }@ -- request fo history for some jobs
+data HistoryRequest = HrList
+                    | HrOutput [ JobName ]
+instance FromJSON HistoryRequest where
+    parseJSON Null = return HrList
+    parseJSON (Object v) = guard (HM.null v) *> return HrList
+                       <|> HrOutput <$> v .: "historyOutput"
     parseJSON _ = mzero

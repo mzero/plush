@@ -23,7 +23,7 @@ module Plush.Job (
     submitJob,
     pollJobs,
     offerInput,
-    getHistory,
+    withHistory,
 
     ) where
 
@@ -276,7 +276,6 @@ offerInput st job input = modifyMVar_ (stScoreBoard st) $ \sb -> do
         maybe (return ()) (signalProcess sig) $ rsProcessID rs
 
 
--- | Return all of history. For now... uhm, yeah, simplest thing that could
--- possibly work.
-getHistory :: ShellThread -> IO [ReportOne HistoryItem]
-getHistory st = withMVar (stHistory st) getAllHistory
+-- | Wrapper for adapting functions on History.
+withHistory :: ShellThread -> (History -> IO a) -> IO a
+withHistory st = withMVar (stHistory st)
