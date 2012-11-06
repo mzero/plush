@@ -20,10 +20,11 @@ module Plush.DocTest (
     )
     where
 
+import Control.Applicative ((<$>))
 import Data.List (foldl', intercalate, isPrefixOf, partition)
 import System.FilePath (takeFileName)
-import System.Process (readProcess)
 
+import Plush.DocTest.Posix
 import Plush.Parser
 import Plush.Run
 import Plush.Utilities
@@ -208,7 +209,7 @@ runDocTests fps = do
 
 shellTests :: String -> [Test] -> IO [(Test, Result)]
 shellTests shcmd tests = do
-    ran <- process `fmap` readProcess shcmd [] script
+    ran <- process . snd <$> readProcessCombinedWithExitCode shcmd [] script
     let skipped = zip testsToSkip (repeat Skipped)
     return $ ran ++ skipped
   where

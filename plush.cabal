@@ -51,6 +51,7 @@ Executable plush
 
   Other-modules:
     Plush.DocTest
+    Plush.DocTest.Posix
     Plush.Job
     Plush.Job.Output
     Plush.Main
