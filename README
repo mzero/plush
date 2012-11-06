@@ -36,8 +36,16 @@ Now you have the built executable in the dist directory:
 
 === Running Tests ===
 
+Before you can run shell tests, you'll need an implementation of recho.
+Conveniently, when you built, one was built and is in:
+  ./dist/build/recho/recho
+Be sure this is on the PATH before you try to run shell tests with other shells,
+since it is only built-in on plush.
+
 The doctests are all in tests/*.doctest:
   ./dist/build/plush/plush -d doctest tests/*.doctest
+This runs all tests in a hermetically sealed "test" mode that is
+isolated from the current system's state or shell environment.
 
 If you want to run those tests in some other shell:
   ./dist/build/plush/plush -d shelltest sh tests/*.doctest
@@ -45,13 +53,6 @@ If you want to run those tests in some other shell:
 Yes, you can run them under plush itself this way, but realize this runs the
 command in "live" mode vs. "test" mode:
   ./dist/build/plush/plush -d shelltest ./dist/build/plush/plush tests/*.doctest
-
-
-Note: To run shell tests, you'll need an implementation of recho.
-Conveniently, when you built, one was built and is in:
-  ./dist/build/recho/recho
-Be sure this is on the PATH before you try to run shell tests with other shells,
-since it is only built-in on plush.
 
 You can run all the tests in both doctest mode, and in shelltest mode
 against bash, sh, dash, and plush with:

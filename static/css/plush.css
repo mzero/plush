@@ -496,13 +496,22 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
   max-height: 1000000em;
 }
 
+.job.max-deferred .view-hide,
+.job.max-deferred .view-tiny,
+.job.max-deferred .view-page,
+.job.max-deferred .view-full,
 .job.max-hide .view-tiny,
 .job.max-hide .view-page,
 .job.max-hide .view-full,
 .job.max-tiny .view-page,
 .job.max-tiny .view-full,
-.job.max-page .view-full {
+.job.max-page .view-full,
+.view-deferred {
   display: none;
+}
+
+.job.max-deferred .view-deferred {
+  display: inherit;
 }
 
 .job .output {

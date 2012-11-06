@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
+define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -136,7 +136,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
       data: JSON.stringify({key: key, req: req}),
       dataType: 'json',
       error: function(xhr, stat, err) {
-        addOutput('err', 'error', stat + ': ' + err);
+        jobs.unknownJob.addOutput('err', 'error', stat + ': ' + err);
       },
       processData: false,
       success: function(data, stat, xhr) {
@@ -188,6 +188,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
           }
         }
       }
+      if ('parseError' in d) {
+        j.addOutput('error', data.parseError);
+      }
     });
     if (jobsRunning) {
       setTimeout(poll, 25);
@@ -195,16 +198,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     if (jobsDone) {
       runContext();
     }
-  }
-
-  function prevCommand(e) {
-    commandline.val(historyApi.previous());
-    return false;
-  }
-
-  function nextCommand(e) {
-    commandline.val(historyApi.next());
-    return false;
   }
 
   function startCompletions(e) {
@@ -265,9 +258,8 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   })
 
   function runCommand(cmd) {
-    var job = jobs.newJob(api, cmd);
-    historyApi.add(cmd);
-    api('run', {job: job, cmd: cmd}, cmdResult);
+    var j = jobs.newJob(api, cmd);
+    api('run', {job: j.job, cmd: cmd}, cmdResult);
   }
 
   function runCommandline(e) {
@@ -350,7 +342,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
   });
 
   function runContext() {
-    api('run', {job: 'ctx', cmd: 'context'}, cmdResult);
+    api('run', {job: 'ctx', record: false, cmd: 'context'}, cmdResult);
   }
 
   function cmdResult(data) {
@@ -372,9 +364,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(historyApi, cwd, jobs, $){
     var loc = commandline[0].selectionStart;
     loc = (typeof loc === 'number') ? ' -c ' + loc : '';
     var cmd = "complete" + loc + " '" + input + "'";
-    api('run', {job: 'comp', cmd: cmd}, cmdResult);
+    api('run', {job: 'comp', record: false, cmd: cmd}, cmdResult);
   }
-  
-  runContext();
 
+  runContext();
+  history.initHistory(api);
 });

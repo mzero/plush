@@ -103,12 +103,24 @@ can't set readonly shell variable
 --
 -- Note: This works dash, but dash has a different error message so
 -- it's disabled.
---
--- Note: This works for plush in doctest mode, but not when you run
--- shelltest ./dist/build/plush/plush because shelltest stderr isn't
--- captured as test output.
---
     # readonly lll=x                            # SKIP: sh bash dash
     # lll=y && echo succeed || echo fail        # SKIP: sh bash dash
     var is read-only: lll
     fail
+
+per-command exported variable bindings are restored after command exits
+    # export mmm=1
+    # mmm=2 env | fgrep mmm
+    mmm=2
+    # env | fgrep mmm
+    mmm=1
+
+per-command variable bindings for special built-in commands are not restored
+    # nnn=1
+    # nnn=2 set mmm=1
+    # set | fgrep nnn
+    nnn='2'
+
+dummy
+    # echo ok
+    ok

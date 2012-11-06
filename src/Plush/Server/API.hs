@@ -17,140 +17,72 @@ limitations under the License.
 {-# LANGUAGE OverloadedStrings #-}
 
 module Plush.Server.API (
+    NullJson,
     runApp,
     pollApp,
     inputApp,
+    historyApp,
     )
     where
 
-import Control.Applicative ((<$>), (<*>), pure)
 import Control.Monad (mzero)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
-import qualified Data.Aeson.Types as AE
 import qualified Data.HashMap.Lazy as HM
-import qualified System.Posix.Signals as S
 
 import Plush.Job
+import Plush.Job.History
+import Plush.Job.Types
 import Plush.Parser
 import Plush.Server.Utilities
 
-data PlushRequest = RunCommand String String
-instance FromJSON PlushRequest where
-    parseJSON (Object v) = RunCommand <$> v .: "job" <*> v .: "cmd"
-    parseJSON _ = mzero
 
-data PlushResponse = ParseError String String
-                  | JobRunning String
-instance ToJSON PlushResponse where
-    toJSON (ParseError j err) = object [ "job" .= j, "parseError" .= err ]
-    toJSON (JobRunning j) = object [ "job" .= j, "running" .= True ]
+-- | When no request or response is needed for a JSON API, this value is passed
+-- on the wire.
+--
+-- JSON Serailized as
+--
+-- @null /or/ { }@
+data NullJson = NullJson
+instance FromJSON NullJson where
+    parseJSON (Object v) = if HM.null v then return NullJson else mzero
+    parseJSON Null = return NullJson
+    parseJSON _ = mzero
+instance ToJSON NullJson where
+    toJSON NullJson = Null
+
 
 -- | Run a command in the shell.
---
--- [Request]
--- @/j/@ is a string to identify the job. @/c/@ is the command to execute.
---
--- @{ job: /j/, cmd: /c/ }@
---
--- [Response]
--- One of:
---
--- @{ job: /j/, parseError: /err/ }@
---
--- @{ job: /j/, running: true }@
---
-runApp :: ShellThread -> JsonApplication PlushRequest PlushResponse
-runApp shellThread (RunCommand job cmd) =
-    case parseNextCommand cmd of
-        Left errs -> returnJson $ ParseError job errs
-        Right (cl, _rest) -> do
-            liftIO $ submitJob shellThread job cl
-            returnJson $ JobRunning job
-
-data NullRequest = NullRequest
-instance FromJSON NullRequest where
-    parseJSON (Object v) = if HM.null v then return NullRequest else mzero
-    parseJSON Null = return NullRequest
-    parseJSON _ = mzero
-
-data PlushStatus = ReportStdOut String String
-                | ReportStdErr String String
-                | ReportJsonOut String [Value]
-                | ReportRunning String
-                | ReportDone String Int
-instance ToJSON PlushStatus where
-    toJSON (ReportStdOut j s) = object [ "job" .= j, "stdout" .= s]
-    toJSON (ReportStdErr j s) = object [ "job" .= j, "stderr" .= s]
-    toJSON (ReportJsonOut j v) = object [ "job" .= j, "jsonout" .= v]
-    toJSON (ReportRunning j) = object [ "job" .= j, "running" .= True]
-    toJSON (ReportDone j e) =
-        object [ "job" .= j, "running" .= False, "exitcode" .= e ]
-
--- | Poll the state of all jobs.
---
--- [Request]
---
--- @null /or/ { }@
---
--- [Response]
--- Replies with a JSON array of status entries. A given job may have multiple
--- entries in this array. Each entry can be one of the following:
---
--- @{ job: /j/, stdout: /s/ }@
---
--- @{ job: /j/, stderr: /s/ }@
---
--- @{ job: /j/, running: /bool/ }@
-pollApp :: ShellThread -> JsonApplication NullRequest [PlushStatus]
-pollApp shellThread _req = do
-    rs <- liftIO $ reviewJobs shellThread report
-    returnJson $ concat rs
-  where
-    report job (Running rs) = do
-        oi' <- gatherOutput rs
-        return $ reportOis job oi' ++ [ReportRunning job]
-    report job (JobDone e oi') =
-        return $ reportOis job oi' ++ [ReportDone job e]
-
-    reportOis job = map (reportOi job)
-    reportOi job (OiStdOut s) = ReportStdOut job s
-    reportOi job (OiStdErr s) = ReportStdErr job s
-    reportOi job (OiJsonOut vs) = ReportJsonOut job vs
+runApp :: ShellThread
+    -> JsonApplication CommandRequest (ReportOne RunResponse)
+runApp shellThread cr@(CommandRequest job _ (CommandItem cmd)) = do
+    r <- case parseNextCommand cmd of
+        Left errs -> return $ RrParseError $ ParseErrorItem errs
+        Right _ -> do
+            liftIO $ submitJob shellThread cr
+            return $ RrRunning RunningItem
+    returnJson $ ReportOne job r
 
 
 
-data OfferInput = OfferInput JobName String Bool (Maybe S.Signal)
-instance FromJSON OfferInput where
-    parseJSON (Object v) = OfferInput
-        <$> v .: "job"
-        <*> v .:? "input" .!= ""
-        <*> v .:? "eof" .!= False
-        <*> ((v .:? "signal") >>= maybe (pure Nothing) (fmap Just . sigName))
-      where
-        sigName :: String -> AE.Parser S.Signal
-        sigName "int" = pure S.keyboardSignal
-        sigName "quit" = pure S.keyboardTermination
-        sigName "kill" = pure S.killProcess
-        sigName _ = fail "unknown signal name"
-    parseJSON _ = mzero
+-- | Poll the state of all jobs. See 'pollJobs' for more information about
+-- what status items are returned.
+pollApp :: ShellThread -> JsonApplication NullJson [ReportOne StatusItem]
+pollApp shellThread _req = (liftIO $ pollJobs shellThread) >>= returnJson
 
-
-data NullResponse = NullResponse
-instance ToJSON NullResponse where
-    toJSON NullResponse = toJSON ()
 
 -- | Offer input to a running job.
--- @/j/@ is a string to identify the job. @/s/@ is the input. If the @eof@
--- flag is set, it is sent after the input (which can be the empty string).
---
--- @{ job: /j/, input: /s/, eof: /bool/}@
---
--- [Response]
--- Replies with null
---
--- @null /or/ { }@
-inputApp :: ShellThread -> JsonApplication OfferInput NullResponse
-inputApp shellThread (OfferInput job input eof sig) = do
-    liftIO $ offerInput shellThread job input eof sig
-    returnJson NullResponse
+inputApp :: ShellThread -> JsonApplication (ReportOne InputItem) NullJson
+inputApp shellThread (ReportOne job input) = do
+    liftIO $ offerInput shellThread job input
+    returnJson NullJson
+
+
+-- | Respond with shell history
+historyApp :: ShellThread
+    -> JsonApplication HistoryRequest [ReportOne HistoryItem]
+historyApp shellThread HrList =
+    liftIO (withHistory shellThread getAllHistory) >>= returnJson
+historyApp shellThread (HrOutput jobs) =
+    liftIO (withHistory shellThread $ getHistoryOutput jobs) >>= returnJson
+

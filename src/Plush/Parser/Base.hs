@@ -20,8 +20,7 @@ module Plush.Parser.Base (
 
     -- * General utilities
     -- ** Parsing two things
-    -- $utiltwo
-    (<&-), (-&>), (<&>),
+    (<&>),
 
     -- ** Parsing Monoids
     -- $utilmonoid
@@ -42,20 +41,6 @@ type ShellParser = Parsec String ()
 --
 -- General Utilities
 --
-
--- $utiltwo
--- Often two things are parsed side-by-side, then one or the other or both
--- are returned. These three operators represent that:
-
--- | Parse two things, but retain the result of only the first
-(<&-) :: Monad m => m a -> m b -> m a
-(<&-) = liftM2 const
-
--- | Parse two things, but retain the result of only the second
-(-&>) :: Monad m => m a -> m b -> m b
-(-&>) = (>>)
-infixl 2 <&-
-infixl 2 -&>
 
 -- | Parse two things, returning both results in a tuple
 (<&>) :: Monad m => m a -> m b -> m (a,b)

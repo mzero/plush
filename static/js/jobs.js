@@ -152,6 +152,8 @@ define(['jquery', 'hterm'], function($){
     function(e) { jobFromElement(this).sizeOutput('page'); });
   scrollback.on('click', '.view-full',
     function(e) { jobFromElement(this).sizeOutput('full'); });
+  scrollback.on('click', '.view-deferred',
+    function(e) { jobFromElement(this).loadDeferredOutput(); });
 
   scrollback.on('click', '.job',
     function(e) { jobFromElement(this).takeTopic(); });
@@ -207,16 +209,19 @@ define(['jquery', 'hterm'], function($){
 
   var jobCount = 0;
 
-  function newJob(api, cmd) {
-    var job = "job" + (++jobCount);
+  function newJob(api, cmd, job) {
+    if (!job) {
+      job = "job" + (++jobCount);
+    }
 
     var node = jobProto.clone();
-    node.attr('id', job);
+    node.attr('data-job', job);
     node.find('.command').text(cmd);
     node.appendTo(scrollback);
 
     var output = node.find('.output-container');
     var outputArea = output.find('.output');
+    var deferredOutputLoader = null;
     var lastOutputSpan = null;
     var lastOutputType = null;
     var lastOutputTime = 0;
@@ -224,7 +229,6 @@ define(['jquery', 'hterm'], function($){
     var newlinesOutput = 0;
     var terminal = null;
     var terminalNode = null;
-    var maxState = null;
 
     function sender(s) {
       api('input', {job: job, input: s}, function() {});
@@ -236,11 +240,28 @@ define(['jquery', 'hterm'], function($){
     };
 
     function sizeOutput(m) {
-      output.removeClass('output-hide output-tiny output-page output-full');
-      output.addClass('output-' + m);
-      setTimeout(function() { scrollIntoView(scrollback, node); }, 100);
-        // have to wait until layout has been recomputed for new size
+      if (deferredOutputLoader) {
+        loadDeferredOutput();
+      } else {
+        output.removeClass('output-hide output-tiny output-page output-full');
+        output.addClass('output-' + m);
+        setTimeout(function() { scrollIntoView(scrollback, node); }, 100);
+          // have to wait until layout has been recomputed for new size
+      }
     };
+
+    function setDeferredOutput(f) {
+      deferredOutputLoader = f;
+      node.addClass('max-deferred');
+      output.removeClass('output-hide output-tiny output-page output-full');
+      output.addClass('output-hide');
+    }
+
+    function loadDeferredOutput() {
+      if (deferredOutputLoader) {
+        deferredOutputLoader(job);
+      }
+    }
 
     function scroller(dir, amt) {
       var line = 10; // TODO: Should be determined dynamically
@@ -261,6 +282,7 @@ define(['jquery', 'hterm'], function($){
       sender: sender,
       signaler: signaler,
       sizeOutput: sizeOutput,
+      loadDeferredOutput: loadDeferredOutput,
       scroller: scroller,
       takeTopic: takeTopic
     });
@@ -283,7 +305,7 @@ define(['jquery', 'hterm'], function($){
         s = 'full';
       }
 
-      if (maxState !== m) {
+      if (!deferredOutputLoader) {
         node.removeClass('max-hide max-tiny max-page max-full');
         node.addClass('max-' + m);
         sizeOutput(s);
@@ -334,6 +356,10 @@ define(['jquery', 'hterm'], function($){
     };
 
     function addOutput(cls, txt) {
+      if (deferredOutputLoader) {
+        deferredOutputLoader = null;
+        node.removeClass('max-deferred');
+      }
       if (terminal) {
         return terminal.interpret(txt);
       } else if (txt.match('\u001b[\[]')) {
@@ -375,14 +401,16 @@ define(['jquery', 'hterm'], function($){
       removeVTOutput();
     }
 
-    node.data('jobPublic', {
+    var jobPublic = {
       job: job,
       addOutput: addOutput,
       setRunning: setRunning,
-      setComplete: setComplete
-    });
+      setComplete: setComplete,
+      setDeferredOutput: setDeferredOutput
+    };
 
-    return job;
+    node.data('jobPublic', jobPublic);
+    return jobPublic;
   }
 
   var unknownJob = {
@@ -392,21 +420,23 @@ define(['jquery', 'hterm'], function($){
       node[0].scrollIntoView(true);
     },
     setRunning: function() { },
-    setComplete: function(e) { }
+    setComplete: function(e) { },
+    setDeferredOutput: function(f) { }
   };
 
   function fromJob(job) {
-    return $('#' + job).data('jobPublic') || unknownJob;
+    return $('.job[data-job="' + job + '"]').data('jobPublic') || unknownJob;
   }
 
   function toDiv(j) {
-    return $('#' + j.job);
+    return $('.job[data-job="' + j.job + '"]');
   }
 
 
   return {
     newJob: newJob,
     fromJob: fromJob,
+    unknownJob: unknownJob,
 
     nextTopic: nextTopic,
     atLastTopic: atLastTopic,

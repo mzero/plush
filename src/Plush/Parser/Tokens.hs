@@ -30,6 +30,7 @@ module Plush.Parser.Tokens (
     )
 where
 
+import Control.Applicative ((<*), (*>))
 import Control.Monad
 import Data.Functor
 import Text.Parsec
@@ -50,7 +51,7 @@ whitespace = do
     optional $ char '#' >> skipMany (satisfy (/= '\n'))
 
 tokenize :: ShellParser a -> ShellParser a
-tokenize p = try p <&- whitespace
+tokenize p = try p <* whitespace
 
 operators :: [String]
 operators = words "&& || ;; << >> <& >& <> <<- >|"
@@ -64,25 +65,26 @@ tok_word = tokenize $ do
         -- TODO: should handle case where start and end are on differnt lines
 
 backslash :: ShellParser WordPart
-backslash = char '\\' -&> Backslashed <$> anyChar
+backslash = char '\\' *> (Backslashed <$> anyChar)
 
 singlequote :: ShellParser WordPart
-singlequote = q -&> Singlequoted <$> manyTill anyChar q
+singlequote = q *> (Singlequoted <$> manyTill anyChar q)
   where q = char '\''
 
 doublequote :: ShellParser WordPart
-doublequote = q -&> Doublequoted <$> manyTill (dqBackslash <|> dollar <|> dqBare) q
+doublequote =
+    (q *>) $ Doublequoted <$> manyTill (dqBackslash <|> dollar <|> dqBare) q
   where
     q = char '"' -- '"' screws up my editor's hilighting
 
-    dqBackslash = char '\\' -&>
+    dqBackslash = char '\\' *>
         ( ( Backslashed <$> oneOf "$`\"\\\n" ) <|> return (Bare "\\") )
 
     dqBare = Bare <$> many1 (noneOf "$`\"\\")
         -- TODO: might be safer as: Bare <$> anyChar, though less efficient
 
 dollar :: ShellParser WordPart
-dollar = char '$' -&> ( parameter <|> arithmetic <|> subcommand <|> variable )
+dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
   where
     parameter = between (char '{') (char '}') $
         liftM2 Parameter variableName (optionMaybe modification)

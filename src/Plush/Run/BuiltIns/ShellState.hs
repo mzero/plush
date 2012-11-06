@@ -23,6 +23,7 @@ module Plush.Run.BuiltIns.ShellState (
     export,
     readonly,
     unset,
+    env,
     )
 where
 
@@ -171,14 +172,9 @@ unset = SpecialUtility $ stdSyntax options "" go
                       -- TODO: enable this eventually
                       -- `andThenM` untilFailureM unsetFunEntry names
 
-    unsetFunEntry _name = do  -- TODO: implement this
-        errStrLn ("unimplemented: unset -f"::String)
-        failure
+    unsetFunEntry _name = notSupported "unset -f"
 
-exportOrReadonly :: (PosixOutStr b, PosixLike m) =>
-                    ((String, VarEntry) -> b) -> (Maybe String -> VarEntry) ->
-                    SpecialUtility m
-exportOrReadonly varFmt mkVarEntry = SpecialUtility $ stdSyntax options "" go
+modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options "" go
   where
     options = [ flag 'p' ]  -- echo exports
 
@@ -186,6 +182,11 @@ exportOrReadonly varFmt mkVarEntry = SpecialUtility $ stdSyntax options "" go
     go _flags nameVals = untilFailureM defVar nameVals
 
     showVars = getVars >>= mapM_ (outStr . varFmt) . sort . M.toList
+    varFmt (n, ve@(_, _, val)) | hasModifier ve =
+        case val of
+            Just v -> cmdName ++ " " ++ n ++ "=" ++ quote v ++ "\n"
+            Nothing -> cmdName ++ " " ++ n ++ "\n"
+    varFmt _ = ""
 
     defVar nameVal = do
         case break (== '=') nameVal of
@@ -194,21 +195,29 @@ exportOrReadonly varFmt mkVarEntry = SpecialUtility $ stdSyntax options "" go
             (name, _) -> setVarEntry name $ mkVarEntry Nothing
 
 export :: (PosixLike m) => SpecialUtility m
-export = exportOrReadonly varFmt (\v -> (VarExported, VarReadWrite, v))
+export = modifyVar "export" isExported (\v -> (VarExported, VarReadWrite, v))
   where
-    varFmt (n, (VarExported, _, Just v)) = "export " ++ n ++ "=" ++ quote v ++ "\n"
-    varFmt (n, (VarExported, _, Nothing)) = "export " ++ n ++ "\n"
-    varFmt _ = ""
+    isExported (VarExported, _, _) = True
+    isExported _ = False
 
 readonly :: (PosixLike m) => SpecialUtility m
-readonly = exportOrReadonly varFmt (\v -> (VarShellOnly, VarReadOnly, v))
+readonly = modifyVar "readonly" isReadOnly (\v -> (VarShellOnly, VarReadOnly, v))
   where
-    varFmt (n, (_, VarReadOnly, Just v)) = "readonly " ++ n ++ "=" ++ quote v ++ "\n"
-    varFmt (n, (_, VarReadOnly, Nothing)) = "readonly " ++ n ++ "\n"
-    varFmt _ = ""
+    isReadOnly (_, VarReadOnly, _) = True
+    isReadOnly _ = False
 
 quote :: String -> String
 quote v = '\'' : concatMap qchar v ++ "'"
   where
     qchar '\'' = "'\"'\"'"
     qchar c = [c]
+
+env :: (PosixLike m) => DirectUtility m
+env = DirectUtility $ stdSyntax [] "" doEnv
+  where
+    doEnv :: (PosixLike m) => String -> Args -> ShellExec m ExitCode
+    doEnv _flags (_:_) = exitMsg 1 "only env with no arguments is currently supported"
+    doEnv _ _ = do
+        bindings <- getEnv
+        mapM_ (\(k, v) -> outStrLn $ k ++ "=" ++ v) bindings
+        success

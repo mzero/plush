@@ -20,18 +20,10 @@ module Plush.Job (
     ShellThread,
 
     -- * Jobs
-    JobName,
-    Status(..),
-    RunningState,
     submitJob,
-    reviewJobs,
-
-    -- * Job Input
+    pollJobs,
     offerInput,
-
-    -- * Job Output
-    OutputItem(..),
-    gatherOutput,
+    withHistory,
 
     ) where
 
@@ -39,26 +31,21 @@ module Plush.Job (
 import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
 import qualified Control.Exception as Exception
-import Control.Monad (when)
 import Data.Aeson (Value)
 import System.Exit
 import System.IO
 import System.Posix
 import qualified System.Posix.Missing as PM
 
+import Plush.Job.History
 import Plush.Job.Output
+import Plush.Job.Types
+import Plush.Parser
 import Plush.Run
 import Plush.Run.Execute
 import Plush.Run.Posix (stdJsonOutput, toByteString, write)
 import Plush.Run.ShellExec
-import Plush.Types
 
-
--- | Requests to the shell thread are given an identifier by the submitter.
-type JobName = String
-
--- | As output is gathered, it is return in pieces, tagged by the source.
-data OutputItem = OiStdOut String | OiStdErr String | OiJsonOut [Value]
 
 
 -- | An opaque type, holding information about a running job.
@@ -70,22 +57,23 @@ data RunningState = RS {
      , rsJsonOut :: OutputStream Value
      , rsProcessID :: Maybe ProcessID
      , rsCheckDone :: IO ()
+     , rsHistory :: HistoryFile
      }
 
 -- | A job can be in one of these states:
 data Status
     = Running RunningState
         -- ^ the 'RunningState' value can be used with 'gatherOutput'
-    | JobDone Int [OutputItem]
+    | JobDone ExitCode [OutputItem]
         -- ^ the exit status of the job, and any remaining gathered output
 
-type Request = (JobName, CommandList)
 type ScoreBoard = [(JobName, Status)]
 
 -- | A handle to the shell thread.
 data ShellThread = ShellThread
-    { stJobRequest :: MVar Request
+    { stJobRequest :: MVar CommandRequest
     , stScoreBoard :: MVar ScoreBoard
+    , stHistory :: MVar History
     }
 
 
@@ -113,18 +101,20 @@ startShell runner = do
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
-    _ <- forkIO $ shellThread jobRequestVar scoreBoardVar devNullFd runner
+    historyVar <- initHistory runner >>= newMVar
+    let st = ShellThread jobRequestVar scoreBoardVar historyVar
+    _ <- forkIO $ shellThread st devNullFd runner
 
-    return (ShellThread jobRequestVar scoreBoardVar, origStdOut, origStdErr)
+    return (st, origStdOut, origStdErr)
   where
     upperFd = Fd 20
 
 
-shellThread :: MVar Request -> MVar ScoreBoard -> Fd -> Runner -> IO ()
-shellThread jobRequestVar scoreBoardVar devNullFd = go
+shellThread :: ShellThread -> Fd -> Runner -> IO ()
+shellThread st devNullFd = go
   where
     go runner = do
-        request <- takeMVar jobRequestVar
+        request <- takeMVar $ stJobRequest st
 
         (master1, slave1) <- openPseudoTerminal
         (master2, slave2) <- openPseudoTerminal
@@ -145,7 +135,7 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
             ignore :: Exception.SomeException -> IO ()
             ignore = const (return ())
 
-        runner' <- runJob scoreBoardVar request frs closeMasters runner
+        runner' <- runJob st request frs closeMasters runner
 
         mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
 
@@ -156,32 +146,40 @@ shellThread jobRequestVar scoreBoardVar devNullFd = go
     srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
 
 
-runJob :: MVar ScoreBoard -> Request
-    -> (Maybe ProcessID -> IO () -> RunningState) -> IO ()
+runJob :: ShellThread -> CommandRequest
+    -> (Maybe ProcessID -> IO () -> HistoryFile -> RunningState) -> IO ()
     -> Runner -> IO Runner
-runJob scoreBoardVar (j, cl) frs closeMs r0 = do
-    (et, r1) <- run (execType cl) r0
-    case et of
-        ExecuteForeground -> foreground r1
-        ExecuteMidground  -> background r1
-        ExecuteBackground -> foreground r1 -- TODO: fix!
+runJob st cr@(CommandRequest j _ (CommandItem cmd)) frs closeMs r0 = do
+    case parseNextCommand cmd of
+        Left _errs -> return r0    -- FIXME
+        Right (cl, _rest) -> runJob' cl
   where
-    foreground runner = do
-        setUp Nothing (return ())
-        (exitStatus, runner') <- runCommand runner
-        cleanUp exitStatus
-        return runner'
+    runJob' cl = do
+        (et, r1) <- run (execType cl) r0
+        case et of
+            ExecuteForeground -> foreground r1
+            ExecuteMidground  -> background r1
+            ExecuteBackground -> foreground r1 -- TODO: fix!
+      where
+        foreground runner = do
+            setUp Nothing (return ())
+            (exitStatus, runner') <- runCommand runner
+            cleanUp exitStatus
+            return runner'
 
-    background runner = do
-        pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . fst)
-        setUp (Just pid) $ checkUp pid
-        return runner
+        background runner = do
+            pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . fst)
+            setUp (Just pid) $ checkUp pid
+            return runner
 
-    runCommand runner = runCommandList cl runner >>= run getLastExitCode
+        runCommand runner = runCommandList cl runner >>= run getLastExitCode
 
     setUp mpid checker = do
-        modifyMVar_ scoreBoardVar $ \sb ->
-            return $ (j, Running $ frs mpid checker) : sb
+        hFd <- modifyMVar (stHistory st) $ startHistory cr
+        let rs = frs mpid checker hFd
+        writeHistory (rsHistory rs) (HiCommand $ CommandItem cmd)
+        modifyMVar_ (stScoreBoard st) $ \sb ->
+            return $ (j, Running rs) : sb
 
     checkUp pid = do
         mStat <- getProcessStatus False False pid
@@ -192,43 +190,67 @@ runJob scoreBoardVar (j, cl) frs closeMs r0 = do
             Just (Stopped _)    -> return ()
 
     cleanUp exitCode = do
-        modifyMVar_ scoreBoardVar $ \sb -> do
+        modifyMVar_ (stScoreBoard st) $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
                 Just (Running rs') -> do
                     oi <- gatherOutput rs'
-                    return $ (j, JobDone exitStatus oi):sb'
+                    writeHistory (rsHistory rs')
+                        $ HiFinished $ FinishedItem exitCode
+                    endHistory (rsHistory rs')
+                    return $ (j, JobDone exitCode oi):sb'
                 _ -> return sb
         closeMs
-      where
-        exitStatus = case exitCode of
-            ExitSuccess -> 0
-            ExitFailure n -> n
 
 
 
 -- | Submit a job for processing.
 -- N.B.: This may block until the shell thread is able to receive a request.
-submitJob :: ShellThread -> JobName -> CommandList -> IO ()
-submitJob st job cl = putMVar (stJobRequest st) (job, cl)
+submitJob :: ShellThread -> CommandRequest -> IO ()
+submitJob st cr = putMVar (stJobRequest st) cr
 
--- | Review jobs. Running jobs and recently done jobs are be passed to the
--- supplied review action. The list of results from the review action is
--- returned.
+-- | Poll jobs for status. A `RunningItem` or `FinishedItem` is returned for
+-- each job the shell knows about. `OutputItem` entries may be returned for
+-- either kind of job, and will come first.
 --
--- N.B.: Done jobs are removed from internal book-keeping once reviewed.
-reviewJobs :: ShellThread -> (JobName -> Status -> IO a) -> IO [a]
-reviewJobs st act = do
+-- N.B.: Finished jobs are removed from internal book-keeping once reviewed.
+pollJobs :: ShellThread -> IO [ReportOne StatusItem]
+pollJobs st = do
     readMVar (stScoreBoard st) >>= sequence_ . map checker
     modifyMVar (stScoreBoard st) $ \sb -> do
-        r <- mapM (uncurry act) sb
-        return (filter running sb, r)
+        r <- mapM (uncurry report) sb
+        return (filter running sb, concat r)
   where
     checker (_, Running rs) = rsCheckDone rs
     checker _ = return ()
 
     running (_, JobDone _ _) = False
     running _ = True
+
+    report :: JobName -> Status -> IO [ReportOne StatusItem]
+    report job (Running rs) = do
+        ois <- gatherOutput rs
+        report' job ois $ SiRunning RunningItem
+
+    report job (JobDone e ois) =
+        report' job ois $ SiFinished (FinishedItem e)
+
+    report' job ois si = return $ map (ReportOne job) $ map SiOutput ois ++ [si]
+
+-- | Gather as much output is available from stdout, stderr, and jsonout.
+gatherOutput :: RunningState -> IO [OutputItem]
+gatherOutput rs = do
+    out <- wrap OutputItemStdOut <$> getAvailable (rsStdOut rs)
+    err <- wrap OutputItemStdErr <$> getAvailable (rsStdErr rs)
+    jout <- wrap OutputItemJsonOut <$> getAvailable (rsJsonOut rs)
+    let ois = out ++ err ++ jout
+    mapM_ (writeOutput (rsHistory rs)) ois
+    return ois
+  where
+    wrap _ [] = []
+    wrap c vs = [c vs]
+
+
 
 -- | Find a job by name in a 'ScoreBoard'. Returns the first 'Status' found,
 -- if any, and a copy of the 'ScoreBoard' without that job enry.
@@ -239,30 +261,21 @@ findJob _ [] = (Nothing,[])
 
 
 -- | Give input to a running job. If the job isn't running, then the input is
--- dropped on the floor. The boolean indicates if EOF should be signaled after
--- the input is sent.
-offerInput :: ShellThread -> JobName -> String -> Bool -> Maybe Signal -> IO ()
-offerInput st job input eof sig = modifyMVar_ (stScoreBoard st) $ \sb -> do
+-- dropped on the floor.
+offerInput :: ShellThread -> JobName -> InputItem -> IO ()
+offerInput st job input = modifyMVar_ (stScoreBoard st) $ \sb -> do
     case findJob job sb of
-        (Just (Running rs), _) -> do  -- TODO: should catch errors here
-            when (not $ null input) $ write (rsStdIn rs) $ toByteString input
-            when eof $ closeFd (rsStdIn rs)
-            case (sig, rsProcessID rs) of
-                (Just s, Just p) -> signalProcess s p
-                _ -> return ()
+        (Just (Running rs), _) -> send input rs
+            -- TODO: should catch errors here
         _ -> return ()
     return sb
-
--- | Gather as much output is available from stdout, stderr, and jsonout.
-gatherOutput :: RunningState -> IO [OutputItem]
-gatherOutput rs = do
-    out <- wrap OiStdOut <$> getAvailable (rsStdOut rs)
-    err <- wrap OiStdErr <$> getAvailable (rsStdErr rs)
-    jout <- wrap OiJsonOut <$> getAvailable (rsJsonOut rs)
-    return $ out ++ err ++ jout
   where
-    wrap _ [] = []
-    wrap c vs = [c vs]
+    send (InputItemInput s) rs = write (rsStdIn rs) $ toByteString s
+    send (InputItemEof) rs = closeFd (rsStdIn rs)
+    send (InputItemSignal sig) rs =
+        maybe (return ()) (signalProcess sig) $ rsProcessID rs
 
 
-
+-- | Wrapper for adapting functions on History.
+withHistory :: ShellThread -> (History -> IO a) -> IO a
+withHistory st = withMVar (stHistory st)
