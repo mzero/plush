@@ -365,6 +365,7 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
 
     var jobPublic = {
       job: job,
+      user: true,
       addOutput: addOutput,
       setRunning: setRunning,
       setComplete: setComplete,
@@ -376,6 +377,7 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
   }
 
   var unknownJob = {
+    user: false,
     addOutput: function(cls, txt) {
       var node = $('<span></span>', { 'class': cls }).text(txt);
       node.appendTo(scrollback);

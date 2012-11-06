@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jobs', 'input', 'help', 'jquery'],
-function(history, cwd, jobs, input, help, $){
+define(['history', 'cwd', 'status', 'jobs', 'input', 'help', 'jquery'],
+function(history, cwd, status, jobs, input, help, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -46,6 +46,7 @@ function(history, cwd, jobs, input, help, $){
   function updateContext(ctx) {
     if (ctx.cwd) {
       cwd.parseToDom(ctx.cwd, runCommand);
+      status.updateStatusPane(ctx.cwd, api, runCommand);
     }
     var envList = $('#context-env');
     var shList = $('#context-shell');
@@ -132,6 +133,10 @@ function(history, cwd, jobs, input, help, $){
   }
 
   function api(call, req, respFn) {
+    if (!respFn) {
+      respFn = cmdResult;
+    }
+
     $.ajax({
       contentType: 'application/json',
       data: JSON.stringify({key: key, req: req}),
@@ -156,24 +161,28 @@ function(history, cwd, jobs, input, help, $){
       var job = ('job' in d) ? d.job : "unknown";
       var j = jobs.fromJob(job);
 
-      if ('stdout' in d) {
-        j.addOutput('stdout', d.stdout);
-      }
-      if ('stderr' in d) {
-        j.addOutput('stderr', d.stderr);
-      }
-      if ('jsonout' in d) {
-        if (job === 'ctx') {
-          d.jsonout.forEach(updateContext);
-        } else if (job === 'comp') {
-          d.jsonout.forEach(updateAnnotations);
-        } else {
-          var s = "";
-          d.jsonout.forEach(function(j) {
-            s += JSON.stringify(j, null, 4);
-            s += "\n";
-          });
-          j.addOutput('stdout', s);
+      if (job === 'ls-status') {
+        status.results(d);
+      } else {
+        if ('stdout' in d) {
+          j.addOutput('stdout', d.stdout);
+        }
+        if ('stderr' in d) {
+          j.addOutput('stderr', d.stderr);
+        }
+        if ('jsonout' in d) {
+          if (job === 'ctx') {
+            d.jsonout.forEach(updateContext);
+          } else if (job === 'comp') {
+            d.jsonout.forEach(updateAnnotations);
+          } else {
+            var s = "";
+            d.jsonout.forEach(function(j) {
+              s += JSON.stringify(j, null, 4);
+              s += "\n";
+            });
+            j.addOutput('stdout', s);
+          }
         }
       }
       if ('running' in d) {
@@ -182,7 +191,7 @@ function(history, cwd, jobs, input, help, $){
           jobsRunning = true;
         }
         else {
-          if (job !== 'ctx' && job !== 'comp') {
+          if (j.user) {
             j.setComplete(d.exitcode);
             commandline.focus();
             jobsDone = true;

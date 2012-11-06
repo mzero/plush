@@ -1,4 +1,4 @@
-/* @override 
+/* @override
 	http://localhost:29544/css/plush.css
 */
 
@@ -25,7 +25,7 @@ limitations under the License.
   padding: 0;
 }
 
-html { 
+html {
   height: 100%;
 }
 
@@ -59,14 +59,20 @@ div.maia-breadcrumb {
   display: none;
 }
 
-
+#status {
+  position: absolute;
+  top: 68px;
+  bottom: 0;
+  right: 0;
+  width: 20em;
+}
 
 #screen {
   position: absolute;
   top: 68px;
   bottom: 0;
   left: 0;
-  right: 0;
+  right: 20em;
 }
 
 #screen > div {
@@ -76,6 +82,19 @@ div.maia-breadcrumb {
   top: 1em;
   bottom: 3.5em;
   overflow: hidden;
+}
+
+#status {
+  position: absolute;
+  top: 68px;
+  bottom: 0;
+  right: 0;
+  width: 20em;
+}
+
+#status > div {
+  margin: 1em 1em 1em 0;
+  padding: 1em;
 }
 
 #scrollback {
@@ -88,7 +107,7 @@ div.maia-breadcrumb {
 }
 
 #scrollback > * {
-  padding-left: 1em;  
+  padding-left: 1em;
 }
 
 #input-area {
@@ -150,6 +169,12 @@ html {
   border-radius: 8px;
   background-color: #fff;
   box-shadow: inset 0 5px 12px -1px rgba(92, 95, 76, 0.6);
+}
+
+#status > div {
+  background: #f5f5f5;
+  border-radius: 4px;
+  box-shadow: inset 0 2px 5px -1px rgba(92, 95, 76, 0.6);
 }
 
 #input-area {
@@ -435,6 +460,11 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
   font-size: 100%;
 }
 
+#status > div {
+  line-height: 1.2;
+  font-size: 82%;
+}
+
 /* @end */
 
 .job {
@@ -588,7 +618,7 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 }
 
 .history-search .job.history-focus {
-  background-color: #ffe;  
+  background-color: #ffe;
 }
 
 .history-search .job.history-focus .command {
@@ -601,7 +631,7 @@ ul.horiz-menu {
 }
 
 ul.horiz-menu li {
-  display: inline-block;  
+  display: inline-block;
 }
 
 .horiz-menu button {
@@ -664,6 +694,74 @@ ul.horiz-menu li {
 #annotations .completions li:focus {
   background-color: #c4d5ed;
   color: #000;
+}
+
+#status h1 {
+  font-size: 100%;
+  padding-bottom: 3px;
+  border-bottom: solid 3px rgba(229,228,211,1);
+  margin-bottom: 3px;
+}
+
+#status-ls table {
+  width: 100%;
+  position: relative;
+  z-index: 0;
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+#status-ls .file .name {
+  text-decoration: underline;
+}
+
+#status-ls .file .name.type-- {
+  text-decoration: none;
+}
+
+#status-ls .file .name.type-d {
+  text-decoration: none;
+  font-weight: bold;
+}
+
+#status-ls .file .name.type-l {
+  text-decoration: none;
+  font-style: italic;
+}
+
+#status-ls td {
+  position: relative;
+  padding: 0.125em;
+}
+
+#status-ls .hidden {
+  position: absolute;
+  top: 1.35em;
+  z-index: 1;
+  background-color: rgba(254,238,124,0.75);
+  width: 16em;
+}
+
+#status-ls td:hover {
+  background-color: rgba(254,238,124,0.75);
+  padding-left: 1em;
+  cursor: none;
+}
+#status-ls td .hidden { right: -9999em; }
+#status-ls td:hover .hidden { right: 0; }
+
+#status-ls dl {
+  font-size: 90%;
+  margin: 1em 0;
+}
+#status-ls dl dt {
+  width: 8em;
+  text-align: right;
+  float: left;
+}
+
+#status-ls dl dd {
+  margin-left: 9em;
 }
 
 #context {
@@ -754,14 +852,14 @@ ul.horiz-menu li {
 }
 
 #context-vars div dl dd {
-  margin-left: 9em;  
+  margin-left: 9em;
 }
 
 #context-vars div dl .ro {
   font-style: italic;
 }
 
-#plush-footer { 
+#plush-footer {
    position:absolute;
    bottom:40px;
    width:100%;

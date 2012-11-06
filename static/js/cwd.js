@@ -13,6 +13,7 @@
 // limitations under the License.
 
 define(['jquery'], function($) {
+  "use strict";
 
   var cwdHistory = [];
 
