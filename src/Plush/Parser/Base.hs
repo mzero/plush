@@ -59,6 +59,3 @@ infix 5 <++>
 -- | Parse something optionally, returning mempty if absent
 moptional :: (Monad m, Monoid a) => ParsecT s u m a -> ParsecT s u m a
 moptional a = a <|> return mempty
-
-
-

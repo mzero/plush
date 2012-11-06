@@ -25,6 +25,7 @@ module Plush.Run.Execute (
 where
 
 import Control.Monad
+import Control.Applicative ((<*>))
 import Data.Functor
 import Data.Monoid
 
@@ -66,9 +67,15 @@ shellExec cl =  execCommandList cl
     execPipe [c] = execCommand c
     execPipe cs = pipeline $ map execCommand cs
 
-    execCommand (Command [] _ (_:_)) = notSupported "Bare redirection"
-    execCommand (Command [] as []) = untilFailureM setShellVars as
-    execCommand (Command ws as rs) = do
+    execCommand (Simple cmd) = execSimpleCommand cmd
+    execCommand (Compound {}) = notSupported "exec compound command"
+    execCommand (Function {}) = notSupported "exec function"
+
+    execSimpleCommand (SimpleCommand [] _ (_:_)) =
+        notSupported "Bare redirection"
+    execSimpleCommand (SimpleCommand [] as []) =
+        untilFailureM setShellVars as
+    execSimpleCommand (SimpleCommand ws as rs) = do
         bindings <- forM as parseAssignment
         expandAndSplit ws >>= withRedirection rs . execFields bindings
 
@@ -108,8 +115,22 @@ execType = typeCommandList
 
     typePipe p = mconcat <$> mapM typeCommand p
 
-    typeCommand (Command [] _ _) = return ExecuteForeground
-    typeCommand (Command ws _ _) =
+    typeCommand (Simple cmd) = typeSimple cmd
+    typeCommand (Compound cmd _) = case cmd of
+        BraceGroup cmdlist -> typeCommandList cmdlist
+        -- Things in the subshell can't change the state of this shell.
+        Subshell {} -> return ExecuteMidground
+        ForClause _ _ cmdlist -> typeCommandList cmdlist
+        IfClause condition consequent alternatives -> minimum <$>
+            mapM typeCommandList (condition : consequent : alternatives)
+        WhileClause condition body ->
+            min <$> typeCommandList condition <*> typeCommandList body
+        UntilClause condition body ->
+            min <$> typeCommandList condition <*> typeCommandList body
+    typeCommand (Function {}) = return ExecuteForeground
+
+    typeSimple (SimpleCommand [] _ _) = return ExecuteForeground
+    typeSimple (SimpleCommand ws _ _) =
         expandAndSplit ws >>= typeFields
 
     typeFields [] = return ExecuteForeground

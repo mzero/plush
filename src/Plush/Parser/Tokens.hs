@@ -17,7 +17,7 @@ limitations under the License.
 module Plush.Parser.Tokens (
     whitespace,
 
-    tok_word,
+    tok_word, tok_name,
     tok_assignment_word,
     tok_io_number,
     tok_newline,
@@ -27,11 +27,16 @@ module Plush.Parser.Tokens (
     tok_dless, tok_dgreat, tok_lessand, tok_greatand, tok_lessgreat,
     tok_dlessdash, tok_clobber,
     tok_bang,
+
+    -- * keywords
+    tok_if, tok_then, tok_else, tok_elif, tok_fi, tok_do, tok_done, tok_case,
+    tok_esac, tok_while, tok_until, tok_for, tok_in,
+    reservedWords
     )
 where
-
 import Control.Applicative ((<*), (*>))
 import Control.Monad
+import qualified Data.Char as Char
 import Data.Functor
 import Text.Parsec
 
@@ -63,6 +68,19 @@ tok_word = tokenize $ do
     end <- getPosition
     return $ Word (Span (sourceColumn start) (sourceColumn end)) ps
         -- TODO: should handle case where start and end are on differnt lines
+
+-- In the shell command language, a word consisting solely of underscores,
+-- digits, and alphabetics from the portable character set. The first character
+-- of a name is not a digit.
+tok_name :: ShellParser Name
+tok_name = tokenize $ do
+    start <- getPosition
+    x <- satisfy $ \c -> Char.isAscii c && (Char.isLetter c || c == '_')
+    xs <- many $ satisfy $ \c ->
+        Char.isAscii c && (Char.isLetter c || Char.isDigit c || c == '_')
+    end <- getPosition
+    let location = Span (sourceColumn start) (sourceColumn end)
+    return $ Name location (x:xs)
 
 backslash :: ShellParser WordPart
 backslash = char '\\' *> (Backslashed <$> anyChar)
@@ -168,8 +186,26 @@ tok_lessgreat = operator "<>" RedirInputOutput
 tok_dlessdash = operator "<<-" RedirHereStrip
 tok_clobber = operator ">|" RedirOutputClobber
 
-tok_bang = tokenize $ do
-    _ <- char '!'
-    return Inverted
+tok_bang :: ShellParser Sense
+tok_bang = tokenize $ char '!' >> return Inverted
 
+keyword :: String -> ShellParser String
+keyword name = tokenize $ string name
 
+tok_if = keyword "if"
+tok_then = keyword "then"
+tok_else = keyword "else"
+tok_elif = keyword "elif"
+tok_fi = keyword "fi"
+tok_do = keyword "do"
+tok_done = keyword "done"
+tok_case = keyword "case"
+tok_esac = keyword "esac"
+tok_while = keyword "while"
+tok_until = keyword "until"
+tok_for = keyword "for"
+tok_in = keyword "in"
+
+reservedWords :: [String]
+reservedWords =
+    words "if then else elif fi do done case esac while until for in"

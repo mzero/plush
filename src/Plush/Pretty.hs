@@ -42,11 +42,39 @@ pp = render . ppCommandList
     ppSense Normal = empty
     ppSense Inverted = char '!'
 
+    ppPipeline :: Pipeline -> Doc
     ppPipeline = sep . intersperse (char '|') . map ppCommand
 
-    ppCommand (Command ws as rs) = hsep $
+    ppCommand (Simple cmd) = ppSimpleCommand cmd
+    ppCommand (Compound cmd redirects) = hsep $
+        ppCompoundCommand cmd : map ppRedirect redirects
+    ppCommand (Function {}) = text "TODO(elaforge): function not implemented"
+
+    ppCompoundCommand cmd = case cmd of
+        BraceGroup cmds -> hsep [char '{', ppCommandList cmds, char '}']
+        Subshell cmds -> hsep [char '(', ppCommandList cmds, char ')']
+        ForClause name words cmds -> hsep $
+            text "for" : ppName name : text "in"
+            : map ppWord words
+            ++ [text "do", ppCommandList cmds, text "done"]
+        IfClause condition consequent alts -> hsep $
+            text "if" : ppCommandList condition : text "then"
+            : ppCommandList consequent : text "else"
+            : map ppCommandList alts
+        WhileClause condition cmds -> hsep
+            [ text "while", ppCommandList condition
+            , text "do", ppCommandList cmds, text "done"
+            ]
+        UntilClause condition cmds -> hsep
+            [text "until", ppCommandList cmds
+            , text "do", ppCommandList condition, text "done"
+            ]
+
+    ppSimpleCommand (SimpleCommand ws as rs) = hsep $
         map ppAssignment as ++ map ppWord ws ++ map ppRedirect rs
 
+    ppName (Name loc str) =
+        leadin <> text str <> leadmid <> ppLoc loc <> leadout
     ppWord w = leadin <> text (wordText w)
         <> leadmid <> ppLoc (location w) <> leadout
     leadin = text "\ESC[4;30;47m"  -- underline, black on white

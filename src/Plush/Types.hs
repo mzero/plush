@@ -44,21 +44,42 @@ data Sense = Normal | Inverted              deriving (Eq, Show)
 
 type Pipeline = [Command]
 
-data Command = Command [Word] [Assignment] [Redirect]
+data Command =
+    Simple SimpleCommand
+    | Compound CompoundCommand [Redirect]
+    | Function FunctionDefinition
     deriving (Eq, Show)
 
-instance Monoid Command where
-    mempty = Command [] [] []
-    mappend (Command wa aa ra) (Command wb ab rb)
-        = Command (wa ++ wb) (aa ++ ab) (ra ++ rb)
+data FunctionDefinition = FunctionDefinition -- not implemented yet
+    deriving (Eq, Show)
 
-commandWord :: Word -> Command
-commandAssignment :: Assignment -> Command
-commandRedirect :: Redirect -> Command
+data SimpleCommand = SimpleCommand [Word] [Assignment] [Redirect]
+    deriving (Eq, Show)
 
-commandWord w       = Command [w] []  []
-commandAssignment a = Command []  [a] []
-commandRedirect r   = Command []  []  [r]
+instance Monoid SimpleCommand where
+    mempty = SimpleCommand [] [] []
+    mappend (SimpleCommand wa aa ra) (SimpleCommand wb ab rb)
+        = SimpleCommand (wa ++ wb) (aa ++ ab) (ra ++ rb)
+
+data CompoundCommand =
+    BraceGroup CommandList
+    | Subshell CommandList
+    -- | for Name in [Word] do CommandList done
+    | ForClause Name [Word] CommandList
+    -- | condition consequent [elif, elif, ...]
+    | IfClause CommandList CommandList [CommandList]
+    -- | condition cmds
+    | WhileClause CommandList CommandList
+    | UntilClause CommandList CommandList
+    deriving (Eq, Show)
+
+commandWord :: Word -> SimpleCommand
+commandAssignment :: Assignment -> SimpleCommand
+commandRedirect :: Redirect -> SimpleCommand
+
+commandWord w       = SimpleCommand [w] []  []
+commandAssignment a = SimpleCommand []  [a] []
+commandRedirect r   = SimpleCommand []  []  [r]
 
 data Assignment = Assignment String Word
     deriving (Eq, Show)
@@ -79,6 +100,10 @@ data RedirectType
     deriving (Eq, Show)
 
 data Word = Word { location :: Location, parts :: Parts }
+    deriving (Eq, Show)
+
+-- | The is the name of \"for name in xs ...\".
+data Name = Name Location String
     deriving (Eq, Show)
 
 type Parts = [WordPart]

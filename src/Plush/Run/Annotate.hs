@@ -49,7 +49,10 @@ annotate cl cursor = coallesce <$> annoCommandList cl
     annoAndOrItem (_, (_, p)) = annoPipe p
 
     annoPipe cs = concat <$> mapM annoCommand cs
-    annoCommand (Command ws _ _) = do
+    annoCommand (Function {}) = return []
+    -- TODO(elaforge): go pull annotations out of the compound command
+    annoCommand (Compound {}) = return []
+    annoCommand (Simple (SimpleCommand ws _ _)) = do
         exws <- expandPassive ws
         let exAnnos = map noteExpansion $ exws \\ ws
         cmdAnno <- case exws of

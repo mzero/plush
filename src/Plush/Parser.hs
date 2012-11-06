@@ -31,12 +31,10 @@ import Plush.Parser.Tokens
 import Plush.Types
 
 
--- Parse the next "commplete_command" in the input, and return it and the 
+-- | Parse the next "commplete_command" in the input, and return it and the
 -- remainder of the input, or an error message
 parseNextCommand :: String -> Either String (CommandList, String)
 parseNextCommand input = left show $ parse nextCommand "" input
   where
     nextCommand :: ShellParser (CommandList, String)
     nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
-
-
