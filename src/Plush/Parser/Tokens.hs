@@ -79,8 +79,8 @@ tok_name = tokenize $ do
     xs <- many $ satisfy $ \c ->
         Char.isAscii c && (Char.isLetter c || Char.isDigit c || c == '_')
     end <- getPosition
-    let location = Span (sourceColumn start) (sourceColumn end)
-    return $ Name location (x:xs)
+    let loc = Span (sourceColumn start) (sourceColumn end)
+    return $ Name loc (x:xs)
 
 backslash :: ShellParser WordPart
 backslash = char '\\' *> (Backslashed <$> anyChar)

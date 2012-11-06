@@ -53,9 +53,9 @@ pp = render . ppCommandList
     ppCompoundCommand cmd = case cmd of
         BraceGroup cmds -> hsep [char '{', ppCommandList cmds, char '}']
         Subshell cmds -> hsep [char '(', ppCommandList cmds, char ')']
-        ForClause name words cmds -> hsep $
+        ForClause name words_ cmds -> hsep $
             text "for" : ppName name : text "in"
-            : map ppWord words
+            : map ppWord words_
             ++ [text "do", ppCommandList cmds, text "done"]
         IfClause condition consequent alts -> hsep $
             text "if" : ppCommandList condition : text "then"
