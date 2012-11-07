@@ -15,88 +15,87 @@
 Tests for variables
 
 Note that many bash tests are skipped because its output format is
-non-standard, e.g. export -p returns "declare -x ...". Also bash
-running in sh mode often returns aaa=x or aaa="x" instead of aaa='x'.
+non-standard, e.g. export -p returns "declare -x ...".
 
 set shell variable
-    # aaa=x                             # SKIP: sh bash
-    # set | fgrep aaa                   # SKIP: sh bash
-    aaa='x'
+    # aaa=x                                     # SKIP bash
+    # set | tr -d \'\" | fgrep aaa              # SKIP bash
+    aaa=x
 
 set empty shell variable
-    # bbb=''                            # SKIP: sh bash
-    # set | fgrep bbb                   # SKIP: sh bash
-    bbb=''
+    # bbb=''                                    # SKIP bash
+    # set | tr -d \'\" | fgrep bbb              # SKIP bash
+    bbb=
 
 export environment var
-    # export ccc=x                      # SKIP: sh bash
-    # export -p | fgrep ccc             # SKIP: sh bash
-    export ccc='x'
+    # export ccc=x                              # SKIP bash
+    # export -p | tr -d \'\" | fgrep ccc        # SKIP bash
+    export ccc=x
 
 export empty string environment var
-    # export ddd=''                     # SKIP: sh bash
-    # export -p | fgrep ddd             # SKIP: sh bash
-    export ddd=''
+    # export ddd=''                             # SKIP bash
+    # export -p | tr -d \'\" | fgrep ddd        # SKIP bash
+    export ddd=
 
 export unassigned environment var
-    # export eee                        # SKIP: sh bash
-    # export -p | fgrep eee             # SKIP: sh bash
+    # export eee                                # SKIP bash
+    # export -p | tr -d \'\" | fgrep eee        # SKIP bash
     export eee
 
 echoing unassigned var acts like empty string
-    # echo ">>$eee<<"                   # SKIP: sh bash
+    # echo ">>$eee<<"                           # SKIP bash
     >><<
 
 setting exported variable remains exported
-    # ccc=y                             # SKIP: sh bash
-    # export -p | fgrep ccc             # SKIP: sh bash
-    export ccc='y'
+    # ccc=y                                     # SKIP bash
+    # export -p | tr -d \'\" | fgrep ccc        # SKIP bash
+    export ccc=y
 
 set readonly shell variable
-    # fff=x                             # SKIP: sh bash
-    # readonly fff                      # SKIP: sh bash
-    # readonly -p | fgrep fff           # SKIP: sh bash
-    readonly fff='x'
-    # set | fgrep fff                   # SKIP: sh bash
-    fff='x'
+    # fff=x                                     # SKIP bash
+    # readonly fff                              # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep fff      # SKIP bash
+    readonly fff=x
+    # set | tr -d \'\" | fgrep fff              # SKIP bash
+    fff=x
 
 set readonly environment variable
-    # export ggg=x                      # SKIP: sh bash
-    # readonly ggg                      # SKIP: sh bash
-    # readonly -p | fgrep ggg           # SKIP: sh bash
-    readonly ggg='x'
-    # export -p | fgrep ggg             # SKIP: sh bash
-    export ggg='x'
+    # export ggg=x                              # SKIP bash
+    # readonly ggg                              # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep ggg      # SKIP bash
+    readonly ggg=x
+    # export -p | tr -d \'\" | fgrep ggg        # SKIP bash
+    export ggg=x
 
 set readonly unassigned environment var
-    # export hhh                        # SKIP: sh bash
-    # readonly hhh                      # SKIP: sh bash
-    # readonly -p | fgrep hhh           # SKIP: sh bash
+    # export hhh                                # SKIP bash
+    # readonly hhh                              # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep hhh      # SKIP bash
     readonly hhh
-    # export -p | fgrep hhh             # SKIP: sh bash
+    # export -p | tr -d \'\" | fgrep hhh        # SKIP bash
     export hhh
 
 set readonly shell variable one-shot
-    # readonly iii=x                    # SKIP: sh bash
-    # readonly -p | fgrep iii           # SKIP: sh bash
-    readonly iii='x'
-    # set | fgrep iii                   # SKIP: sh bash
-    iii='x'
+    # readonly iii=x                # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep iii      # SKIP bash
+    readonly iii=x
+    # set | tr -d \'\" | fgrep iii              # SKIP bash
+    iii=x
 
 export readonly variable
-    # readonly jjj=x                    # SKIP: sh bash
-    # export jjj                        # SKIP: sh bash
-    # readonly -p | fgrep jjj           # SKIP: sh bash
-    readonly jjj='x'
-    # export -p | fgrep jjj             # SKIP: sh bash
-    export jjj='x'
+    # readonly jjj=x                            # SKIP bash
+    # export jjj                                # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep jjj      # SKIP bash
+    readonly jjj=x
+    # export -p | tr -d \'\" | fgrep jjj        # SKIP bash
+    export jjj=x
 
 export readonly unassigned environment var
-    # readonly kkk                      # SKIP: sh bash
-    # export kkk                        # SKIP: sh bash
-    # readonly -p | fgrep kkk           # SKIP: sh bash
+    # readonly kkk                              # SKIP bash
+    # export kkk                                # SKIP bash
+    # readonly -p | tr -d \'\" | fgrep kkk      # SKIP bash
     readonly kkk
-    # export -p | fgrep kkk             # SKIP: sh bash
+    # export -p | tr -d \'\" | fgrep kkk        # SKIP bash
     export kkk
 
 can't set readonly shell variable
@@ -116,10 +115,11 @@ per-command exported variable bindings are restored after command exits
     mmm=1
 
 per-command variable bindings for special built-in commands are not restored
-    # nnn=1
-    # nnn=2 set mmm=1
-    # set | fgrep nnn
-    nnn='2'
+Note: bash actually does the wrong thing here, and restores the binding.
+    # nnn=1                                     # SKIP bash
+    # nnn=2 set mmm=1                           # SKIP bash
+    # set | tr -d \'\" | fgrep nnn              # SKIP bash
+    nnn=2
 
 dummy
     # echo ok
