@@ -28,6 +28,7 @@ import Text.Parsec
 import Plush.Parser.Base
 import Plush.Parser.Tokens
 import Plush.Types
+import Debug.Trace
 
 -- A close translation of the Shell Grammar from §2.10
 
@@ -75,15 +76,17 @@ command = (Compound <$> compound_command <*> option [] redirect_list)
 
 compound_command :: ShellParser CompoundCommand
 compound_command = choice
-    [ brace_group, subshell, for_clause, case_clause, if_clause
-    , while_clause, until_clause
+    [ brace_group, subshell, for_clause{-, case_clause, if_clause
+    , while_clause, until_clause-}
     ]
 
 brace_group :: ShellParser CompoundCommand
-brace_group = unexpected "brace_group not supported"
+brace_group = BraceGroup <$> (tok_lbrace *> compound_list <* tok_rbrace)
+  >>= \g -> trace ("brace_group: " ++show g) $ return g
+
 
 subshell :: ShellParser CompoundCommand
-subshell = unexpected "subshell not supported"
+subshell = Subshell <$> (tok_lparen *> compound_list <* tok_rparen)
 
 for_clause :: ShellParser CompoundCommand
 for_clause = do
@@ -94,7 +97,7 @@ for_clause = do
     words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
     doGroup <- tok_do *> compound_list <* tok_done
     return $ ForClause name words_ doGroup
-
+{-
 case_clause :: ShellParser CompoundCommand
 case_clause = unexpected "case_clause not supported"
 
@@ -106,7 +109,7 @@ while_clause = unexpected "while_clause not supported"
 
 until_clause :: ShellParser CompoundCommand
 until_clause = unexpected "until_clause not supported"
-
+-}
 -- | This is the same as 'list', except that the cmds are separated with
 -- 'separator' instead of 'separator_op'.  Normally I'd factor them into one
 -- function, but we're trying to maintain exactly the structure and names of
@@ -130,7 +133,14 @@ term = do
 -- * function definition
 
 function_defintion :: ShellParser FunctionDefinition
-function_defintion = unexpected "function definitions not yet supported"
+function_defintion =
+  FunctionDefinition <$> fname <* tok_lparen <* tok_rparen <* linebreak
+                     <*> compound_command
+                     <*> option [] redirect_list
+  >>= \f -> trace ("fun: "++show f) $ return f
+
+fname :: ShellParser Name
+fname = tok_name
 
 -- * simple command
 
@@ -210,4 +220,3 @@ separator = (separator_op <* linebreak) <|> (newline_list >> return Sequential)
 
 sequential_sep :: ShellParser ()
 sequential_sep = (operator ";" () *> linebreak) <|> newline_list
-
