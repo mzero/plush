@@ -298,6 +298,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
 
   var checkTimer = null;
   commandline.keydown(function(e) {
+    var r = history.keydown(e);
+    if (r !== undefined) return r;
+
     if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
       switch (e.keyCode) {
         case 9: return startCompletions(e)  // TAB
@@ -312,6 +315,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   });
 
   commandline.keyup(function(e) {
+    var r = history.commandChange($(this).val());
+    if (r !== undefined) return r;
+
     requestRunComplete();
   });
 
@@ -321,6 +327,9 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   }
 
   $(window).on('keydown', function(e) {
+    var r = history.keydown(e);
+    if (r !== undefined) return r;
+
     // commands valid no matter what the modifiers
     if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
       switch (e.keyCode) {
@@ -340,6 +349,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
     }
     return jobs.keydown(e);
   });
+
 
   function runContext() {
     api('run', {job: 'ctx', record: false, cmd: 'context'}, cmdResult);

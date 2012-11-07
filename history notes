@@ -77,19 +77,28 @@ TASKS
 
 
 
+
+
+
+
 [x] split command info and output into separate files
    - 20121105.1134.0.cmd & 20121105.1134.0.out
 [x] ship just commands on history request
 [x] request for output for a command in history
    [x] back-end API end point for requesting
    [x] front-end request ouptut ... as user opens? last 6 hours? until a gap?
+
+[] add time and working directory to command file
+
+
+
+[] add command to "all-time" command list
+
 [] kill output on full-screen
    [] back-end API for killing output
    [] send kill-output on entering full-screen
    [] handle missing output file gracefully
    [] commands without output should not be deferred, but be in some no-output state
-[] add time and working directory to command file
-[] add command to "all-time" command list
 
 
 
@@ -115,11 +124,40 @@ kill command
     delete - easy
     sync to job system no longer recording -- hard
 
+[x] entering history search should focus on command line if needed
+[x] return should enter current focus into command line
+[] ensure that focused entry is always scrolled into view
+[] scroll list so that it is at bottom, not top of screen
+[] better css
+    [] for when in history mode
+    [] for the focused item
+[] corner cases better
+    [] when the selection goes empty shouldn't loose focus place
+    [] when focus at bottom with dir 1 goes out of match, then back in
+[] animage hiding/showing of output ?
+[] bindings
+    [] should ESC key enter or cancel ?
+    [] should ALT+/ and ALT+\ enter history search ?
+    [] what key should be bound to clear the search field?
+[] display focused entry overlaid onto command line ala completion ?
+[] restore commandline on cancel search?
 
 
+From readline's History UI
+    C-r : incremental search backward
+    C-s : incremental search forward
+        -- these both start the search, and continue in the direction given
+    esc, C-j : terminate search, inserting c71urrent match
+    C-g : cancel search, inserts nothing
+    <character> : enters into text field, narrows search
+    <bs>, <del> : delete in text field, widens search
 
 
-
+    c-p, c-n : prev/next in history -- our opt-up, opt-down
+    M-<, M-> : begin/end of history
+    M-p, M-n : non-incremental search back/forward
+    M-C-y : yank n-th arg
+    M-., M-_ : yank last arg
 
 
 

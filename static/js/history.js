@@ -100,9 +100,127 @@ define(['jobs'], function(jobs) {
     }
   }
 
+  var searchMode = false;
+  var searchFocus = null;
+  var searchLastDir = -1;
+  var commandline;
+
+  function startSearch(dir) {
+    $('#scrollback').addClass('history-search');
+    searchMode = true;
+    searchFocus = null;
+    searchLastDir = dir;
+    commandline = $('#commandline');
+    search(commandline.val());
+    commandline.focus();
+  }
+
+  function cancelSearch() {
+    $('#scrollback').removeClass('history-search');
+    var j = $('#scrollback .job');
+    j.show('fast')
+    j.removeClass('history-match history-focus');
+    searchMode = false;
+    searchFocus = null;
+    commandline.focus();
+  }
+
+  var ANIM_SPEED = 100;
+
+  function search(s) {
+    s = s || '';
+    $('#scrollback .job')
+      .each(function(idx) {
+          var n = $(this);
+          if (s.length === 0 || n.find('.command').text().indexOf(s) >= 0) {
+            n.show(ANIM_SPEED);
+            n.addClass('history-match');
+          } else {
+            n.hide(ANIM_SPEED);
+            n.removeClass('history-match');
+          }
+        });
+    if (!searchFocus || !(searchFocus.hasClass('history-match'))) {
+      nextFocus(searchLastDir);
+    }
+  }
+
+  function endSearch() {
+    if (searchFocus) {
+      var selected = searchFocus.find('.command').text();
+      var n = selected.length;
+      commandline.val(selected);
+      commandline.focus();
+      commandline.get(0).setSelectionRange(n, n);
+    }
+    cancelSearch();
+  }
+
+  function nextFocus(dir) {
+    searchLastDir = dir;
+    var next = null;
+    if (searchFocus) {
+      switch (dir) {
+        case -1: next = searchFocus.prevAll('.history-match').first();  break;
+        case  1: next = searchFocus.nextAll('.history-match').first(); break;
+      }
+      searchFocus.removeClass('history-focus');
+    } else {
+      var js = $('#scrollback .history-match');
+      switch (dir) {
+        case -1: next = js.last();  break;
+        case  1: next = js.first(); break;
+      }
+    }
+    if (next && next.length > 0) {
+      next.addClass('history-focus');
+      searchFocus = next;
+    } else {
+      searchFocus = null;
+    }
+  }
+
+  function keydown(e) {
+    if (!searchMode) {
+      if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
+        switch (e.which) {
+          case 82: startSearch(-1); return false; // CTRL+R
+          case 83: startSearch(1);  return false; // CTRL+S
+        }
+      }
+    } else {
+      if (!(e.ctrlKey || e.shiftKey || e.metaKey)) { // ALT+ is optional
+        switch (e.which) {
+          case 38: nextFocus(-1);   return false;  // UP
+          case 40: nextFocus(1);    return false;  // DOWN
+        }
+      }
+      if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
+        switch (e.which) {
+          case 13: endSearch();     return false; // RETURN
+          case 27: endSearch();     return false; // ESC
+        }
+      } else if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
+        switch (e.which) {
+          case 71: cancelSearch();  return false; // CTRL+G
+          case 82: nextFocus(-1);   return false; // CTRL+R
+          case 83: nextFocus(1);    return false; // CTRL+S
+        }
+      } 
+    }
+  }
+
+  function commandChange(s) {
+    if (searchMode) {
+      search(s);
+      return false;
+    }
+  }
 
   return {
-    initHistory: initHistory
+    initHistory: initHistory,
+    keydown: keydown,
+    commandChange: commandChange
   };
 
 });

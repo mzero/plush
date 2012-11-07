@@ -577,6 +577,19 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
   z-index: 1;
 }
 
+.history-search {
+  background-color: #ffc;
+}
+
+.history-search .job .view-controls,
+.history-search .job .output-container {
+  display: none;
+}
+
+.history-search .job.history-focus .command {
+  font-weight: bold;
+  padding-left: 0.5em;
+}
 
 ul.horiz-menu {
   list-style: none;
