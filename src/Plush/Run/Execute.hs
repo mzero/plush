@@ -105,14 +105,15 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     WhileClause _condition _cmds -> notSupported "WhileClause"
     UntilClause _condition _cmds -> notSupported "UntilClause"
 
-execFor :: (PosixLike m) => Name -> [Word] -> CommandList
+execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ExitCode
-execFor (Name _ name) words_ cmds = do
+execFor _ Nothing _ = notSupported "missing 'in' means substitute $@"
     -- TODO(elaforge): if words is null, substitute "$@" but I don't think we
     -- support $@ yet.
-    expandAndSplit words_ >>= \words' -> case words' of
+execFor (Name _ name) (Just words1) cmds = do
+    expandAndSplit words1 >>= \words2 -> case words2 of
         [] -> setLastExitCode ExitSuccess
-        _ -> forBreak words' $ \word -> do
+        _ -> forBreak words2 $ \word -> do
             ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just word)
             case ok of
                 ExitFailure {} -> return False

@@ -91,7 +91,7 @@ for_clause = do
     -- like a name and not any old word (name requires a more restricted
     -- character set).
     name <- tok_for *> tok_name <* linebreak
-    words_ <- option [] $ tok_in *> many tok_word <* sequential_sep
+    words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
     doGroup <- tok_do *> compound_list <* tok_done
     return $ ForClause name words_ doGroup
 
