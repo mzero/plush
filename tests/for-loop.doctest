@@ -1,0 +1,61 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+
+basic for loop
+    # for x in a b c; do echo $x; done
+    a
+    b
+    c
+    # echo $x # shell for is not very sanitary
+    c
+
+more cmds in the body
+    # for x in 1 2; do echo a $x; echo b $x; done
+    a 1
+    b 1
+    a 2
+    b 2
+
+no words
+    # for x in; do echo $x; done
+
+expand variables
+    # ws='a b'
+    # for x in $ws; do echo $x; done
+    a
+    b
+
+return value is last cmd
+skipped because $? doesn't work in doctest
+    # for x in false true; do $x; done
+    # echo $?                                   # SKIP
+    0
+    # for x in true false; do $x; done
+    # echo $?                                   # SKIP
+    1
+
+redirection
+    # rm -rf /tmp/doctest
+    # mkdir /tmp/doctest
+    # cd /tmp/doctest
+    # for x in a b; do echo $x; done >out
+    # cat out
+    a
+    b
+
+readonly variable aborts the loop
+    # readonly x=10
+    # for x in a b; do echo $x; done
+    var is read-only: x

@@ -65,6 +65,8 @@ data CompoundCommand =
     BraceGroup CommandList
     | Subshell CommandList
     -- | for Name in [Word] do CommandList done
+    -- TODO(elaforge): [Word] should be Maybe [Word] to indicate than there was
+    -- no "in"
     | ForClause Name [Word] CommandList
     -- | condition consequent [elif, elif, ...]
     | IfClause CommandList CommandList [CommandList]

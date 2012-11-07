@@ -39,7 +39,7 @@ import Plush.Types
 
 
 shellExec :: (PosixLike m) => CommandList -> ShellExec m ()
-shellExec cl =  execCommandList cl
+shellExec cl = execCommandList cl
   where
     execCommandList = mapM_ execCommandItem
 
@@ -68,13 +68,14 @@ shellExec cl =  execCommandList cl
     execPipe cs = pipeline $ map execCommand cs
 
     execCommand (Simple cmd) = execSimpleCommand cmd
-    execCommand (Compound {}) = notSupported "exec compound command"
+    execCommand (Compound cmd redirects) =
+        execCompoundCommand cmd redirects
     execCommand (Function {}) = notSupported "exec function"
 
     execSimpleCommand (SimpleCommand [] _ (_:_)) =
         notSupported "Bare redirection"
     execSimpleCommand (SimpleCommand [] as []) =
-        untilFailureM setShellVars as
+        untilFailureM setShellVar as
     execSimpleCommand (SimpleCommand ws as rs) = do
         bindings <- forM as parseAssignment
         expandAndSplit ws >>= withRedirection rs . execFields bindings
@@ -86,12 +87,42 @@ shellExec cl =  execCommandList cl
 
     parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
 
-    parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
-
-    setShellVars :: (PosixLike m) => Assignment -> ShellExec m ExitCode
-    setShellVars (Assignment name w) = do
+    setShellVar :: (PosixLike m) => Assignment -> ShellExec m ExitCode
+    setShellVar (Assignment name w) = do
         v <- parseAssignmentValue w
         setVarEntry name (VarShellOnly, VarReadWrite, Just v)
+
+    parseAssignmentValue :: (PosixLike m) => Word -> ShellExec m String
+    parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
+
+execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
+    -> ShellExec m ExitCode
+execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
+    BraceGroup _cmds -> notSupported "BraceGroup"
+    Subshell _cmds -> notSupported "Subshell"
+    ForClause name words_ cmds -> execFor name words_ cmds
+    IfClause _condition _consequent _alts -> notSupported "IfClause"
+    WhileClause _condition _cmds -> notSupported "WhileClause"
+    UntilClause _condition _cmds -> notSupported "UntilClause"
+
+execFor :: (PosixLike m) => Name -> [Word] -> CommandList
+    -> ShellExec m ExitCode
+execFor (Name _ name) words_ cmds = do
+    -- TODO(elaforge): if words is null, substitute "$@" but I don't think we
+    -- support $@ yet.
+    expandAndSplit words_ >>= \words' -> case words' of
+        [] -> setLastExitCode ExitSuccess
+        _ -> forBreak words' $ \word -> do
+            ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just word)
+            case ok of
+                ExitFailure {} -> return False
+                ExitSuccess -> shellExec cmds >> return True
+    getLastExitCode
+
+forBreak [] _ = return ()
+forBreak (x:xs) f = do
+    b <- f x
+    if b then forBreak xs f else return ()
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
   deriving (Eq, Ord, Bounded)
