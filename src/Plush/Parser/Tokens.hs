@@ -27,6 +27,7 @@ module Plush.Parser.Tokens (
     tok_dless, tok_dgreat, tok_lessand, tok_greatand, tok_lessgreat,
     tok_dlessdash, tok_clobber,
     tok_bang,
+    tok_lparen, tok_rparen, tok_lbrace, tok_rbrace,
 
     -- * keywords
     tok_if, tok_then, tok_else, tok_elif, tok_fi, tok_do, tok_done, tok_case,
@@ -117,8 +118,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
 
     variableName = specialParameterName <|> shellVariableName
     specialParameterName = oneOf "@*#?-$!0" >>= return . (:[])
-    shellVariableName =
-        liftM2 (:) (char '_' <|> letter) $ many (char '_' <|> alphaNum)
+    shellVariableName = many (char '_' <|> alphaNum)
 
     modification = choice modifiers <&> wordContent (char '}')
     modifiers = map (try . string) $ words ":- - := = :? ? :+ + % %% # ##"
@@ -136,7 +136,7 @@ wordContent endP = bits
 bare :: ShellParser WordPart
 bare = Bare <$> many1 (noneOf nonWordChars)
   where
-    nonWordChars = " \n\\\'\"$" ++ operatorStarts
+    nonWordChars = " \n\\\'\"$!{}()" ++ operatorStarts
     operatorStarts = concatMap (take 1) operators
 
 
@@ -188,6 +188,11 @@ tok_clobber = operator ">|" RedirOutputClobber
 
 tok_bang :: ShellParser Sense
 tok_bang = tokenize $ char '!' >> return Inverted
+
+tok_lparen = tokenize $ char '('
+tok_rparen = tokenize $ char ')'
+tok_lbrace = tokenize $ char '{'
+tok_rbrace = tokenize $ char '}'
 
 keyword :: String -> ShellParser String
 keyword name = tokenize $ string name

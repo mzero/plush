@@ -39,66 +39,78 @@ import Plush.Types
 
 
 shellExec :: (PosixLike m) => CommandList -> ShellExec m ()
-shellExec cl = execCommandList cl
-  where
-    execCommandList = mapM_ execCommandItem
+shellExec cmd = execCommandList cmd >> return ()
 
-    execCommandItem (ao, Sequential) = execAndOr ao
-    execCommandItem (_, Background) = notSupported "Background execution"
+execCommandList :: (PosixLike m) => CommandList -> ShellExec m ExitCode
+execCommandList = untilFailureM execCommandItem
 
-    execAndOr ao = foldM execAndOrItem ExitSuccess ao
+execCommandItem :: (PosixLike m) => (AndOrList, Execution) -> ShellExec m ExitCode
+execCommandItem (ao, Sequential) = execAndOr ao
+execCommandItem (_, Background) = notSupported "Background execution"
 
-    execAndOrItem ExitSuccess     (AndThen, (s, p))          = execPipeSense s p
-    execAndOrItem (ExitFailure e) (OrThen, (s, p))  | e /= 0 = execPipeSense s p
-    execAndOrItem e _ = return e
+execAndOr :: (PosixLike m) => AndOrList -> ShellExec m ExitCode
+execAndOr ao = foldM execAndOrItem ExitSuccess ao
 
-    execPipeSense s p = do
-        e <- sense s `fmap` execPipe p
-        setLastExitCode e
-        return e
+execAndOrItem :: (PosixLike m) => ExitCode -> (Connector, (Sense, Pipeline))
+    -> ShellExec m ExitCode
+execAndOrItem ExitSuccess     (AndThen, (s, p))          = execPipeSense s p
+execAndOrItem (ExitFailure e) (OrThen, (s, p))  | e /= 0 = execPipeSense s p
+execAndOrItem e _ = return e
 
-    sense Normal   e = e
-    sense Inverted ExitSuccess = ExitFailure 1
-    sense Inverted (ExitFailure e)
-        | e /= 0    = ExitSuccess
-        | otherwise = ExitFailure 1
+execPipeSense :: (PosixLike m) => Sense -> [Command] -> ShellExec m ExitCode
+execPipeSense s p = do
+    e <- sense s `fmap` execPipe p
+    setLastExitCode e
+    return e
 
-    execPipe [] = exitMsg 120 "Emtpy pipeline"
-    execPipe [c] = execCommand c
-    execPipe cs = pipeline $ map execCommand cs
+sense :: Sense -> ExitCode -> ExitCode
+sense Normal   e = e
+sense Inverted ExitSuccess = ExitFailure 1
+sense Inverted (ExitFailure e)
+    | e /= 0    = ExitSuccess
+    | otherwise = ExitFailure 1
 
-    execCommand (Simple cmd) = execSimpleCommand cmd
-    execCommand (Compound cmd redirects) =
-        execCompoundCommand cmd redirects
-    execCommand (Function {}) = notSupported "exec function"
+execPipe :: (PosixLike m) => [Command] -> ShellExec m ExitCode
+execPipe [] = exitMsg 120 "Emtpy pipeline"
+execPipe [c] = execCommand c
+execPipe cs = pipeline $ map execCommand cs
 
-    execSimpleCommand (SimpleCommand [] _ (_:_)) =
-        notSupported "Bare redirection"
-    execSimpleCommand (SimpleCommand [] as []) =
-        untilFailureM setShellVar as
-    execSimpleCommand (SimpleCommand ws as rs) = do
-        bindings <- forM as parseAssignment
-        expandAndSplit ws >>= withRedirection rs . execFields bindings
+execCommand :: (PosixLike m) => Command -> ShellExec m ExitCode
+execCommand (Simple cmd) = execSimpleCommand cmd
+execCommand (Compound cmd redirects) =
+    execCompoundCommand cmd redirects
+execCommand (Function fun) = setFun fun >> success
 
-    execFields bindings (cmd:args) = do
-        (_, ex, _) <- commandSearch cmd
-        ex bindings args
-    execFields _ [] = exitMsg 122 "Empty command"
+execSimpleCommand :: (PosixLike m) => SimpleCommand -> ShellExec m ExitCode
+execSimpleCommand (SimpleCommand [] _ (_:_)) =
+    notSupported "Bare redirection"
+execSimpleCommand (SimpleCommand [] as []) =
+    untilFailureM setShellVar as
+execSimpleCommand (SimpleCommand ws as rs) = do
+    bindings <- forM as parseAssignment
+    expandAndSplit ws >>= withRedirection rs . execFields bindings
 
-    parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
+execFields :: (PosixLike m) => Bindings -> [String] -> ShellExec m ExitCode
+execFields bindings (cmd:args) = do
+    (_, ex, _) <- commandSearch cmd execFun
+    ex bindings args
+execFields _ [] = exitMsg 122 "Empty command"
 
-    setShellVar :: (PosixLike m) => Assignment -> ShellExec m ExitCode
-    setShellVar (Assignment name w) = do
-        v <- parseAssignmentValue w
-        setVarEntry name (VarShellOnly, VarReadWrite, Just v)
+parseAssignment :: (PosixLike m) => Assignment -> ShellExec m (String, String)
+parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
 
-    parseAssignmentValue :: (PosixLike m) => Word -> ShellExec m String
-    parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
+setShellVar :: (PosixLike m) => Assignment -> ShellExec m ExitCode
+setShellVar (Assignment name w) = do
+    v <- parseAssignmentValue w
+    setVarEntry name (VarShellOnly, VarReadWrite, Just v)
+
+parseAssignmentValue :: (PosixLike m) => Word -> ShellExec m String
+parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
 
 execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
     -> ShellExec m ExitCode
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
-    BraceGroup _cmds -> notSupported "BraceGroup"
+    BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
     ForClause name words_ cmds -> execFor name words_ cmds
     IfClause _condition _consequent _alts -> notSupported "IfClause"
@@ -120,10 +132,21 @@ execFor (Name _ name) (Just words1) cmds = do
                 ExitSuccess -> shellExec cmds >> return True
     getLastExitCode
 
+forBreak :: Monad m => [t] -> (t -> m Bool) -> m ()
 forBreak [] _ = return ()
 forBreak (x:xs) f = do
     b <- f x
     if b then forBreak xs f else return ()
+
+execFun :: (PosixLike m) => FunctionDefinition -> Bindings -> Args -> ShellExec m ExitCode
+execFun (FunctionDefinition (Name _loc _fname) body redirects) bindings args = do
+    untilFailureM setVar bindings `andThenM` do
+        withFunContext args $ do
+            untilFailureM setArg (zip [1::Int ..] args)
+            `andThenM` execCompoundCommand body redirects
+  where
+    setVar (name, val) = setVarEntry name (VarShellOnly, VarReadWrite, Just val)
+    setArg (num, val) = setVarEntry (show num) (VarShellOnly, VarReadWrite, Just val)
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
   deriving (Eq, Ord, Bounded)
@@ -167,11 +190,14 @@ execType = typeCommandList
 
     typeFields [] = return ExecuteForeground
     typeFields (cmd:_) = do
-        (fc, _, _) <- commandSearch cmd
+        (fc, _, _) <- commandSearch cmd dummyExecFun
         return $ typeFound fc
+
+    dummyExecFun = error "not reached"
 
     typeFound SpecialCommand = ExecuteForeground
     typeFound DirectCommand = ExecuteForeground
     typeFound (BuiltInCommand _) = ExecuteMidground
+    typeFound FunCallCommand = ExecuteForeground
     typeFound (ExecutableCommand _) = ExecuteMidground
     typeFound UnknownCommand = ExecuteForeground

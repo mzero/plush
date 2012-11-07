@@ -24,6 +24,7 @@ module Plush.Run.ShellExec (
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
+    getFun, setFun, unsetFun, withFunContext,
     getEnv,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
@@ -43,6 +44,7 @@ import qualified Data.Text as T
 import Plush.Run.Posix
 import Plush.Run.ShellFlags
 import Plush.Run.Types
+import Plush.Types
 import Plush.Types.CommandSummary
 
 -- Shell State
@@ -51,6 +53,7 @@ data VarScope = VarShellOnly | VarExported  deriving (Eq, Ord, Bounded, Enum)
 data VarMode = VarReadWrite | VarReadOnly   deriving (Eq, Ord, Bounded, Enum)
 type VarEntry = (VarScope, VarMode, Maybe String)
 type Vars = M.HashMap String VarEntry
+type Funs = M.HashMap String FunctionDefinition
 
 varValue :: VarEntry -> String
 varValue (_,_,s) = fromMaybe "" s
@@ -60,6 +63,7 @@ data ShellState = ShellState
     , ssArgs :: [String]  -- "Positional Parameters", technically
     , ssFlags :: Flags
     , ssVars :: Vars
+    , ssFuns :: Funs
     , ssLastExitCode :: ExitCode
     , ssSummaries :: M.HashMap String CommandSummary
     }
@@ -68,7 +72,7 @@ data ShellState = ShellState
 initialShellState :: ShellState
 initialShellState = ShellState
     { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
+      ssFuns = M.empty, ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -87,10 +91,10 @@ getFlags = gets ssFlags
 setFlags :: (Monad m) => Flags -> ShellExec m ()
 setFlags flags = modify $ (\s -> s { ssFlags = flags })
 
-getVars :: (Monad m, Functor m) => ShellExec m Vars
+getVars :: (Monad m) => ShellExec m Vars
 getVars = gets ssVars
 
-getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
+getVar :: (Monad m) => String -> ShellExec m (Maybe String)
 getVar name = get >>= (\s -> return . msum $ [normalVar s, specialVar s])
   where
     normalVar s = varValue `fmap` M.lookup name (ssVars s)
@@ -108,7 +112,7 @@ getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
 
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
-getVarEntry name = get >>= \s -> return $ M.lookup name $ ssVars s
+getVarEntry name = gets ssVars >>= return . M.lookup name
 
 setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
 setVarEntry name entry = do
@@ -161,11 +165,24 @@ unsetVarEntry name = do
             errStrLn $ "var is read-only: " ++ name
             failure
 
-getEnv :: (Monad m, Functor m) => ShellExec m Bindings
+getEnv :: (Monad m) => ShellExec m Bindings
 getEnv = getVars >>= return . foldr getBinding [] . M.toList
   where
     getBinding (name, ve@(VarExported, _, _)) acc = (name, varValue ve) : acc
     getBinding _ acc = acc
+
+getFun :: (Monad m) => String -> ShellExec m (Maybe FunctionDefinition)
+getFun fname = gets ssFuns >>= return . M.lookup fname
+
+setFun :: (Monad m) => FunctionDefinition -> ShellExec m ()
+setFun fun@(FunctionDefinition (Name _ fname) _ _) =
+    modify $ \s -> s { ssFuns = M.insert fname fun $ ssFuns s }
+
+unsetFun :: (Monad m) => String -> ShellExec m ()
+unsetFun fname = modify $ \s -> s { ssFuns = M.delete fname $ ssFuns s }
+
+withFunContext :: (Monad m) => [String] -> ShellExec m a -> ShellExec m a
+withFunContext args body = withStateT (\s -> s { ssArgs = args }) body
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
@@ -173,13 +190,11 @@ getLastExitCode = gets ssLastExitCode
 setLastExitCode :: (Monad m) => ExitCode -> ShellExec m ()
 setLastExitCode ec = modify $ (\s -> s { ssLastExitCode = ec })
 
-getSummary :: (Monad m, Functor m) =>
-    String -> ShellExec m (Maybe CommandSummary)
+getSummary :: (Monad m, Functor m) => String -> ShellExec m (Maybe CommandSummary)
 getSummary c = M.lookup c `fmap` gets ssSummaries
 
-loadSummaries :: (Monad m, Functor m) => T.Text -> ShellExec m ()
-loadSummaries t = modify $
-    \s -> s { ssSummaries = M.fromList $ parseSummaries t }
+loadSummaries :: (Monad m) => T.Text -> ShellExec m ()
+loadSummaries t = modify $ \s -> s { ssSummaries = M.fromList $ parseSummaries t }
 
 primeShellState :: (PosixLike m) => ShellExec m ()
 primeShellState = do
