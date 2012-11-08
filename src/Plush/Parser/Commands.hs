@@ -210,4 +210,3 @@ separator = (separator_op <* linebreak) <|> (newline_list >> return Sequential)
 
 sequential_sep :: ShellParser ()
 sequential_sep = (operator ";" () *> linebreak) <|> newline_list
-
