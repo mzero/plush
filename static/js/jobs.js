@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'hterm'], function($){
+define(['jquery', 'util', 'hterm'], function($, util){
   'use strict';
 
   var LINES_IN_TINY = 3;
@@ -39,30 +39,6 @@ define(['jquery', 'hterm'], function($){
     return $(elem).closest('.job').data('jobPrivate');
   }
 
-  function scrollIntoView(scroller, inner, offset) {
-    var sTop = scroller.scrollTop();
-    var sBottom = sTop + scroller.height();
-    var sTop0 = sTop;
-
-    var iTop = inner.offset().top - scroller.children().offset().top;
-      // TODO(mzero): this doesn't work if the scroller has non-scrolled content
-    var iBottom = iTop + inner.outerHeight(true);
-
-    if (offset) {
-      iTop += offset;
-    }
-
-    if (iBottom > sBottom) {
-      sTop += iBottom - sBottom;
-    }
-    if (iTop < sTop) {
-      sTop -= sTop - iTop;
-    }
-    if (sTop != sTop0) {
-      scroller.scrollTop(sTop);
-    }
-  }
-
   var currentTopic = null;
 
   function blurAll() {
@@ -77,7 +53,7 @@ define(['jquery', 'hterm'], function($){
     currentTopic = nextTopic;
     if (currentTopic) {
       currentTopic.addClass('topic focus');
-      scrollIntoView(scrollback, currentTopic);
+      util.scrollIntoView(scrollback, currentTopic);
     }
   }
 
@@ -245,7 +221,7 @@ define(['jquery', 'hterm'], function($){
       } else {
         output.removeClass('output-hide output-tiny output-page output-full');
         output.addClass('output-' + m);
-        setTimeout(function() { scrollIntoView(scrollback, node); }, 100);
+        setTimeout(function() { util.scrollIntoView(scrollback, node); }, 100);
           // have to wait until layout has been recomputed for new size
       }
     };
@@ -387,7 +363,7 @@ define(['jquery', 'hterm'], function($){
       adjustOutput();
 
       if (wasAtEnd && lastOutputTime >= scrollIfAfter) {
-        scrollIntoView(output, outputArea, spanOffset);
+        util.scrollIntoView(output, outputArea, spanOffset);
       }
     }
 

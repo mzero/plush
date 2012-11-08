@@ -126,21 +126,23 @@ kill command
 
 [x] entering history search should focus on command line if needed
 [x] return should enter current focus into command line
-[] ensure that focused entry is always scrolled into view
+[x] ensure that focused entry is always scrolled into view
+[x] better css
+    [-] for when in history mode
+    [x] for the focused item
+[x] corner cases better
+    [x] when the selection goes empty shouldn't loose focus place
+    [x] when focus at bottom with dir 1 goes out of match, then back in
+[x] bindings
+    [x] should ESC key enter or cancel - cancel
+    [x] should ALT+/ and ALT+\ enter history search - yes
+    [x] what key should be bound to clear the search field - C-u
+
 [] scroll list so that it is at bottom, not top of screen
-[] better css
-    [] for when in history mode
-    [] for the focused item
-[] corner cases better
-    [] when the selection goes empty shouldn't loose focus place
-    [] when focus at bottom with dir 1 goes out of match, then back in
-[] animage hiding/showing of output ?
-[] bindings
-    [] should ESC key enter or cancel ?
-    [] should ALT+/ and ALT+\ enter history search ?
-    [] what key should be bound to clear the search field?
-[] display focused entry overlaid onto command line ala completion ?
-[] restore commandline on cancel search?
+
+[-] animate hiding/showing of output ?
+[-] display focused entry overlaid onto command line ala completion ?
+[-] restore commandline on cancel search?
 
 
 From readline's History UI

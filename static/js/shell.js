@@ -315,7 +315,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   });
 
   commandline.keyup(function(e) {
-    var r = history.commandChange($(this).val());
+    var r = history.commandChange();
     if (r !== undefined) return r;
 
     requestRunComplete();

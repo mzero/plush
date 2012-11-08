@@ -439,6 +439,7 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 
 .job {
   border-left: 2px solid #fff;
+  margin: 0.5em 0;
 }
 .job.topic {
   border-left-color: #ddd;
@@ -584,6 +585,10 @@ h1,h2,h3,h4,blockquote,q,.maia-nav ul {
 .history-search .job .view-controls,
 .history-search .job .output-container {
   display: none;
+}
+
+.history-search .job.history-focus {
+  background-color: #ffe;  
 }
 
 .history-search .job.history-focus .command {

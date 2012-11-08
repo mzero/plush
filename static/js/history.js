@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jobs'], function(jobs) {
+define(['util', 'jobs'], function(util, jobs) {
   "use strict";
 
   var api;
@@ -102,34 +102,38 @@ define(['jobs'], function(jobs) {
 
   var searchMode = false;
   var searchFocus = null;
+  var searchPriorFocus = null;
   var searchLastDir = -1;
+  var scrollback;
   var commandline;
 
   function startSearch(dir) {
-    $('#scrollback').addClass('history-search');
     searchMode = true;
     searchFocus = null;
     searchLastDir = dir;
+    scrollback = $('#scrollback');
+    scrollback.addClass('history-search');
     commandline = $('#commandline');
-    search(commandline.val());
     commandline.focus();
+    search();
   }
 
   function cancelSearch() {
-    $('#scrollback').removeClass('history-search');
-    var j = $('#scrollback .job');
+    scrollback.removeClass('history-search');
+    var j = scrollback.find('.job');
     j.show('fast')
     j.removeClass('history-match history-focus');
     searchMode = false;
     searchFocus = null;
+    searchPriorFocus = null;
     commandline.focus();
   }
 
   var ANIM_SPEED = 100;
 
-  function search(s) {
-    s = s || '';
-    $('#scrollback .job')
+  function search() {
+    var s = commandline.val() || '';
+    scrollback.find('.job')
       .each(function(idx) {
           var n = $(this);
           if (s.length === 0 || n.find('.command').text().indexOf(s) >= 0) {
@@ -143,6 +147,18 @@ define(['jobs'], function(jobs) {
     if (!searchFocus || !(searchFocus.hasClass('history-match'))) {
       nextFocus(searchLastDir);
     }
+    setTimeout(rescrollMatch, ANIM_SPEED);
+  }
+
+  function rescrollMatch() {
+    if (searchFocus) {
+      util.scrollIntoView(scrollback, searchFocus);
+    }
+  }
+ 
+  function clearSearch() {
+    commandline.val('');
+    search();
   }
 
   function endSearch() {
@@ -156,24 +172,38 @@ define(['jobs'], function(jobs) {
     cancelSearch();
   }
 
+  function focusEdge(dir) {
+    var js = scrollback.find('.history-match');
+    switch (dir) {
+      case -1: return js.first();
+      case  1: return js.last();
+    }
+  }
   function nextFocus(dir) {
     searchLastDir = dir;
     var next = null;
     if (searchFocus) {
+      searchPriorFocus = searchFocus;
       switch (dir) {
         case -1: next = searchFocus.prevAll('.history-match').first();  break;
         case  1: next = searchFocus.nextAll('.history-match').first(); break;
       }
       searchFocus.removeClass('history-focus');
+      if (next === null || next.length === 0) {
+        next = focusEdge(dir);
+      }
     } else {
-      var js = $('#scrollback .history-match');
-      switch (dir) {
-        case -1: next = js.last();  break;
-        case  1: next = js.first(); break;
+      if (searchPriorFocus && searchPriorFocus.hasClass('history-match')) {
+        next = searchPriorFocus;
+      } else {
+        next = focusEdge(-dir);
+          // -dir because if there is no focus, and the user goes UP,
+          // they want to start with the last item.
       }
     }
     if (next && next.length > 0) {
       next.addClass('history-focus');
+      util.scrollIntoView(scrollback, next);
       searchFocus = next;
     } else {
       searchFocus = null;
@@ -187,6 +217,11 @@ define(['jobs'], function(jobs) {
           case 82: startSearch(-1); return false; // CTRL+R
           case 83: startSearch(1);  return false; // CTRL+S
         }
+      } else if (e.altKey && !(e.ctrlKey || e.shiftKey || e.metaKey)) {
+        switch (e.which) {
+          case 191: startSearch(-1);  return false; // ALT+/
+          case 220: startSearch(1);   return false; // ALT+\
+        }
       }
     } else {
       if (!(e.ctrlKey || e.shiftKey || e.metaKey)) { // ALT+ is optional
@@ -198,21 +233,30 @@ define(['jobs'], function(jobs) {
       if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
         switch (e.which) {
           case 13: endSearch();     return false; // RETURN
-          case 27: endSearch();     return false; // ESC
+          case 27: cancelSearch();  return false; // ESC
+              // Standard readline bindings would be endSearch, but this
+              // seems to be what most people expect in this context
         }
       } else if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
         switch (e.which) {
           case 71: cancelSearch();  return false; // CTRL+G
           case 82: nextFocus(-1);   return false; // CTRL+R
           case 83: nextFocus(1);    return false; // CTRL+S
+          case 85: clearSearch();   return false; // CTRL+U
         }
-      } 
+      } else if (e.altKey && !(e.ctrlKey || e.shiftKey || e.metaKey)) {
+        switch (e.which) {
+          case 191: nextFocus(-1);  return false; // ALT+/
+          case 220: nextFocus(1);   return false; // ALT+\
+        }
+      }
+
     }
   }
 
-  function commandChange(s) {
+  function commandChange() {
     if (searchMode) {
-      search(s);
+      search();
       return false;
     }
   }
