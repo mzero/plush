@@ -108,22 +108,16 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ExitCode
 execFor _ Nothing _ = notSupported "missing 'in' means substitute $@"
-    -- TODO(elaforge): if words is null, substitute "$@" but I don't think we
-    -- support $@ yet.
-execFor (Name _ name) (Just words1) cmds = do
-    expandAndSplit words1 >>= \words2 -> case words2 of
-        [] -> setLastExitCode ExitSuccess
-        _ -> forBreak words2 $ \word -> do
-            ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just word)
-            case ok of
-                ExitFailure {} -> return False
-                ExitSuccess -> shellExec cmds >> return True
-    getLastExitCode
-
-forBreak [] _ = return ()
-forBreak (x:xs) f = do
-    b <- f x
-    if b then forBreak xs f else return ()
+execFor (Name _ name) (Just words_) cmds = do
+    setLastExitCode ExitSuccess
+    expandAndSplit words_ >>= forLoop
+  where
+    forLoop [] = getLastExitCode
+    forLoop (w:ws) = do
+        ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just w)
+        case ok of
+            ExitSuccess -> shellExec cmds >> forLoop ws
+            e@(ExitFailure {}) -> return e
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
   deriving (Eq, Ord, Bounded)

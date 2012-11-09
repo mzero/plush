@@ -38,13 +38,12 @@ expand variables
     b
 
 return value is last cmd
-skipped because $? doesn't work in doctest
-    # for x in false true; do $x; done
-    # echo $?                                   # SKIP
+    # for x in false true; do $x; done; echo $?
     0
-    # for x in true false; do $x; done
-    # echo $?                                   # SKIP
+    # for x in true false; do $x; done; echo $?
     1
+    # for x in ; do $x; done; echo $?
+    0
 
 redirection
     # rm -rf /tmp/doctest
@@ -57,5 +56,5 @@ redirection
 
 readonly variable aborts the loop
     # readonly x=10
-    # for x in a b; do echo $x; done
+    # for x in a b; do echo $x; done    # SKIP dash bash sh
     var is read-only: x
