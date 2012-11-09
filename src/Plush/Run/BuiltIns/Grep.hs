@@ -70,7 +70,7 @@ doGrep flags (pat:args) = do
                     -- TODO: should short-circuit
             if found then success else failure
   where
-    gofile df "-" = gofd df "(standard input)" (Fd 0)
+    gofile df "-" = gofd df "(standard input)" stdInput
     gofile df f = do
         fd <- openFd f ReadOnly Nothing defaultFileFlags
             -- TODO: handle errors here gracefully
@@ -109,4 +109,3 @@ doGrep flags (pat:args) = do
     filePrefix False _ = ""
 
     lineNumber n = if 'n' `elem` flags then show n ++ ":" else ""
-

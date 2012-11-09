@@ -85,6 +85,7 @@ builtin = flip M.lookup $ M.fromList $ map (fixup unBuiltIn)
     , ("recho", recho)
     , ("rm", rm)
     , ("touch", touch)
+    , ("tr", tr)
     ]
 
 
