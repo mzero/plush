@@ -18,20 +18,14 @@ module Plush.Run.BuiltIns.Trivial (
     true, false,
     echo,
     recho, rechoExec,
-    tr,
     )
 where
 
 
 import Data.List (intercalate)
-import qualified Data.HashMap.Strict as M
-import qualified Data.Set as S
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
 
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
-import Plush.Run.BuiltIns.Syntax
 import Plush.Run.Types
 
 
@@ -46,12 +40,13 @@ false = DirectUtility . const $ Utility falseExec noArgsAnnotate
     falseExec _ = failure
 
 echo :: (PosixLike m) => BuiltInUtility m
-echo = BuiltInUtility $ stdSyntax options "" go
+echo = BuiltInUtility . const $ Utility echoExec emptyAnnotate
+    -- NOTE: can't use stdSyntax here, because defintion of echo is funny
   where
-    options = [ flag 'n' ]  -- no newline
-    go "n" args = echoExec args ""
-    go _ args = echoExec args "\n"
-    echoExec args endl = outStr (intercalate " " args ++ endl) >> success
+    echoExec ("-n":args) = outStr   (process args) >> success
+    echoExec       args  = outStrLn (process args) >> success
+
+    process = intercalate " "
 
 recho :: (PosixLike m) => BuiltInUtility m
 recho = BuiltInUtility . const $ Utility rechoExec emptyAnnotate
@@ -64,26 +59,3 @@ rechoExec args = mapM_ outStrLn (zipWith argLine [(1::Int)..] args) >> success
         | c < ' '     = '^' : (toEnum . (+64) . fromEnum) c : []
         | c == '\DEL' = "^?"
         | otherwise   = c : []
-
-tr :: (PosixLike m) => BuiltInUtility m
-tr = BuiltInUtility $ stdSyntax options "" go
-  where
-    options = [ flag 'C', flag 'c', flag 'd', flag 's' ]
-
-    go flags args = do
-        contents <- LT.decodeUtf8 `fmap` readAll stdInput
-        trExec flags args contents
-
-    trExec "d" [chars] contents = do
-        let delSet = S.fromList chars
-        outStr $ LT.foldr (delete delSet) LT.empty contents
-        success
-    trExec (_:_) _args _ = notSupported "tr with flags"
-    trExec "" [fromChars, toChars] contents = do
-        let trMap = M.fromList $ zip fromChars toChars
-        outStr $ LT.map (translate trMap) contents
-        success
-    trExec _ _ _ = exitMsg 1 "invalid arguments: tr"
-
-    delete delSet c acc = if S.member c delSet then acc else LT.cons c acc
-    translate trMap c = M.lookupDefault c c trMap

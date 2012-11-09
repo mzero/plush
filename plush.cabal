@@ -66,6 +66,7 @@ Executable plush
     Plush.Run.BuiltIns.Grep
     Plush.Run.BuiltIns.ShellState
     Plush.Run.BuiltIns.Syntax
+    Plush.Run.BuiltIns.Text
     Plush.Run.BuiltIns.Trivial
     Plush.Run.BuiltIns.Utilities
     Plush.Run.BuiltIns.WorkingDirectory

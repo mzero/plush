@@ -26,6 +26,7 @@ import qualified Data.HashMap.Strict as M
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
 import Plush.Run.BuiltIns.ShellState
+import Plush.Run.BuiltIns.Text
 import Plush.Run.BuiltIns.Trivial
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.WorkingDirectory
