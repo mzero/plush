@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['util', 'jobs'], function(util, jobs) {
+define(['util', 'input', 'jobs'], function(util, input, jobs) {
   "use strict";
 
   var api;
@@ -33,7 +33,7 @@ define(['util', 'jobs'], function(util, jobs) {
       var job = item.job;
       if (!(job in historyJobs)) {
         historyJobs[job] = true;
-        historyOutputToFetch.push(job);          
+        historyOutputToFetch.push(job);
       }
       if ('cmd' in item) {
         var j = jobs.newJob(api, item.cmd, job);
@@ -46,7 +46,7 @@ define(['util', 'jobs'], function(util, jobs) {
     }
     if (OUTPUT_PREFETCH > 0) {
       historyOutputToFetch = historyOutputToFetch.splice(-OUTPUT_PREFETCH);
-      setTimeout(streamFetch, OUTPUT_UPDATE_RATE);    
+      setTimeout(streamFetch, OUTPUT_UPDATE_RATE);
     } else {
       historyOutputToFetch = [];
     }
@@ -55,7 +55,7 @@ define(['util', 'jobs'], function(util, jobs) {
   function fetchOutput(job) {
       api('history', { historyOutput: [ job ]}, outputResult);
   }
-  
+
   function outputResult(items) {
     for (var i in items) {
       handleHistoryItem(items[i]);
@@ -155,7 +155,7 @@ define(['util', 'jobs'], function(util, jobs) {
       util.scrollIntoView(scrollback, searchFocus);
     }
   }
- 
+
   function clearSearch() {
     commandline.val('');
     search();
@@ -210,47 +210,23 @@ define(['util', 'jobs'], function(util, jobs) {
     }
   }
 
+  var triggerKeydown = input.keyHandler({
+    'CTRL+R, ALT+SLASH':      function() { startSearch(-1); },
+    'CTRL+S, ALT+BACK_SLASH': function() { startSearch(1); },
+  });
+  var searchModeKeydown = input.keyHandler({
+    'CTRL+R, ALT+SLASH,      UP,   ALT+UP':   function() { nextFocus(-1); },
+    'CTRL+S, ALT+BACK_SLASH, DOWN, ALT+DOWN': function() { nextFocus(1); },
+    'ESCAPE, CTRL+G':                         function() { cancelSearch(); },
+    'RETURN':                                 function() { endSearch(); },
+    'CTRL+U':                                 function() { clearSearch(); }
+  });
+
   function keydown(e) {
     if (!searchMode) {
-      if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
-        switch (e.which) {
-          case 82: startSearch(-1); return false; // CTRL+R
-          case 83: startSearch(1);  return false; // CTRL+S
-        }
-      } else if (e.altKey && !(e.ctrlKey || e.shiftKey || e.metaKey)) {
-        switch (e.which) {
-          case 191: startSearch(-1);  return false; // ALT+/
-          case 220: startSearch(1);   return false; // ALT+\
-        }
-      }
+      return triggerKeydown(e);
     } else {
-      if (!(e.ctrlKey || e.shiftKey || e.metaKey)) { // ALT+ is optional
-        switch (e.which) {
-          case 38: nextFocus(-1);   return false;  // UP
-          case 40: nextFocus(1);    return false;  // DOWN
-        }
-      }
-      if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
-        switch (e.which) {
-          case 13: endSearch();     return false; // RETURN
-          case 27: cancelSearch();  return false; // ESC
-              // Standard readline bindings would be endSearch, but this
-              // seems to be what most people expect in this context
-        }
-      } else if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
-        switch (e.which) {
-          case 71: cancelSearch();  return false; // CTRL+G
-          case 82: nextFocus(-1);   return false; // CTRL+R
-          case 83: nextFocus(1);    return false; // CTRL+S
-          case 85: clearSearch();   return false; // CTRL+U
-        }
-      } else if (e.altKey && !(e.ctrlKey || e.shiftKey || e.metaKey)) {
-        switch (e.which) {
-          case 191: nextFocus(-1);  return false; // ALT+/
-          case 220: nextFocus(1);   return false; // ALT+\
-        }
-      }
-
+      return searchModeKeydown(e);
     }
   }
 

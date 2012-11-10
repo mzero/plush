@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
+define(['history', 'cwd', 'jobs', 'input', 'jquery'],
+function(history, cwd, jobs, input, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -60,7 +61,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
       if (v.scope === 'shell') { shList.append(dt); shList.append(dd); }
     });
   }
-  
+
   var completionSpan = null;
 
   function updateAnnotations(comp) {
@@ -97,7 +98,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
         }
         m += "\n";
       });
-      
+
       m = m.trim()
       if (m || c.length) {
         if (i < span.start) {
@@ -108,7 +109,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
         blockElem.addClass('annotation');
         annoElem.append(blockElem);
         i = span.end;
-        
+
         if (m) {
           var msgElem = $('<span></span>', { "class": "message" });
           msgElem.text(m);
@@ -129,7 +130,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
       }
     });
   }
-  
+
   function api(call, req, respFn) {
     $.ajax({
       contentType: 'application/json',
@@ -146,7 +147,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
       url: '/api/' + call
     });
   }
-  
+
   function pollResult(data) {
     var jobsRunning = false;
     var jobsDone = false;
@@ -200,7 +201,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
     }
   }
 
-  function startCompletions(e) {
+  function startCompletions() {
     var input = commandline.val();
     var compArr = [];
     $('.completions li').each(function() {
@@ -216,7 +217,6 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
       insertCompletion(common);
       requestRunComplete();
     }
-    return false;
   }
 
   function commonPrefix(arr) {
@@ -262,14 +262,13 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
     api('run', {job: j.job, cmd: cmd}, cmdResult);
   }
 
-  function runCommandline(e) {
+  function runCommandline() {
     var cmd = commandline.val();
     commandline.val('');
     if (cmd.trim() !== '') {
       $('#annotations').text('')
       runCommand(cmd);
     }
-    return false;
   }
 
   function reenterTopic() {
@@ -297,21 +296,17 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
   })();
 
   var checkTimer = null;
-  commandline.keydown(function(e) {
-    var r = history.keydown(e);
-    if (r !== undefined) return r;
 
-    if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
-      switch (e.keyCode) {
-        case 9: return startCompletions(e)  // TAB
-        case 13: return runCommandline(e);  // RETURN
-        case 32: // SPACE
-        case 37: // LEFT
-        case 39: // RIGHT
-          e.stopPropagation(); // don't let window handler grab these
-          break;
-      };
-    }
+  var commandlineKeydown = input.keyHandler({
+    'TAB':                  function() { startCompletions(); },
+    'RETURN':               function() { runCommandline(); },
+    'SPACE, LEFT, RIGHT':   function() { return input.STOP_PROPIGATION; }
+  });
+
+  commandline.keydown(function(e) {
+    var r;
+    r = history.keydown(e);     if (r !== undefined) return r;
+    r = commandlineKeydown(e);  if (r !== undefined) return r;
   });
 
   commandline.keyup(function(e) {
@@ -326,28 +321,23 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
     checkTimer = setTimeout(runComplete, 200);
   }
 
-  $(window).on('keydown', function(e) {
-    var r = history.keydown(e);
-    if (r !== undefined) return r;
+  var shellKeydown = input.keyHandler({
+    'RETURN, ALT+RETURN': function() { reenterTopic(); },
+    'LEFT,   ALT+LEFT':   function() { commandline.focus(); },
+    'UP,     ALT+UP':     function() { jobs.nextTopic(1); },
+    'RIGHT,  ALT+RIGHT':  function() { jobs.nextTopic(0); },
+    'DOWN,   ALT+DOWN':
+      function() {
+        if (jobs.atLastTopic())      commandline.focus();
+        else                         jobs.nextTopic(-1);
+      }
+  });
 
-    // commands valid no matter what the modifiers
-    if (!(e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
-      switch (e.keyCode) {
-      }
-    }
-    if (!(e.ctrlKey || e.shiftKey || e.metaKey)) { // ALT+ is optional
-      switch (e.keyCode) {
-        case 13: reenterTopic();       return false;  // RETURN
-        case 37: commandline.focus();  return false;  // LEFT
-        case 38: jobs.nextTopic(1);    return false;  // UP
-        case 39: jobs.nextTopic(0);    return false;  // RIGHT
-        case 40:                                      // DOWN
-          if (jobs.atLastTopic())      commandline.focus();
-          else                         jobs.nextTopic(-1);
-          return false;
-      }
-    }
-    return jobs.keydown(e);
+  $(window).on('keydown', function(e) {
+    var r;
+    r = history.keydown(e);   if (r !== undefined) return r;
+    r = shellKeydown(e);      if (r !== undefined) return r;
+    r = jobs.keydown(e);      if (r !== undefined) return r;
   });
 
 
@@ -367,7 +357,7 @@ define(['history', 'cwd', 'jobs', 'jquery'], function(history, cwd, jobs, $){
       poll();
     }
   }
-  
+
   function runComplete() {
     var input = commandline.val();
     input = input.replace(/'/g,"'\\''");

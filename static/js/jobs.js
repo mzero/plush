@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'util', 'hterm'], function($, util){
+define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
   'use strict';
 
   var LINES_IN_TINY = 3;
@@ -136,50 +136,36 @@ define(['jquery', 'util', 'hterm'], function($, util){
   scrollback.on('focus', '.input-container input',
     function(e) { jobFromElement(this).takeTopic(); });
 
+  var jobKeydown = input.keyHandler({
+    functions: {
+      pageDown:           function(e,j) { j.scroller(1, SCROLL_PAGE); },
+      pageUp:             function(e,j) { j.scroller(-1, SCROLL_PAGE); },
+    },
+    bindings: {
+      'PAGE_DOWN,   ALT+PAGE_DOWN':   'pageDown',
+      'PAGE_UP,     ALT+PAGE_UP':     'pageUp',
+      'SPACE,       ALT+SPACE':       'pageDown',
+      'SHIFT+SPACE, ALT+SHIFT+SPACE': 'pageUp',
+
+      'END,  ALT+END':    function(j) { j.scroller(1, SCROLL_FULL); },
+      'HOME, ALT+HOME':   function(j) { j.scroller(-1, SCROLL_FULL); },
+
+      'ALT+0':            function(j) { j.sizeOutput('hide'); },
+      'ALT+1':            function(j) { j.sizeOutput('tiny'); },
+      'ALT+2':            function(j) { j.sizeOutput('page'); },
+      'ALT+3':            function(j) { j.sizeOutput('full'); },
+
+      'CTRL+D':           function(j) { j.sender('\0x04'); },
+      'CTRL+C':           function(j) { j.signaler('int'); },
+      'CTRL+BACK_SLASH':  function(j) { j.signaler('quit'); },
+      'CTRL+9':           function(j) { j.signaler('kill'); }
+    }
+  });
 
   function keydown(e) {
     if (!currentTopic) return;
-
     var j = currentTopic.data('jobPrivate');
-
-    if (!(e.ctrlKey || e.metaKey)) { // ALT+ & SHIFT+ are optional
-      var dir = e.shiftKey ? -1 : 1; // SHIFT+ inverts direction
-      switch (e.keyCode) {
-        case 32: j.scroller(dir, SCROLL_PAGE); return false; // SPACE
-      }
-    }
-    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) { // ALT+ is optional
-      switch (e.keyCode) {
-        case 33: j.scroller( -1, SCROLL_PAGE); return false; // PAGE_UP
-        case 34: j.scroller(  1, SCROLL_PAGE); return false; // PAGE_DOWN
-        case 35: j.scroller(  1, SCROLL_FULL); return false; // END
-        case 36: j.scroller( -1, SCROLL_FULL); return false; // HOME
-      }
-    }
-    if (e.altKey && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
-      switch (e.keyCode) {
-        case 48: // ALT+0
-          j.sizeOutput('hide'); return false;
-        case 49: // ALT+1
-          j.sizeOutput('tiny'); return false;
-        case 50: // ALT+2
-          j.sizeOutput('page'); return false;
-        case 51: // ALT+3
-          j.sizeOutput('full'); return false;
-      }
-    }
-    if (e.ctrlKey && !(e.altKey || e.shiftKey || e.metaKey)) {
-      switch (e.keyCode) {
-        case 68: // CTRL+D
-          j.sender('\0x04'); return false;
-        case 67: // CTRL+C
-          j.signaler('int'); return false;
-        case 220: // CTRL+\ (BACKSLASH)
-          j.signaler('quit'); return false;
-        case 57: // CTRL+9
-          j.signaler('kill'); return false;
-      }
-    }
+    return jobKeydown(e, j);
   }
 
 
