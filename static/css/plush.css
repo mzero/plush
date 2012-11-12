@@ -779,3 +779,83 @@ ul.horiz-menu li {
    width:100%;
    height:40px;
 }
+
+#help-body {
+  background-color: #fff;
+}
+#help {
+  position: absolute;
+  right: 3em;
+  left: 3em;
+  top: 5em;
+  background-color: #222;
+  border-radius: 14px;
+  color: #fff;
+  opacity: 0.85;
+  padding: 1em 2em;
+  font-size: 90%;
+}
+#help-body #help {
+  top: 2em;;
+}
+#help h1,
+#help h2 {
+  color: #fefa81;
+}
+#help-header {
+  border-bottom: 1px solid #fff;
+  margin-bottom: 1em;
+  position: relative;
+}
+#help-body #help-header .controls {
+  display: none;
+}
+#help-header .controls {
+  position: absolute;
+  right: 0;
+  top: 0.5em;
+}
+#help-header a {
+  color: #fff;
+  margin-left: 2em;
+}
+#help h1 {
+  font-size: 150%;
+}
+#help h2 {
+  font-size: 100%;
+  font-weight: bold;
+}
+#help table {
+  width: 100%;
+}
+#help td {
+  width: 50%;
+  text-align: top;
+  vertical-align: top;
+}
+#help dl dt {
+  float: left;
+  width: 10em;
+  overflow: hidden;
+}
+#help dl dt small {
+  font-size: 80%;
+}
+#help dl dt i {
+  font-weight: normal;
+  color: #cacaca;
+}
+#help dl dd {
+  margin-left: 10em;
+}
+#help dl dd i {
+  font-weight: normal;
+}
+#help h2 + dl {
+  margin-top: 0;
+}
+#help * + h2,
+#help * + dl {
+  margin-top: 2em;
+}

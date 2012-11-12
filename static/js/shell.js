@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['history', 'cwd', 'jobs', 'input', 'jquery'],
-function(history, cwd, jobs, input, $){
+define(['history', 'cwd', 'jobs', 'input', 'help', 'jquery'],
+function(history, cwd, jobs, input, help, $){
   "use strict";
 
   var key = (function initializeKey() {
@@ -335,6 +335,7 @@ function(history, cwd, jobs, input, $){
 
   $(window).on('keydown', function(e) {
     var r;
+    r = help.keydown(e);      if (r !== undefined) return r;
     r = history.keydown(e);   if (r !== undefined) return r;
     r = shellKeydown(e);      if (r !== undefined) return r;
     r = jobs.keydown(e);      if (r !== undefined) return r;

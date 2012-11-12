@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!--
+Copyright 2012 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="initial-scale=1, minimum-scale=1, width=device-width" name="viewport">
+    <title>Plush Keyboard Shortcuts</title>
+    <link rel="stylesheet" href="css/plush.css">
+  </head>
+  <body id="help-body">
+    <div id="help">
+      <div id="help-header">
+        <h1>Keyboard Shortcuts</h1>
+        <div class="controls">
+          <a id="help-opener" href="help.html" target="plush_help_windows">Open in new window</a>
+          <a id="help-closer" href="">Close</a>
+        </div>
+      </div>
+      <table><tr>
+        <td>
+          <h2>Command Line</h2>
+          <dl>
+            <dt><small>RETURN</small></dt>
+            <dd>run command line</dd>
+            <dt><small>TAB</small></dt>
+            <dd>start completion</dd>
+          </dl>
+          <h2>Navigation</h2>
+          <dl>
+            <dt>↑ <i>or</i> <small>ALT</small> + ↑</dt>
+            <dd>prior job</dd>
+            <dt>↓ <i>or</i> <small>ALT</small> + ↓</dt>
+            <dd>later job</dd>
+            <dt><small>ALT</small> + ←</dt>
+            <dd>focus on command line</dd>
+            <dt><small>ALT</small> + →</dt>
+            <dd>focus on current job</dd>
+            <dt><small>RETURN</small></dt>
+            <dd>when focused on prior job, reenter job into command line</dd>
+          </dl>
+          <h2>History</h2>
+          <dl>
+            <dt><small>CTRL</small> + R <i>or</i> <small>ALT</small> + /</dt>
+            <dd>start history search from most recent,<br />then continue backward</dd>
+            <dt><small>CTRL</small> + S <i>or</i> <small>ALT</small> + \</dt>
+            <dd>start history search from oldest,<br />then continue forward</dd>
+          </dl>
+          <dl>
+            <dt>↑ <i>or</i> <small>ALT</small> + ↑</dt>
+            <dd>prior match</dd>
+            <dt>↓ <i>or</i> <small>ALT</small> + ↓</dt>
+            <dd>next match</dd>
+            <dt><small>ESC</small> <i>or</i> <small>CTRL</small> + G</dt>
+            <dd>cancel search</dd>
+            <dt><small>RETURN</small></dt>
+            <dd>reenter current match into command line</dd>
+            <dt><small>CTRL</small> + U</dt>
+            <dd>clear search field</dd>
+          </dl>
+        </td>
+        <td>
+          <h2>Current Job</h2>
+          <dl>
+            <dt><small>PAGE DOWN</small> <i>|</i> <small>PAGE UP</small></dt>
+            <dd>scroll output down/up a page</dd>
+            <dt><small>SPACE</small> <i>|</i> <small>SHIFT</small> + <small>SPACE</small></dt>
+            <dd>scroll output down/up a page</dd>
+            <dt><small>HOME</small></dt>
+            <dd>scroll output to start</dd>
+            <dt><small>END</small></dt>
+            <dd>scroll output to end</dd>
+            <dd><i>— <small>ALT</small> can be added to any of the above.</i></dd>
+          </dl>
+          <dl>
+            <dt><small>ALT</small> + 0</dt>
+            <dd>hide output</dd>
+            <dt><small>ALT</small> + 1</dt>
+            <dd>resize output small (3 lines)</dd>
+            <dt><small>ALT</small> + 2</dt>
+            <dd>resize output page</dd>
+            <dt><small>ALT</small> + 3</dt>
+            <dd>resize output full</dd>
+          </dl>
+          <dl>
+            <dt><small>CTRL</small> + D</dt>
+            <dd>send EOF</dd>
+            <dt><small>CTRL</small> + C</dt>
+            <dd>interrupt (signal 2)</dd>
+            <dt><small>CTRL</small> + \</dt>
+            <dd>quit (signal 3)</dd>
+            <dt><small>CTRL</small> + 9</dt>
+            <dd>kill (signal 9)</dd>
+          </dl>
+        </td>
+      </tr></table>
+    </div>
+  </body>
+</html>

@@ -70,7 +70,7 @@ define(['jquery'], function($) {
   keyCodes['RETURN'] = 13;
   keyCodes['ENTER'] = 14;
   keyCodes['SHIFT'] = 16;
-  keyCodes['CONTROL'] = 17;
+  keyCodes['CONTROL'] = keyCodes['CTRL'] = 17;
   keyCodes['ALT'] = 18;
   keyCodes['PAUSE'] = 19;
   keyCodes['CAPS_LOCK'] = 20;
@@ -219,15 +219,17 @@ define(['jquery'], function($) {
 
   var modCodes = Object.create(null);
   modCodes['ALT'] = ALT_CODE;
-  modCodes['CTRL'] = CTRL_CODE;
+  modCodes['CTRL'] = modCodes['CONTROL'] = CTRL_CODE;
   modCodes['META'] = META_CODE;
   modCodes['SHIFT'] = SHIFT_CODE;
 
 
-  function modNameToCode(mod) {
+  function modNameToCode(mod, def) {
     var code = modCodes[mod];
     if (code === undefined) {
+      if (def !== undefined) return def;
       console.log('input.js: unknown modifier name:', mod);
+      return 0;
     }
     return code;
   }
@@ -261,8 +263,9 @@ define(['jquery'], function($) {
       specs.split(/[, ]+/).forEach(function(spec) {
         var parts = spec.split('+');
         if (parts.length === 0) return;
-        var keyCode = keyNameToCode(parts.pop());
-        var modCode = 0;
+        var keyName = parts.pop();
+        var keyCode = keyNameToCode(keyName);
+        var modCode = modNameToCode(keyName, 0);
         parts.forEach(function(mod) { modCode |= modNameToCode(mod); });
         var k = 'k' + String(modCode+keyCode);
         lookup[k] = handler;
@@ -277,26 +280,27 @@ define(['jquery'], function($) {
   var STOP_PROPIGATION = 2;
 
 
-  function handleKeyEvent(lookup, e, t) {
+  function findHandler(lookup, e) {
     var code = e.keyCode;
     if (e.altKey) code += ALT_CODE;
     if (e.ctrlKey) code += CTRL_CODE;
     if (e.metaKey) code += META_CODE;
     if (e.shiftKey) code += SHIFT_CODE;
     var k = 'k' + String(code);
-    var f = lookup[k];
-    if (f === undefined) return;
-    switch (f(t)) {
-      case PASS: return;
-      case STOP_PROPIGATION: e.stopPropagation(); return;
-      default: return false;
-    }
+    return lookup[k];
   }
 
   function keyHandler(map) {
     var lookup = compileKeyMap(map);
+    var defaultHandler = map.default;
     return function(e, t) {
-      return handleKeyEvent(lookup, e, t);
+      var h = findHandler(lookup, e) || defaultHandler;
+      if (h === undefined) return;
+      switch (h(t)) {
+        case PASS: return;
+        case STOP_PROPIGATION: e.stopPropagation(); return;
+        default: return false;
+      }
     }
   }
 
