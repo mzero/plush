@@ -63,8 +63,8 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
     var next = currentTopic;
     if (!currentTopic) {
       next = scrollback.children('.job').last();
-//  } else if (!(currentTopic.hasClass('focus'))) {
-//    // enable above to ignore motion if topic wasn't focused, and just refocus
+    } else if (!(currentTopic.hasClass('focus'))) {
+      // ignore motion if topic wasn't focused, and just refocus
     } else {
       switch (n) {
         case -1:
@@ -138,8 +138,8 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
 
   var jobKeydown = input.keyHandler({
     functions: {
-      pageDown:           function(e,j) { j.scroller(1, SCROLL_PAGE); },
-      pageUp:             function(e,j) { j.scroller(-1, SCROLL_PAGE); },
+      pageDown:           function(j) { j.scroller(1, SCROLL_PAGE); },
+      pageUp:             function(j) { j.scroller(-1, SCROLL_PAGE); },
     },
     bindings: {
       'PAGE_DOWN,   ALT+PAGE_DOWN':   'pageDown',
