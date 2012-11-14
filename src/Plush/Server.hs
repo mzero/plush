@@ -30,6 +30,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 #else
+import qualified Data.Text.Encoding as T
 #endif
 import Network.HTTP.Types (Ascii, methodPost, status200)
 import qualified Network.Wai.Handler.Warp as Warp
@@ -55,7 +56,10 @@ server runner port = do
     key <- genKey
     hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
     void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
-    Warp.run port' $ application shellThread key
+    Warp.run port'
+        $ dispatchApp (jsonApis shellThread key)
+        $ staticApp
+        $ respApp notFound
   where
     port' = fromMaybe 29544 port
     genKey = replicateM 40 $ randomRIO ('a','z')
@@ -66,33 +70,29 @@ server runner port = do
 
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 
-application :: ShellThread -> String -> Wai.Application
-application shellThread key =
-    ($staticApp) $ Route.dispatch True $ Route.mkRoutes'
-        [ Route.Post "api/run" $ jsonKeyApp (runApp shellThread)
-        , Route.Post "api/poll" $ jsonKeyApp (pollApp shellThread)
-        , Route.Post "api/input" $ jsonKeyApp (inputApp shellThread)
-        , Route.Post "api/history" $ jsonKeyApp (historyApp shellThread)
-        ]
-  where
-    jsonKeyApp app = jsonApp $ keyedApp key app
-
+dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
+dispatchApp = Route.dispatch True . Route.mkRoutes' . map (uncurry Route.Post)
 
 #else
 
 -- wai-middleware-route (0, 2, 0)
-application :: ShellThread -> String -> Wai.Application
-application shellThread key = Route.dispatch
-    [ (Route.rule methodPost "^/api/run", jsonKeyApp $ runApp shellThread)
-    , (Route.rule methodPost "^/api/poll", jsonKeyApp $ pollApp shellThread)
-    , (Route.rule methodPost "^/api/input", jsonKeyApp $ inputApp shellThread)
-    , (Route.rule methodPost "^/api/history", jsonKeyApp $ historyApp shellThread)
-    ]
-    (staticApp $ respApp notFound)
+dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
+dispatchApp = Route.dispatch . map postRule
   where
-    jsonKeyApp app = jsonApp $ keyedApp key app
+    postRule (p,a) = (Route.rule methodPost (T.encodeUtf8 $ T.append "^/" p), a)
 
 #endif
+
+jsonApis :: ShellThread -> String -> [(T.Text, Wai.Application)]
+jsonApis shellThread key =
+    [ ("api/run", jsonKeyApp runApp)
+    , ("api/poll", jsonKeyApp pollApp)
+    , ("api/input", jsonKeyApp inputApp)
+    , ("api/history",  jsonKeyApp historyApp)
+    ]
+  where
+    jsonKeyApp j = jsonApp $ keyedApp key $ j shellThread
+
 
 staticApp :: Wai.Middleware
 staticApp app req = do
