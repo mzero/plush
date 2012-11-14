@@ -81,6 +81,15 @@ live and test modes:
 
 Executables will be found (with PATH search) and run in live mode only.
 
+
+=== Development & Production Builds ===
+
+The build procedure above will result in a development build. The static files
+that Plush uses will be used live out of the development tree, assuming you
+start plush from the root of the development tree. This enables fast javascript
+development, since all you need to do is reload in the browser to test your
+changes.
+
 If you want to run plush from another folder than the source tree root, and
 plush is not installed, an environment variable needs to be set so plush can
 find its data files, which are in the source tree:
@@ -88,6 +97,12 @@ find its data files, which are in the source tree:
 
 Be sure to undo or change this export if you install plush, or change to a
 different development directory.
+
+You can build plush in production mode, which will embed all the static files
+directly into the plush exectuable. To do so:
+  cabal clean
+  cabal configure -fProduction
+  cabal build
 
 
 === Running The Server ===

@@ -14,17 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TemplateHaskell #-}
 
 module Plush.Utilities (
     readUtf8File,
-    getDataDir,
+    getDataResource,
+    getStaticResource,
     )
     where
 
-import System.Directory (getCurrentDirectory, doesDirectoryExist)
+import qualified Data.ByteString as B
 import System.IO
+
+#ifdef PRODUCTION
+import Data.FileEmbed
+#else
+import System.Directory (getCurrentDirectory, doesDirectoryExist, doesFileExist)
+import System.FilePath ((</>))
 import System.Posix (getEnv)
+#endif
 
 import qualified Paths_plush as CabalPaths
 
@@ -36,6 +44,36 @@ readUtf8File path = do
     h <- openFile path ReadMode
     hSetEncoding h utf8
     hGetContents h
+
+
+getDataResource :: FilePath -> IO (Maybe B.ByteString)
+getStaticResource :: FilePath -> IO (Maybe B.ByteString)
+
+#ifdef PRODUCTION
+
+getDataResource = return . flip lookup dataResources
+getStaticResource = return . flip lookup staticResources
+
+dataResources :: [(FilePath, B.ByteString)]
+dataResources = $(embedDir "data")
+
+staticResources :: [(FilePath, B.ByteString)]
+staticResources = $(embedDir "static")
+
+#else
+
+getDataResource = getResource . ("data" </>)
+getStaticResource = getResource . ("static" </>)
+
+getResource :: FilePath -> IO (Maybe B.ByteString)
+getResource fp = do
+    fp' <- (</> fp) `fmap` getDataDir
+    exists <- doesFileExist fp'
+    if exists
+        then Just `fmap` B.readFile fp'
+        else return Nothing
+
+#endif
 
 #ifdef PRODUCTION
 -- | Return the a data directory where Plush's static data files are installed.
