@@ -18,10 +18,12 @@ limitations under the License.
 
 module Plush.Utilities (
     readUtf8File,
+    readMaybe,
     getDataDir,
     )
     where
 
+import Data.Maybe (listToMaybe)
 import System.Directory (getCurrentDirectory, doesDirectoryExist)
 import System.IO
 import System.Posix (getEnv)
@@ -36,6 +38,13 @@ readUtf8File path = do
     h <- openFile path ReadMode
     hSetEncoding h utf8
     hGetContents h
+
+
+-- | The missing read function. The string must parse entirely for this to
+-- return a value.
+readMaybe :: (Read a) => String -> Maybe a
+readMaybe = listToMaybe . map fst . filter (null . snd) . reads
+
 
 #ifdef PRODUCTION
 -- | Return the a data directory where Plush's static data files are installed.
