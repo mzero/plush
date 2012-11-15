@@ -37,13 +37,14 @@ import Control.Monad.Error
 import Control.Monad.Trans.State
 import qualified Data.HashMap.Strict as M
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 
 import Plush.Run.Posix
 import Plush.Run.ShellFlags
 import Plush.Run.Types
 import Plush.Types.CommandSummary
+import Plush.Utilities (readMaybe)
 
 -- Shell State
 
@@ -91,14 +92,18 @@ getVars :: (Monad m, Functor m) => ShellExec m Vars
 getVars = gets ssVars
 
 getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
-getVar name = get >>= (\s -> return . msum $ [normalVar s, specialVar s])
+getVar name = get >>= return . varOptions
   where
+    varOptions s = msum $ [normalVar s, specialVar s, positionalVar s]
     normalVar s = varValue `fmap` M.lookup name (ssVars s)
     specialVar s = case name of
         "*" -> Just . intercalate (starSep s) . ssArgs $ s
         "#" -> Just . show . length . ssArgs $ s
         "?" -> Just . show . exitStatus . ssLastExitCode $ s
         "-" -> Just . flagParameter . ssFlags $ s
+        _ -> Nothing
+    positionalVar s = case readMaybe name of
+        Just n | n > 0 -> listToMaybe . drop (n - 1) $ ssArgs s
         _ -> Nothing
     starSep = take 1 . maybe " " varValue . M.lookup "IFS" . ssVars
     exitStatus ExitSuccess = 0
@@ -108,7 +113,7 @@ getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
 
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
-getVarEntry name = get >>= \s -> return $ M.lookup name $ ssVars s
+getVarEntry name = gets ssVars >>= return . M.lookup name
 
 setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
 setVarEntry name entry = do

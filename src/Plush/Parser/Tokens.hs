@@ -34,6 +34,7 @@ module Plush.Parser.Tokens (
     reservedWords
     )
 where
+
 import Control.Applicative ((<*), (*>))
 import Control.Monad
 import qualified Data.Char as Char
@@ -115,8 +116,11 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
 
     variable = variableName >>= \v -> return $ Parameter v Nothing
 
-    variableName = specialParameterName <|> shellVariableName
-    specialParameterName = oneOf "@*#?-$!0" >>= return . (:[])
+    variableName = positionalName <|> specialName <|> shellVariableName
+    positionalName = many1 digit
+        -- these overlap with 0 in special, but the parse is the same
+        -- same as dash: $11 is treated as ${11} (bash inerprets it as ${1}1)
+    specialName = oneOf "@*#?-$!0" >>= return . (:[])
     shellVariableName =
         liftM2 (:) (char '_' <|> letter) $ many (char '_' <|> alphaNum)
 
