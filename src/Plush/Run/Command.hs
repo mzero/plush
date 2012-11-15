@@ -40,8 +40,13 @@ commandSearch :: (PosixLike m) =>
 commandSearch cmd
     | '/' `elem` cmd = external cmd
     | otherwise  =
+        -- §2.9.1 Command Search and Execution: 1 a: special built-ins
         search special setShellVars SpecialCommand $
+
+        -- §2.9.1 Command Search and Execution: 1 c: utilities
         search direct withEnvVars DirectCommand $
+
+        -- §2.9.1 Command Search and Execution: 1 d: PATH
         findOnPath
   where
     findOnPath = do
@@ -50,9 +55,14 @@ commandSearch cmd
         go (fp:fps) = do
             b <- doesFileExist fp -- TODO: check if it can be executed
             if b
-                then search builtin withEnvVars (BuiltInCommand fp) $ external fp
+                then -- §2.9.1 Command Search and Execution: 1 d i a: regular built-ins
+                     search builtin withEnvVars (BuiltInCommand fp) $
+                     -- §2.9.1 Command Search and Execution: 1 d i b: exec from fs
+                     external fp
                 else go fps
-        go [] = search builtin withEnvVars (BuiltInCommand "/???") $ unknown
+        go [] = search builtin withEnvVars (BuiltInCommand "/???") $
+                -- §2.9.1 Command Search and Execution: 1 d ii: unsuccessful
+                unknown
             -- TODO: technically shouldn't run the builtins if not found in
             -- during path search. But for now, since the test environemnt
             -- doesn't have them, this will fail to run anything!
@@ -62,8 +72,7 @@ commandSearch cmd
                                     utilAnnotate util))
         $ lkup cmd
 
-    external fp = do
-        return (ExecutableCommand fp, externalExec fp, emptyAnnotate)
+    external fp = return (ExecutableCommand fp, externalExec fp, emptyAnnotate)
     externalExec fp = withEnvVars $ \args -> do
         env <- getEnv
         execProcess env fp args
