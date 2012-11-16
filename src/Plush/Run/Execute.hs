@@ -110,7 +110,7 @@ parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
 execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
     -> ShellExec m ExitCode
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
-    BraceGroup _cmds -> notSupported "BraceGroup"
+    BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
     ForClause name words_ cmds -> execFor name words_ cmds
     IfClause _condition _consequent _alts -> notSupported "IfClause"

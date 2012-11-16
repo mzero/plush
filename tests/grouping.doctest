@@ -1,0 +1,57 @@
+-- Copyright 2012 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Grouping Compound Commands
+
+A brace group can have one or more commands
+    # { echo hello; }
+    hello
+    # { echo hello; echo world; }
+    hello
+    world
+
+Exit code of the brace group, is the exit of the last command
+    # { true ; false ; } ; echo $?
+    1
+    # { false ; true ; } ; echo $?
+    0
+
+Changes inside the brace group, affect the outer environment
+    # x=1
+    # { x=2; echo $x; }
+    2
+    # echo $x
+    2
+
+Set-up
+    # testdir=doctest
+    # cd /tmp
+    # rm -rf ${testdir}
+    # mkdir ${testdir}
+
+Changes to working directory persist too
+    # cd ${testdir}
+    # mkdir sub
+    # touch apple-pie sub/apple-jack
+    # echo apple-*
+    apple-pie
+    # { cd sub; echo apple-*; }
+    apple-jack
+    # echo apple-*
+    apple-jack
+
+Clean-up
+    # cd /tmp
+    # rm -rf ${testdir}
+
