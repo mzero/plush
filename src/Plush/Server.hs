@@ -24,17 +24,18 @@ module Plush.Server (
 
 import Control.Concurrent (forkIO)
 import Control.Monad (replicateM, void)
+import Control.Monad.Trans (liftIO)
+import Data.ByteString.Lazy (fromChunks)
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 #else
-import qualified Data.Text as T
-import Network.HTTP.Types (methodPost)
+import qualified Data.Text.Encoding as T
 #endif
+import Network.HTTP.Types (Ascii, methodPost, status200)
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Middleware.Route as Route
-import qualified Network.Wai.Middleware.Static as Static
 import qualified Network.Wai as Wai
-import System.FilePath
 import System.IO
 import System.Posix (sleep)
 import System.Random
@@ -52,11 +53,13 @@ import Plush.Utilities
 server :: Runner -> Maybe Int -> IO ()
 server runner port = do
     (shellThread, origOut, _origErr) <- startShell runner
-    staticPath <- (</> "static") `fmap` getDataDir
     key <- genKey
     hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
     void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
-    Warp.run port' $ application shellThread key staticPath
+    Warp.run port'
+        $ dispatchApp (jsonApis shellThread key)
+        $ staticApp
+        $ respApp notFound
   where
     port' = fromMaybe 29544 port
     genKey = replicateM 40 $ randomRIO ('a','z')
@@ -67,32 +70,56 @@ server runner port = do
 
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 
-application :: ShellThread -> String -> FilePath -> Wai.Application
-application shellThread key staticPath =
-    ($staticApp) $ Route.dispatch True $ Route.mkRoutes'
-        [ Route.Post "api/run" $ jsonKeyApp (runApp shellThread)
-        , Route.Post "api/poll" $ jsonKeyApp (pollApp shellThread)
-        , Route.Post "api/input" $ jsonKeyApp (inputApp shellThread)
-        , Route.Post "api/history" $ jsonKeyApp (historyApp shellThread)
-        ]
-  where
-    jsonKeyApp app = jsonApp $ keyedApp key app
-    staticApp = (Static.staticPolicy $ Static.addBase staticPath)
-        (respApp notFound)
+dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
+dispatchApp = Route.dispatch True . Route.mkRoutes' . map (uncurry Route.Post)
 
 #else
 
 -- wai-middleware-route (0, 2, 0)
-application :: ShellThread -> String -> FilePath -> Wai.Application
-application shellThread key staticPath = Route.dispatch
-    [ (Route.rule methodPost "^/api/run", jsonKeyApp $ runApp shellThread)
-    , (Route.rule methodPost "^/api/poll", jsonKeyApp $ pollApp shellThread)
-    , (Route.rule methodPost "^/api/input", jsonKeyApp $ inputApp shellThread)
-    , (Route.rule methodPost "^/api/history", jsonKeyApp $ historyApp shellThread)
-    ]
-    staticApp
+dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
+dispatchApp = Route.dispatch . map postRule
   where
-    jsonKeyApp app = jsonApp $ keyedApp key app
-    staticApp = (Static.staticRoot (T.pack staticPath)) (respApp notFound)
+    postRule (p,a) = (Route.rule methodPost (T.encodeUtf8 $ T.append "^/" p), a)
 
 #endif
+
+jsonApis :: ShellThread -> String -> [(T.Text, Wai.Application)]
+jsonApis shellThread key =
+    [ ("api/run", jsonKeyApp runApp)
+    , ("api/poll", jsonKeyApp pollApp)
+    , ("api/input", jsonKeyApp inputApp)
+    , ("api/history",  jsonKeyApp historyApp)
+    ]
+  where
+    jsonKeyApp j = jsonApp $ keyedApp key $ j shellThread
+
+
+staticApp :: Wai.Middleware
+staticApp app req = do
+    mbs <- if ok then liftIO (getStaticResource fp) else return Nothing
+    case mbs of
+        Nothing -> app req
+        Just bs -> liftIO . return . resp $ fromChunks [bs]
+  where
+    pi_ = Wai.pathInfo req
+    ok = all (not . T.isPrefixOf ".") pi_
+    fp = T.unpack $ T.intercalate "/" pi_
+    resp = Wai.responseLBS status200 [("Content-Type", getMimeType fp)]
+
+getMimeType fp = fromMaybe defaultMimeType $ flip lookup defaultMimeTypes
+    $ drop 1 $ dropWhile (/= '.') fp
+
+defaultMimeType :: Ascii
+defaultMimeType = "application/octet-stream"
+
+defaultMimeTypes :: [(String, Ascii)]
+defaultMimeTypes = [
+  ( "css"     , "text/css"                          ),
+  ( "gif"     , "image/gif"                         ),
+  ( "html"    , "text/html"                         ),
+  ( "jpeg"    , "image/jpeg"                        ),
+  ( "jpg"     , "image/jpeg"                        ),
+  ( "js"      , "text/javascript"                   ),
+  ( "ogg"     , "application/ogg"                   ),
+  ( "png"     , "image/png"                         )
+  ]

@@ -36,8 +36,9 @@ where
 import Control.Arrow (first)
 import Control.Monad.Error
 import Control.Monad.Trans.State
-import qualified Data.Text.IO as T
-import System.FilePath ((</>))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T
 
 import Plush.Pretty
 import Plush.Run.Execute
@@ -111,8 +112,8 @@ runCommandList cl r = snd `fmap` run (shellExec cl) r
 -- runner is in Test.
 prime :: Runner -> IO Runner
 prime r = do
-    dataPath <- (</> "data") `fmap` getDataDir
-    summaries <- T.readFile (dataPath </> "summaries.txt")
+    summaries <- maybe T.empty (T.decodeUtf8With T.lenientDecode)
+                    `fmap` getDataResource "summaries.txt"
     snd `fmap` run (primeShellState >> loadSummaries summaries) r
 
 -- | A similar encapsulation as 'Runner', but always with the 'TestExec' monad.
