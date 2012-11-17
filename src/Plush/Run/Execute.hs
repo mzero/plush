@@ -79,7 +79,7 @@ execCommand :: (PosixLike m) => Command -> ShellExec m ExitCode
 execCommand (Simple cmd) = execSimpleCommand cmd
 execCommand (Compound cmd redirects) =
     execCompoundCommand cmd redirects
-execCommand (Function {}) = notSupported "Execute function"
+execCommand (Function (Name _ name) fun) = setFun name fun >> success
 
 execSimpleCommand :: (PosixLike m) => SimpleCommand -> ShellExec m ExitCode
 execSimpleCommand (SimpleCommand [] _ (_:_)) =
@@ -93,7 +93,10 @@ execSimpleCommand (SimpleCommand ws as rs) = do
 execFields :: (PosixLike m) => Bindings -> [String] -> ShellExec m ExitCode
 execFields bindings (cmd:args) = do
     (_, ex, _) <- commandSearch cmd
-    ex bindings args
+    case ex of
+        UtilityAction ua  -> ua bindings args
+        FunctionAction fa -> fa execFunctionBody bindings args
+
 execFields _ [] = exitMsg 122 "Empty command"
 
 parseAssignment :: (PosixLike m) => Assignment -> ShellExec m (String, String)
@@ -130,6 +133,11 @@ execFor (Name _ name) (Just words_) cmds = do
         case ok of
             ExitSuccess -> shellExec cmds >> forLoop ws
             e@(ExitFailure {}) -> return e
+
+execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
+execFunctionBody (FunctionBody body redirects) =
+    execCompoundCommand body redirects
+
 
 data ExecuteType = ExecuteForeground | ExecuteMidground | ExecuteBackground
   deriving (Eq, Ord, Bounded)
@@ -179,5 +187,7 @@ execType = typeCommandList
     typeFound SpecialCommand = ExecuteForeground
     typeFound DirectCommand = ExecuteForeground
     typeFound (BuiltInCommand _) = ExecuteMidground
+    typeFound FunctionCall = ExecuteForeground
+        -- TODO: analyze function bodies to see if they can be midgrounded
     typeFound (ExecutableCommand _) = ExecuteMidground
     typeFound UnknownCommand = ExecuteForeground

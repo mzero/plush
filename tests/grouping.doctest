@@ -34,6 +34,11 @@ Changes inside the brace group, affect the outer environment
     # echo $x
     2
 
+Braces only parse in command name position
+    # { echo {; echo }; }
+    {
+    }
+
 Set-up
     # testdir=doctest
     # cd /tmp

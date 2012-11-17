@@ -47,10 +47,10 @@ type Pipeline = [Command]
 data Command =
     Simple SimpleCommand
     | Compound CompoundCommand [Redirect]
-    | Function FunctionDefinition
+    | Function Name FunctionBody
     deriving (Eq, Show)
 
-data FunctionDefinition = FunctionDefinition -- not implemented yet
+data FunctionBody = FunctionBody CompoundCommand [Redirect]
     deriving (Eq, Show)
 
 data SimpleCommand = SimpleCommand [Word] [Assignment] [Redirect]
@@ -160,4 +160,3 @@ modifyPartsM mf (Word l p) = Word l `fmap` mf p
 
 expandPartsM :: (Functor m) => (Parts -> m [Parts]) -> Word -> m [Word]
 expandPartsM mf (Word l p) = map (Word l) `fmap` mf p
-

@@ -69,7 +69,7 @@ pipe_sequence = command `sepBy1` (operator "|" () *> linebreak)
 
 command :: ShellParser Command
 command = Compound <$> compound_command <*> option [] redirect_list
-    <|> Function <$> function_defintion
+    <|> uncurry Function <$> function_defintion
     <|> Simple <$> simple_command
 
 -- * compound command
@@ -130,8 +130,15 @@ term = do
 
 -- * function definition
 
-function_defintion :: ShellParser FunctionDefinition
-function_defintion = unexpected "function definitions not yet supported"
+function_defintion :: ShellParser (Name, FunctionBody)
+function_defintion =
+    try (fname <* tok_lparen <* tok_rparen <* linebreak) <&> function_body
+
+function_body :: ShellParser FunctionBody
+function_body = FunctionBody <$> compound_command <*> option [] redirect_list
+
+fname :: ShellParser Name
+fname = tok_name
 
 -- * simple command
 
@@ -211,4 +218,3 @@ separator = (separator_op <* linebreak) <|> (newline_list >> return Sequential)
 
 sequential_sep :: ShellParser ()
 sequential_sep = (operator ";" () *> linebreak) <|> newline_list
-

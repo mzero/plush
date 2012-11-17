@@ -24,6 +24,7 @@ module Plush.Run.ShellExec (
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
+    getFun, setFun, unsetFun, withFunContext,
     getEnv,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
@@ -43,6 +44,7 @@ import qualified Data.Text as T
 import Plush.Run.Posix
 import Plush.Run.ShellFlags
 import Plush.Run.Types
+import Plush.Types
 import Plush.Types.CommandSummary
 import Plush.Utilities (readMaybe)
 
@@ -52,6 +54,7 @@ data VarScope = VarShellOnly | VarExported  deriving (Eq, Ord, Bounded, Enum)
 data VarMode = VarReadWrite | VarReadOnly   deriving (Eq, Ord, Bounded, Enum)
 type VarEntry = (VarScope, VarMode, Maybe String)
 type Vars = M.HashMap String VarEntry
+type Funs = M.HashMap String FunctionBody
 
 varValue :: VarEntry -> String
 varValue (_,_,s) = fromMaybe "" s
@@ -61,6 +64,7 @@ data ShellState = ShellState
     , ssArgs :: [String]  -- "Positional Parameters", technically
     , ssFlags :: Flags
     , ssVars :: Vars
+    , ssFuns :: Funs
     , ssLastExitCode :: ExitCode
     , ssSummaries :: M.HashMap String CommandSummary
     }
@@ -69,7 +73,7 @@ data ShellState = ShellState
 initialShellState :: ShellState
 initialShellState = ShellState
     { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
+      ssFuns = M.empty, ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -171,6 +175,24 @@ getEnv = getVars >>= return . foldr getBinding [] . M.toList
   where
     getBinding (name, ve@(VarExported, _, _)) acc = (name, varValue ve) : acc
     getBinding _ acc = acc
+
+getFun :: (Monad m) => String -> ShellExec m (Maybe FunctionBody)
+getFun fname = gets ssFuns >>= return . M.lookup fname
+
+setFun :: (Monad m) => String -> FunctionBody -> ShellExec m ()
+setFun fname fun =
+    modify $ \s -> s { ssFuns = M.insert fname fun $ ssFuns s }
+
+unsetFun :: (Monad m) => String -> ShellExec m ()
+unsetFun fname = modify $ \s -> s { ssFuns = M.delete fname $ ssFuns s }
+
+withFunContext :: (Monad m) => [String] -> ShellExec m a -> ShellExec m a
+withFunContext args body = do
+    origArgs <- gets ssArgs
+    modify $ \s -> s { ssArgs = args }
+    r <- body   -- TODO: this should be in some protected bracket
+    modify $ \s -> s { ssArgs = origArgs }
+    return r
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
