@@ -21,7 +21,6 @@ module Plush.Main (plushMain) where
 import Control.Monad (when)
 import Control.Monad.Trans (liftIO)
 import Data.List (foldl')
-import Data.Maybe (listToMaybe)
 import System.Console.GetOpt
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
@@ -120,7 +119,6 @@ runWebServer opts args = case args of
   where
     serve = server (optRunner opts)
     badArgs = usage >> exitFailure
-    readMaybe = listToMaybe . map fst . filter (null . snd) . reads
 
 debugOptions :: Options -> [String] -> IO ()
 debugOptions _ ["parse"] = runRepl runInPrettyPrint

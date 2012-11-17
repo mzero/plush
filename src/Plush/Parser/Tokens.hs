@@ -27,6 +27,7 @@ module Plush.Parser.Tokens (
     tok_dless, tok_dgreat, tok_lessand, tok_greatand, tok_lessgreat,
     tok_dlessdash, tok_clobber,
     tok_bang,
+    tok_lparen, tok_rparen, tok_lbrace, tok_rbrace,
 
     -- * keywords
     tok_if, tok_then, tok_else, tok_elif, tok_fi, tok_do, tok_done, tok_case,
@@ -34,6 +35,7 @@ module Plush.Parser.Tokens (
     reservedWords
     )
 where
+
 import Control.Applicative ((<*), (*>))
 import Control.Monad
 import qualified Data.Char as Char
@@ -115,8 +117,11 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
 
     variable = variableName >>= \v -> return $ Parameter v Nothing
 
-    variableName = specialParameterName <|> shellVariableName
-    specialParameterName = oneOf "@*#?-$!0" >>= return . (:[])
+    variableName = positionalName <|> specialName <|> shellVariableName
+    positionalName = many1 digit
+        -- these overlap with 0 in special, but the parse is the same
+        -- same as dash: $11 is treated as ${11} (bash inerprets it as ${1}1)
+    specialName = oneOf "@*#?-$!0" >>= return . (:[])
     shellVariableName =
         liftM2 (:) (char '_' <|> letter) $ many (char '_' <|> alphaNum)
 
@@ -189,6 +194,11 @@ tok_clobber = operator ">|" RedirOutputClobber
 tok_bang :: ShellParser Sense
 tok_bang = tokenize $ char '!' >> return Inverted
 
+tok_lparen = tokenize $ char '('
+tok_rparen = tokenize $ char ')'
+tok_lbrace = tokenize $ char '{'
+tok_rbrace = tokenize $ char '}'
+
 keyword :: String -> ShellParser String
 keyword name = tokenize $ string name
 
@@ -208,4 +218,4 @@ tok_in = keyword "in"
 
 reservedWords :: [String]
 reservedWords =
-    words "if then else elif fi do done case esac while until for in"
+    words "if then else elif fi do done case esac while until for { } ! in"

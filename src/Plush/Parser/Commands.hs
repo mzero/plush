@@ -19,6 +19,7 @@ module Plush.Parser.Commands (
     linebreak
     )
 where
+
 import qualified Control.Applicative as Applicative
 import Control.Applicative ((<*), (*>), (<*>))
 import Data.Functor
@@ -67,8 +68,8 @@ pipe_sequence :: ShellParser Pipeline
 pipe_sequence = command `sepBy1` (operator "|" () *> linebreak)
 
 command :: ShellParser Command
-command = (Compound <$> compound_command <*> option [] redirect_list)
-    <|> Function <$> function_defintion
+command = Compound <$> compound_command <*> option [] redirect_list
+    <|> uncurry Function <$> function_defintion
     <|> Simple <$> simple_command
 
 -- * compound command
@@ -80,10 +81,10 @@ compound_command = choice
     ]
 
 brace_group :: ShellParser CompoundCommand
-brace_group = unexpected "brace_group not supported"
+brace_group = BraceGroup <$> (tok_lbrace *> compound_list <* tok_rbrace)
 
 subshell :: ShellParser CompoundCommand
-subshell = unexpected "subshell not supported"
+subshell = Subshell <$> (tok_lparen *> compound_list <* tok_rparen)
 
 for_clause :: ShellParser CompoundCommand
 for_clause = do
@@ -96,16 +97,16 @@ for_clause = do
     return $ ForClause name words_ doGroup
 
 case_clause :: ShellParser CompoundCommand
-case_clause = unexpected "case_clause not supported"
+case_clause = tok_case *> unexpected "case_clause not supported"
 
 if_clause :: ShellParser CompoundCommand
-if_clause = unexpected "if_clause not supported"
+if_clause = tok_if *> unexpected "if_clause not supported"
 
 while_clause :: ShellParser CompoundCommand
-while_clause = unexpected "while_clause not supported"
+while_clause = tok_while *> unexpected "while_clause not supported"
 
 until_clause :: ShellParser CompoundCommand
-until_clause = unexpected "until_clause not supported"
+until_clause = tok_until *> unexpected "until_clause not supported"
 
 -- | This is the same as 'list', except that the cmds are separated with
 -- 'separator' instead of 'separator_op'.  Normally I'd factor them into one
@@ -129,8 +130,15 @@ term = do
 
 -- * function definition
 
-function_defintion :: ShellParser FunctionDefinition
-function_defintion = unexpected "function definitions not yet supported"
+function_defintion :: ShellParser (Name, FunctionBody)
+function_defintion =
+    try (fname <* tok_lparen <* tok_rparen <* linebreak) <&> function_body
+
+function_body :: ShellParser FunctionBody
+function_body = FunctionBody <$> compound_command <*> option [] redirect_list
+
+fname :: ShellParser Name
+fname = tok_name
 
 -- * simple command
 
@@ -210,4 +218,3 @@ separator = (separator_op <* linebreak) <|> (newline_list >> return Sequential)
 
 sequential_sep :: ShellParser ()
 sequential_sep = (operator ";" () *> linebreak) <|> newline_list
-
