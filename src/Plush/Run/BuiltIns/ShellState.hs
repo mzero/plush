@@ -95,6 +95,8 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
         object [ ct "direct" ]
     jsonAnno (FoundCommandAnno (BuiltInCommand fp)) =
         object [ ct "builtin", "path" .= fp ]
+    jsonAnno (FoundCommandAnno FunCallCommand) =
+        object [ ct "function" ]
     jsonAnno (FoundCommandAnno (ExecutableCommand fp)) =
         object [ ct "executable", "path" .= fp ]
     jsonAnno (FoundCommandAnno (UnknownCommand)) =
@@ -167,12 +169,9 @@ unset = SpecialUtility $ stdSyntax options "" go
     options = [ flag 'v', flag 'f' ]
 
     go "v" names = untilFailureM unsetVarEntry names
-    go "f" names = untilFailureM unsetFunEntry names
+    go "f" names = mapM_ unsetFun names >> success
     go _flags names = untilFailureM unsetVarEntry names
-                      -- TODO: enable this eventually
-                      -- `andThenM` untilFailureM unsetFunEntry names
-
-    unsetFunEntry _name = notSupported "unset -f"
+                      `andThenM` (mapM_ unsetFun names >> success)
 
 modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options "" go
   where
