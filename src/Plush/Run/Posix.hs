@@ -219,14 +219,7 @@ instance PosixLike IO where
 
     execProcess env cmd args = do
         (_, _, _, h) <- IO.createProcess $
-                        IO.CreateProcess { IO.cmdspec = IO.RawCommand cmd args
-                                         , IO.cwd = Nothing
-                                         , IO.env = Just env
-                                         , IO.std_in = IO.Inherit
-                                         , IO.std_out = IO.Inherit
-                                         , IO.std_err = IO.Inherit
-                                         , IO.close_fds = False
-                                         , IO.create_group = False }
+                        (IO.proc cmd args) { IO.env = Just env }
         IO.waitForProcess h
 
     pipeline = ioPipeline
