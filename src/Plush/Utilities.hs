@@ -17,6 +17,7 @@ limitations under the License.
 {-# LANGUAGE CPP, TemplateHaskell #-}
 
 module Plush.Utilities (
+    readMaybe,
     readUtf8File,
     getDataResource,
     getStaticResource,
@@ -24,6 +25,7 @@ module Plush.Utilities (
     where
 
 import qualified Data.ByteString as B
+import Data.Maybe (listToMaybe)
 import System.IO
 
 #ifdef PRODUCTION
@@ -32,10 +34,14 @@ import Data.FileEmbed
 import System.Directory (getCurrentDirectory, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>))
 import System.Posix (getEnv)
+import qualified Paths_plush as CabalPaths
 #endif
 
-import qualified Paths_plush as CabalPaths
 
+-- | The missing read function. The string must parse entirely for this to
+-- return a value.
+readMaybe :: (Read a) => String -> Maybe a
+readMaybe = listToMaybe . map fst . filter (null . snd) . reads
 
 -- | Lazily get a text file's contents as with 'readFile', but assume its
 -- contents are encoded with UTF-8 regardless of the user's current locale.
@@ -44,7 +50,6 @@ readUtf8File path = do
     h <- openFile path ReadMode
     hSetEncoding h utf8
     hGetContents h
-
 
 getDataResource :: FilePath -> IO (Maybe B.ByteString)
 getStaticResource :: FilePath -> IO (Maybe B.ByteString)
@@ -73,14 +78,6 @@ getResource fp = do
         then Just `fmap` B.readFile fp'
         else return Nothing
 
-#endif
-
-#ifdef PRODUCTION
--- | Return the a data directory where Plush's static data files are installed.
--- Can be overriden by the environment variable @plush_datadir@.
-getDataDir :: IO FilePath
-getDataDir = CabalPaths.getDataDir
-#else
 -- | Return the a data directory where Plush's static data files are installed.
 -- Can be overriden by the environment variable @plush_datadir@.
 -- For non-production builds, this is based on the 'getDataDir' that Cabal

@@ -24,6 +24,7 @@ module Plush.Run.ShellExec (
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
+    getFun, setFun, unsetFun, withFunContext,
     getEnv,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
@@ -37,13 +38,15 @@ import Control.Monad.Error
 import Control.Monad.Trans.State
 import qualified Data.HashMap.Strict as M
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 
 import Plush.Run.Posix
 import Plush.Run.ShellFlags
 import Plush.Run.Types
+import Plush.Types
 import Plush.Types.CommandSummary
+import Plush.Utilities (readMaybe)
 
 -- Shell State
 
@@ -51,6 +54,7 @@ data VarScope = VarShellOnly | VarExported  deriving (Eq, Ord, Bounded, Enum)
 data VarMode = VarReadWrite | VarReadOnly   deriving (Eq, Ord, Bounded, Enum)
 type VarEntry = (VarScope, VarMode, Maybe String)
 type Vars = M.HashMap String VarEntry
+type Funs = M.HashMap String FunctionBody
 
 varValue :: VarEntry -> String
 varValue (_,_,s) = fromMaybe "" s
@@ -60,6 +64,7 @@ data ShellState = ShellState
     , ssArgs :: [String]  -- "Positional Parameters", technically
     , ssFlags :: Flags
     , ssVars :: Vars
+    , ssFuns :: Funs
     , ssLastExitCode :: ExitCode
     , ssSummaries :: M.HashMap String CommandSummary
     }
@@ -68,7 +73,7 @@ data ShellState = ShellState
 initialShellState :: ShellState
 initialShellState = ShellState
     { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
+      ssFuns = M.empty, ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -91,14 +96,18 @@ getVars :: (Monad m, Functor m) => ShellExec m Vars
 getVars = gets ssVars
 
 getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
-getVar name = get >>= (\s -> return . msum $ [normalVar s, specialVar s])
+getVar name = get >>= return . varOptions
   where
+    varOptions s = msum $ [normalVar s, specialVar s, positionalVar s]
     normalVar s = varValue `fmap` M.lookup name (ssVars s)
     specialVar s = case name of
         "*" -> Just . intercalate (starSep s) . ssArgs $ s
         "#" -> Just . show . length . ssArgs $ s
         "?" -> Just . show . exitStatus . ssLastExitCode $ s
         "-" -> Just . flagParameter . ssFlags $ s
+        _ -> Nothing
+    positionalVar s = case readMaybe name of
+        Just n | n > 0 -> listToMaybe . drop (n - 1) $ ssArgs s
         _ -> Nothing
     starSep = take 1 . maybe " " varValue . M.lookup "IFS" . ssVars
     exitStatus ExitSuccess = 0
@@ -108,7 +117,7 @@ getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
 
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
-getVarEntry name = get >>= \s -> return $ M.lookup name $ ssVars s
+getVarEntry name = gets ssVars >>= return . M.lookup name
 
 setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
 setVarEntry name entry = do
@@ -166,6 +175,24 @@ getEnv = getVars >>= return . foldr getBinding [] . M.toList
   where
     getBinding (name, ve@(VarExported, _, _)) acc = (name, varValue ve) : acc
     getBinding _ acc = acc
+
+getFun :: (Monad m) => String -> ShellExec m (Maybe FunctionBody)
+getFun fname = gets ssFuns >>= return . M.lookup fname
+
+setFun :: (Monad m) => String -> FunctionBody -> ShellExec m ()
+setFun fname fun =
+    modify $ \s -> s { ssFuns = M.insert fname fun $ ssFuns s }
+
+unsetFun :: (Monad m) => String -> ShellExec m ()
+unsetFun fname = modify $ \s -> s { ssFuns = M.delete fname $ ssFuns s }
+
+withFunContext :: (Monad m) => [String] -> ShellExec m a -> ShellExec m a
+withFunContext args body = do
+    origArgs <- gets ssArgs
+    modify $ \s -> s { ssArgs = args }
+    r <- body   -- TODO: this should be in some protected bracket
+    modify $ \s -> s { ssArgs = origArgs }
+    return r
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode

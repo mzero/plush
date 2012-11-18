@@ -32,7 +32,6 @@ import Data.Aeson
 import Data.Aeson.Types (Pair)
 import qualified Data.HashMap.Strict as M
 import Data.List (sort)
-import Data.Maybe (listToMaybe)
 
 import Plush.Parser
 import Plush.Run.Annotate
@@ -45,6 +44,7 @@ import Plush.Run.ShellFlags
 import Plush.Run.Types
 import Plush.Types
 import Plush.Types.CommandSummary
+import Plush.Utilities (readMaybe)
 
 context :: (PosixLike m) => SpecialUtility m
 context = SpecialUtility . const $ Utility contextExec noArgsAnnotate
@@ -73,7 +73,7 @@ complete :: (PosixLike m) => SpecialUtility m
 complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
   where
     go "" [cmdline] = go' Nothing cmdline >>= jsonOut >> success
-    go optC [cmdline] = case maybeRead optC of
+    go optC [cmdline] = case readMaybe optC of
         Just n -> go' (Just n) cmdline >>= jsonOut >> success
         _ -> exitMsg 2 "non-numeric -c argument"
     go _ _ = exitMsg 1 "One argument only"
@@ -95,6 +95,8 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
         object [ ct "direct" ]
     jsonAnno (FoundCommandAnno (BuiltInCommand fp)) =
         object [ ct "builtin", "path" .= fp ]
+    jsonAnno (FoundCommandAnno FunctionCall) =
+        object [ ct "function" ]
     jsonAnno (FoundCommandAnno (ExecutableCommand fp)) =
         object [ ct "executable", "path" .= fp ]
     jsonAnno (FoundCommandAnno (UnknownCommand)) =
@@ -112,9 +114,6 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
 
     ct :: String -> Pair
     ct = ("commandType" .=)
-
-maybeRead :: (Read a) => String -> Maybe a
-maybeRead = listToMaybe . map fst . filter (null . snd) . reads
 
 
 -- | The set special built-in is a marvel:
@@ -167,12 +166,9 @@ unset = SpecialUtility $ stdSyntax options "" go
     options = [ flag 'v', flag 'f' ]
 
     go "v" names = untilFailureM unsetVarEntry names
-    go "f" names = untilFailureM unsetFunEntry names
+    go "f" names = mapM_ unsetFun names >> success
     go _flags names = untilFailureM unsetVarEntry names
-                      -- TODO: enable this eventually
-                      -- `andThenM` untilFailureM unsetFunEntry names
-
-    unsetFunEntry _name = notSupported "unset -f"
+                      `andThenM` (mapM_ unsetFun names >> success)
 
 modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options "" go
   where
