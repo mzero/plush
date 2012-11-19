@@ -55,10 +55,6 @@ body {
   float: right;
 }
 
-div.maia-breadcrumb {
-  display: none;
-}
-
 #status {
   position: absolute;
   top: 68px;
@@ -235,182 +231,12 @@ form input:not([type]):focus,form input[type="text"]:focus,form textarea:focus {
   outline: 0
 }
 
-form input[disabled],form textarea[disabled],form label.maia-form-disabled {
+form input[disabled],form textarea[disabled] {
   color: #999
 }
 
 form input:not([type])[disabled],form input[type="text"][disabled],form textarea[disabled] {
   background-color: #ebebeb
-}
-
-/* @end */
-
-/* @group button */
-
-.maia-button {
-  background-color: #5e94ff;
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAGZQTFRFcZ/7ZZTwWIbiXIrmW4nlXYvnYI7qY5HtYpDsaJbyb535V4XhVoTgb575WYjjbpz4XYzoX47pbJv3Z5bxZJLuYY/ra5n1apj0VoXhcJ76bZv3aZfzZJPva5r2WIfjZpXxWojkXo3pYWddNgAAAD1JREFUeNrMwYcBQwAAALDYs2iNFrX+f9IbEh5h9lJqLT42k69VoXcI/A0yuVHq7dJJRGKnxi5U+alvAQYATb8CMoTkHNsAAAAASUVORK5CYII=");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  background-image: linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  background-position: left bottom;
-  background-repeat: repeat-x;
-  border: 1px solid #5e94ff;
-  -moz-border-radius: 2px;
-  -webkit-border-radius: 2px;
-  border-radius: 2px;
-  -moz-box-shadow: 0 1px 1px rgba(0,0,0,.2);
-  -webkit-box-shadow: 0 1px 1px rgba(0,0,0,.2);
-  box-shadow: 0 1px 1px rgba(0,0,0,.2);
-  color: #fff;
-  display: inline-block;
-  font-family: "open sans",arial,sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.54;
-  padding: 8px 12px;
-  text-align: center;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.2);
-  -moz-transition: all .218s ease-in;
-  -o-transition: all .218s ease-in;
-  -webkit-transition: all .218s ease-in;
-  transition: all .218s ease-in
-}
-
-a.maia-button {
-  color: #fff !important;
-  text-decoration: none
-}
-
-button.maia-button {
-  margin: 0;
-  overflow: visible;
-  white-space: normal
-}
-
-button.maia-button::-moz-focus-inner {
-  border: 0;
-  padding: 0
-}
-
-.maia-button:hover,.maia-button:focus {
-  border-color: #15c;
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAGNQTFRFb576bJr2YIzlVoLZZZLsbpz4YY7nXIjgZJHqZ5XvYo/oa5n1aZbxWobdZZLraZfyapjzXorjVYDXZZPtbp35VYHYXYnhY5DpUn3UU37UbZv3YIzkZpTuW4ffWITbaJbwWYXcwa+l2AAAAD1JREFUeNrMwYcBQwAAALDYs2iNFjX+v5IzJDzCILEI7pVOq3Yo/PVijdxXKRVavU0ym5fTLjL6mP0uAQYAPgUCEii55JQAAAAASUVORK5CYII=");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.2));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.2));
-  background-image: linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.2))
-}
-
-.maia-button:focus {
-  outline: 0;
-  border-color: #222
-}
-
-.maia-button:active {
-  -moz-box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
-  -webkit-box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.2)
-}
-
-.maia-button:focus:active {
-  border-color: #15c
-}
-
-.maia-button.maia-button-disabled,.maia-button[disabled] {
-  background-color: #abc7ff;
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAEhQTFRFssr7o7vsrcX2qsLzmrLjm7Pknrbnpr7vqcHynbXmobnqr8f4mbHiq8P0oLjpmLDhn7fopLztscn6sMj5rMT1pb3uqMDxp7/w595GXwAAADZJREFUeNrMwYcBgCAAwLC6EAcgzv8/pWeYwA+cXGzufZMYHP3yMfuh0nl15iB48eTRO6UJMAAxjAFXtKLtCwAAAABJRU5ErkJggg==");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  background-image: linear-gradient(top,rgba(226,226,226,.14),rgba(34,34,34,.14));
-  border-color: #91b6ff;
-  color: #fff
-}
-
-.maia-button.maia-button-secondary {
-  background-color: #fff;
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF/v7++fn5/f39+/v7/Pz8+vr69fX1+Pj4y05DDgAAAB5JREFUeNpiYBhUgAkJssAhMxyywiEjEmRnYAMIMAAKoQBcoIylzwAAAABJRU5ErkJggg==");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  background-image: linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  border: 1px solid #e5e5e5;
-  -moz-box-shadow: 0 2px 4px rgba(0,0,0,.03),inset 0 -2px 1px rgba(0,0,0,.01);
-  -webkit-box-shadow: 0 2px 4px rgba(0,0,0,.03),inset 0 -2px 1px rgba(0,0,0,.01);
-  box-shadow: 0 2px 4px rgba(0,0,0,.03),inset 0 -2px 1px rgba(0,0,0,.01);
-  color: #15c;
-  text-shadow: none
-}
-
-a.maia-button.maia-button-secondary {
-  color: #15c !important
-}
-
-.maia-button.maia-button-secondary:hover,.maia-button.maia-button-secondary:focus {
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAACpQTFRF/v7+/f39+/v7/Pz8+vr6+Pj49fX1+fn59/f39vb28PDw8vLy8/Pz9PT0SnmE/QAAAC1JREFUeNpiYBgkgBEOmcGQCQpZwJAdCFnBkIOBE4zZwJCXgYeBm4GLgQsgwAAO4wCs+h/pBQAAAABJRU5ErkJggg==");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.06));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.06));
-  background-image: linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.06));
-  border-color: #ccc
-}
-
-.maia-button.maia-button-secondary:focus {
-  border-color: #444
-}
-
-.maia-button.maia-button-secondary:active {
-  -moz-box-shadow: inset 0 1px 2px rgba(0,0,0,.2),inset 0 -2px 1px rgba(0,0,0,.01);
-  -webkit-box-shadow: inset 0 1px 2px rgba(0,0,0,.2),inset 0 -2px 1px rgba(0,0,0,.01);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.2),inset 0 -2px 1px rgba(0,0,0,.01)
-}
-
-.maia-button.maia-button-secondary:focus:active {
-  border-color: #ccc
-}
-
-.maia-button.maia-button-secondary.maia-button-disabled,.maia-button.maia-button-secondary[disabled] {
-  background-color: #f9f9f9;
-  background-image: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAABkCAMAAABw8qpSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABtQTFRF+fn59vb29/f39PT09fX1+Pj48/Pz8fHx8vLyyt9VXAAAAChJREFUeNpiYBgEgJWBCYghJBMQMkJJBGSBQ2YkyAaEHEDMzsAOEGAADcUAdh617PUAAAAASUVORK5CYII=");
-  background-image: -moz-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  background-image: -webkit-linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  background-image: linear-gradient(top,rgba(226,226,226,.03),rgba(34,34,34,.03));
-  border-color: #e5e5e5;
-  color: #aaa
-}
-
-/* @end */
-
-/* @group search */
-
-.maia-search input[type="text"] {
-  border: 1px solid #e5e5e5;
-  border-top-color: #dcdcdc;
-  color: #666;
-  display: inline-block;
-  line-height: normal;
-  margin: 0 10px 0 0;
-  padding: 6px 10px;
-  width: 200px
-}
-
-.maia-search input[type="text"]:focus {
-  border-color: #5e94ff;
-  -moz-box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
-  -webkit-box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
-  color: #444;
-  outline: 0
-}
-
-.maia-search .maia-button {
-  height: 29px;
-  line-height: normal;
-  padding: 0 10px
-}
-
-.maia-search-icon {
-  background: url("data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAQtJREFUeNpi/P//PwMlgAmLWBQQrwDip0D8EIiXAnEgThNALkDC8//jBnPQ1IIxMicZpOrv378/du/e3R8UFBQSGRkZdvjw4alAsd9QQ0LwGbALpGLr1q3tQIdJATE7EHMAseyhQ4cmQQ1Yh8sAdqjtvz08PBTQvVlUVKQPNeA1ugEogcjIyPg/MDDwKboBvr6+MDE2fIF4AGTFnz9/EtHV/Pr1qxDqgi0EA/Hfv39fgFQCEPMDsSgQZwLFvj99+hQciOiWo0fLIjzR+B8auFL4DIC5BOTUj9BAA4V8FFQDskFg9YzEJmVgADP8R1IM5EsDuc9IMgDmCmRhJlIzDyPMJBifFrmRJAAQYABIl4BFtRdyJgAAAABJRU5ErkJggg==") center center no-repeat;
-  line-height: 1.54;
-  text-indent: -9999px;
-  width: 46px
 }
 
 /* @end */
@@ -438,7 +264,7 @@ h1,h2,h3,h4,em,i {
   font-weight: bold
 }
 
-h1,h2,h3,h4,blockquote,q,.maia-nav ul {
+h1,h2,h3,h4,blockquote,q {
   font-family: "open sans",arial,sans-serif
 }
 
@@ -868,14 +694,6 @@ ul.horiz-menu li {
    font-size: 11px;
    line-height: 1.8;
    list-style: none;
-}
-
-#maia-footer {
-   position:fixed;
-   bottom:0;
-   left: 0;
-   width:100%;
-   height:40px;
 }
 
 #help-body {
