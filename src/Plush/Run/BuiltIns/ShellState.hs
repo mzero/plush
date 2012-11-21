@@ -82,8 +82,9 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
         _ -> exitMsg 2 "non-numeric -c argument"
     go _ _ = exitMsg 1 "One argument only"
 
-    go' optC cmdline =
-        case parseNextCommand cmdline of
+    go' optC cmdline = do
+        aliases <- getAliases
+        case parseCommand aliases cmdline of
             Left errs -> return $ object [ "parseError" .= errs ]
             Right (cl, _rest) -> do
                 spans <- annotate cl optC

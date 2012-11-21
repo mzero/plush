@@ -40,7 +40,6 @@ import qualified System.Posix.Missing as PM
 import Plush.Job.History
 import Plush.Job.Output
 import Plush.Job.Types
-import Plush.Parser
 import Plush.Run
 import Plush.Run.Execute
 import Plush.Run.Posix (stdJsonOutput, toByteString, write)
@@ -66,6 +65,8 @@ data Status
         -- ^ the 'RunningState' value can be used with 'gatherOutput'
     | JobDone ExitCode [OutputItem]
         -- ^ the exit status of the job, and any remaining gathered output
+    | ParseError String
+        -- ^ the command didn't parse
 
 type ScoreBoard = [(JobName, Status)]
 
@@ -150,8 +151,9 @@ runJob :: ShellThread -> CommandRequest
     -> (Maybe ProcessID -> IO () -> HistoryFile -> RunningState) -> IO ()
     -> Runner -> IO Runner
 runJob st cr@(CommandRequest j _ (CommandItem cmd)) frs closeMs r0 = do
-    case parseNextCommand cmd of
-        Left _errs -> return r0    -- FIXME
+    pr <- runParseCommand cmd r0
+    case pr of
+        Left errs -> parseError errs >> return r0
         Right (cl, _rest) -> runJob' cl
   where
     runJob' cl = do
@@ -173,6 +175,10 @@ runJob st cr@(CommandRequest j _ (CommandItem cmd)) frs closeMs r0 = do
             return runner
 
         runCommand runner = runCommandList cl runner >>= run getLastExitCode
+
+    parseError errs =
+        modifyMVar_ (stScoreBoard st) $ \sb ->
+            return $ (j, ParseError errs) : sb
 
     setUp mpid checker = do
         hFd <- modifyMVar (stHistory st) $ startHistory cr
@@ -224,8 +230,8 @@ pollJobs st = do
     checker (_, Running rs) = rsCheckDone rs
     checker _ = return ()
 
-    running (_, JobDone _ _) = False
-    running _ = True
+    running (_, Running _) = True
+    running _ = False
 
     report :: JobName -> Status -> IO [ReportOne StatusItem]
     report job (Running rs) = do
@@ -234,6 +240,11 @@ pollJobs st = do
 
     report job (JobDone e ois) =
         report' job ois $ SiFinished (FinishedItem e)
+
+    report job (ParseError e) = return $ map (ReportOne job)
+        [ SiParseError (ParseErrorItem e)
+        , SiFinished (FinishedItem $ ExitFailure 2)
+        ]
 
     report' job ois si = return $ map (ReportOne job) $ map SiOutput ois ++ [si]
 

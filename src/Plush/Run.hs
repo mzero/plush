@@ -20,6 +20,7 @@ module Plush.Run (
     -- * Runner
     Runner,
     run,
+    runParseCommand,
     runCommandList,
     runInIO,
     runInTest,
@@ -28,6 +29,7 @@ module Plush.Run (
     -- * TestRunner
     TestRunner,
     testRun,
+    testRunParseCommand,
     testRunCommandList,
     testRunInTest,
     )
@@ -36,10 +38,12 @@ where
 import Control.Arrow (first)
 import Control.Monad.Error
 import Control.Monad.Trans.State
+import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
 
+import Plush.Parser
 import Plush.Pretty
 import Plush.Run.Execute
 import Plush.Run.Posix
@@ -101,6 +105,11 @@ run act runner = case runner of
 
     RunInPrettyPrint -> fail "run: can't execute actions in PrettyPrint"
 
+-- | Parse a command, using the state of the 'Runner'
+runParseCommand :: String -> Runner -> IO ParseCommandResult
+runParseCommand s RunInPrettyPrint = return $ parseCommand M.empty s
+runParseCommand s r = (\(a,_) -> parseCommand a s) `fmap` run getAliases r
+
 -- | Run a 'CommandList' with a 'Runner'
 runCommandList :: CommandList -> Runner -> IO Runner
 runCommandList cl RunInPrettyPrint = putStrLn (pp cl) >> return RunInPrettyPrint
@@ -136,6 +145,12 @@ testRun act runner = case runner of
         let (r, t') = runTest (runStateT act s) t
             (r', s') = either (\e -> (Left $ show e, s)) (first Right) r
         in  (r', TestRunInTest s' t')
+
+-- | Parse a command, using the state of the 'TestRunner'
+testRunParseCommand :: String -> TestRunner -> ParseCommandResult
+testRunParseCommand s r =
+    either Left (\a -> parseCommand a s) . fst $ testRun getAliases r
+
 
 -- | Run a 'CommandList' with a 'TestRunner'. The first part of the return pair
 -- is a combination of the @stdout@ and @stderr@ outputs.

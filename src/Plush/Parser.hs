@@ -17,24 +17,31 @@ limitations under the License.
 {-# LANGUAGE FlexibleContexts #-}
 
 module Plush.Parser (
-    parseNextCommand
+    parseCommand,
+    ParseCommandResult,
 )
 where
 
 import Control.Applicative ((*>))
-import Control.Arrow (left)
+import Control.Arrow (second, (+++))
 import Text.Parsec
 
+import Plush.Parser.Aliases
 import Plush.Parser.Base
 import Plush.Parser.Commands
 import Plush.Parser.Tokens
 import Plush.Types
 
+-- | Either it is an error message, or a parsed command list, and the remainder
+-- of the input string.
+type ParseCommandResult = Either String (CommandList, String)
 
 -- | Parse the next "commplete_command" in the input, and return it and the
 -- remainder of the input, or an error message
-parseNextCommand :: String -> Either String (CommandList, String)
-parseNextCommand input = left show $ parse nextCommand "" input
+parseCommand :: Aliases -> String -> ParseCommandResult
+parseCommand _aliases = (show +++ unprep) . parse nextCommand "" . prep
   where
-    nextCommand :: ShellParser (CommandList, String)
     nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
+
+    prep = id
+    unprep = second id
