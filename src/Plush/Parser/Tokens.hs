@@ -42,6 +42,7 @@ import qualified Data.Char as Char
 import Data.Functor
 import Text.Parsec
 
+import Plush.Parser.Aliases (originalSourceColumn)
 import Plush.Parser.Base
 import Plush.Types
 
@@ -65,10 +66,10 @@ operators = words "&& || ;; << >> <& >& <> <<- >|"
 
 tok_word :: ShellParser Word
 tok_word = tokenize $ do
-    start <- getPosition
+    start <- originalSourceColumn
     ps <- many1 (backslash <|> singlequote <|> doublequote <|> dollar <|> bare)
-    end <- getPosition
-    return $ Word (Span (sourceColumn start) (sourceColumn end)) ps
+    end <- originalSourceColumn
+    return $ Word (Span start end) ps
         -- TODO: should handle case where start and end are on differnt lines
 
 -- In the shell command language, a word consisting solely of underscores,
@@ -76,12 +77,12 @@ tok_word = tokenize $ do
 -- of a name is not a digit.
 tok_name :: ShellParser Name
 tok_name = tokenize $ do
-    start <- getPosition
+    start <- originalSourceColumn
     x <- satisfy $ \c -> Char.isAscii c && (Char.isLetter c || c == '_')
     xs <- many $ satisfy $ \c ->
         Char.isAscii c && (Char.isLetter c || Char.isDigit c || c == '_')
-    end <- getPosition
-    let loc = Span (sourceColumn start) (sourceColumn end)
+    end <- originalSourceColumn
+    let loc = Span start end
     return $ Name loc (x:xs)
 
 backslash :: ShellParser WordPart

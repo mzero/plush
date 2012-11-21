@@ -15,6 +15,7 @@
 Alias Commands
 
 Start with a blank slate
+    # shopt -s expand_aliases       # ONLY bash
     # unalias -a
     # alias
 
@@ -35,3 +36,76 @@ bash is skipped here because its output is non-compliant
 
 
 
+Alias Substition
+
+Start with a blank slate
+    # unalias -a
+    # alias
+
+Simple
+    # alias say=echo
+    # say hi
+    hi
+    # alias greet='echo yo,'
+    # greet bob
+    yo, bob
+
+But only in first position
+    # echo say
+    say
+    # echo greet
+    greet
+    # say say
+    say
+
+A space at the end, induces further alias substition
+    # alias alex='echo expands to '
+    # alex echo
+    expands to echo
+    # alex say
+    expands to echo
+    # alex greet
+    expands to echo yo,
+
+Commands can be aliased to themselves, without infinite repeat
+    # alias du=du\ -k
+    # alex du
+    expands to du -k
+
+Alias can be chained
+    # alias diskusage=du
+    # alex diskusage
+    expands to du -k
+
+Alias can be mutually chained
+    # alias one='two too'
+    # alias two='one won'
+    # alex one
+    expands to one won too
+    # alex two
+    expands to two too won
+
+Tricky things with spaces at the end
+    # alex alex
+    expands to echo expands to
+    # alias bob='alex say'
+    # bob apples
+    expands to echo apples
+
+Tests so bizarre, we can't run them all
+    # alias dog='echo woof'
+    # dog
+    woof
+    # alex dog
+    expands to echo woof
+    # alias no=''
+    # no dog
+    woof
+    # alex no dog           # SKIP sh bash disagree on reading of §2.3.1
+    expands to echo woof
+--  expands to dog          # bash's output
+
+Spaces at front are ignored
+    # alias spacey='    echo like,'
+    # spacey wow
+    like, wow

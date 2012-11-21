@@ -26,6 +26,7 @@ import Data.Functor
 import Data.Monoid
 import Text.Parsec
 
+import Plush.Parser.Aliases
 import Plush.Parser.Base
 import Plush.Parser.Tokens
 import Plush.Types
@@ -148,20 +149,10 @@ simple_command
     <|> (cmd_name <++> moptional cmd_suffix)
 
 cmd_name :: ShellParser SimpleCommand
-cmd_name = notReservedWord >> (commandWord <$> tok_word) -- apply rule 7a
-
--- | This is rule 1.
---
--- Fail if this is a reserved word.
-notReservedWord :: ShellParser ()
-notReservedWord = notFollowedBy $ do
-    word <- tok_word
-    case parts word of
-        [Bare s] | s `elem` reservedWords -> return $ "keyword: " ++ s
-        _ -> Applicative.empty
+cmd_name = firstSimpleCommandNonAssignmentWord  -- applying rule 7a
 
 cmd_word :: ShellParser SimpleCommand
-cmd_word = commandWord <$> tok_word -- apply rule 7b
+cmd_word = firstSimpleCommandNonAssignmentWord -- applying rule 7b
 
 cmd_prefix :: ShellParser SimpleCommand
 cmd_prefix = mconcat <$>
@@ -172,6 +163,20 @@ cmd_suffix :: ShellParser SimpleCommand
 cmd_suffix = mconcat <$>
     many1 (commandRedirect <$> io_redirect
             <|> commandWord <$> tok_word)
+
+firstSimpleCommandNonAssignmentWord :: ShellParser SimpleCommand
+firstSimpleCommandNonAssignmentWord = do
+    notReservedWord     -- apply rule 1
+    aliasSubstitution   -- only point at which it is initiiated, §2.3.1
+    commandWord <$> tok_word
+
+-- Fail if this is a reserved word. This is rule 1.
+notReservedWord :: ShellParser ()
+notReservedWord = notFollowedBy $ do
+    word <- tok_word
+    case parts word of
+        [Bare s] | s `elem` reservedWords -> return $ "keyword: " ++ s
+        _ -> Applicative.empty
 
 redirect_list :: ShellParser [Redirect]
 redirect_list = many1 io_redirect
