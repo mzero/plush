@@ -39,9 +39,9 @@ type ParseCommandResult = Either String (CommandList, String)
 -- | Parse the next "commplete_command" in the input, and return it and the
 -- remainder of the input, or an error message
 parseCommand :: Aliases -> String -> ParseCommandResult
-parseCommand _aliases = (show +++ unprep) . parse nextCommand "" . prep
+parseCommand aliases = (show +++ unprep) . parse nextCommand "" . prep
   where
     nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
 
-    prep = id
-    unprep = second id
+    prep = dealiasStream aliases
+    unprep = second dealiasRemainder
