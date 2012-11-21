@@ -58,6 +58,7 @@ Library
     Plush.Job.History
     Plush.Job.Output
     Plush.Job.Types
+    Plush.Parser.Aliases
     Plush.Parser.Base
     Plush.Parser.Commands
     Plush.Parser.Tokens
@@ -115,7 +116,7 @@ Library
     random >= 1.0.0 && < 1.1,
     text >= 0.11.1 && < 1.12,
     unix >= 2.4.0 && < 2.7,
-    unordered-containers >= 0.1.4 && < 0.3,
+    unordered-containers >= 0.2.1 && < 0.3,
     warp >= 1.0.0 && < 1.4
 
   -- New versions of ghc have bytestring-10, but old versions of wai-*
@@ -169,6 +170,6 @@ Executable recho
     text >= 0.11.1 && < 1.12,
     transformers >= 0.2.2 && < 0.4,
     unix >= 2.4.0 && < 2.7,
-    unordered-containers >= 0.1.4 && < 0.3
+    unordered-containers >= 0.2.1 && < 0.3
 
   ghc-options: -Wall -fno-warn-missing-signatures	-fwarn-tabs

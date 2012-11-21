@@ -23,6 +23,8 @@ module Plush.Run.BuiltIns.ShellState (
     export,
     readonly,
     unset,
+    alias,
+    unalias,
     env,
     )
 where
@@ -30,10 +32,12 @@ where
 import Control.Applicative
 import Data.Aeson
 import Data.Aeson.Types (Pair)
+import Data.Either (lefts)
 import qualified Data.HashMap.Strict as M
-import Data.List (sort)
+import Data.List (foldl', sort)
 
 import Plush.Parser
+import Plush.Parser.Aliases (Aliases, aliasNameChar)
 import Plush.Run.Annotate
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.Syntax
@@ -201,6 +205,41 @@ readonly = modifyVar "readonly" isReadOnly (\v -> (VarShellOnly, VarReadOnly, v)
   where
     isReadOnly (_, VarReadOnly, _) = True
     isReadOnly _ = False
+
+alias :: (PosixLike m) => DirectUtility m
+alias = DirectUtility . const $ Utility doAlias emptyAnnotate
+  where
+    doAlias [] = getAliases >>= mapM_ showAlias . sort . M.toList >> success
+    doAlias args = modifyAliases $ \m -> foldl' doOne ([],m) args
+
+    doOne (us, m) arg = let (n,w) = break (== '=') arg in
+        if all aliasNameChar n
+            then case w of
+                [] -> ((maybe (Left $ "unknown alias: " ++ n)
+                              (\v -> Right $ n ++ '=' : quote v)
+                              $ M.lookup n m):us, m)
+                (_:v) -> (us, M.insert n v m)  -- the first char is the '='
+            else (Left ("invalid alias name: " ++ n) : us, m)
+
+    showAlias (n,v) = outStrLn $ n ++ '=' : quote v
+
+unalias :: (PosixLike m) => DirectUtility m
+unalias = DirectUtility $ stdSyntax [ flag 'a' ] "" doUnalias
+  where
+    doUnalias "a" _ = setAliases M.empty >> success
+    doUnalias _ args = modifyAliases $ \m -> foldl' remove ([], m) args
+    remove (us, m) n = if M.member n m
+        then (us, M.delete n m)
+        else ((Left $ "unknown alias: " ++ n):us, m)
+
+
+modifyAliases :: (PosixLike m) =>
+    (Aliases -> ([Either String String], Aliases)) -> ShellExec m ExitCode
+modifyAliases f = do
+    (msgs, newAliases) <- f `fmap` getAliases
+    setAliases newAliases
+    mapM_ (either errStrLn outStrLn) $ reverse msgs
+    if null $ lefts msgs then success else failure
 
 quote :: String -> String
 quote v = '\'' : concatMap qchar v ++ "'"

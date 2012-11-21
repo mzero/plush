@@ -49,9 +49,9 @@ special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
     ]
     -- eventually will include:
     -- break, colon(:), continue, dot(.), eval, exec, exit
-    -- return, set, shift, times, trap
+    -- return, shift, times, trap
     -- plush extensions:
-    -- context
+    -- complete, context
 
 -- | Direct Built-In Utilities (§2.9.1)
 -- These are executed without PATH search. These commands may have side-effects
@@ -65,10 +65,12 @@ direct = flip M.lookup $ M.fromList $ map (fixup unDirect)
         , ("env", env)
         , ("false", false)
         , ("true", true)
+        , ("alias", alias)
+        , ("unalias", unalias)
         ]
     -- eventually will also include:
-    -- alias, bg, command, fc, fg, getopts, jobs, kill,
-    -- newgrp, pwd, read, umask, unalias, wait
+    -- bg, command, fc, fg, getopts, jobs, kill,
+    -- newgrp, pwd, read, umask, wait
 
 -- | Regular Built-In Utilities (§2.9.1)
 -- If PATH search succeeds in finding an executable for these, then the built-in
