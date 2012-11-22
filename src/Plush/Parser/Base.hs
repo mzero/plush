@@ -33,9 +33,11 @@ import Control.Monad
 import Data.Monoid
 import Text.Parsec
 
+import Plush.Parser.Aliases
+
 
 -- | The parser type used for parsing shell commands
-type ShellParser = Parsec String ()
+type ShellParser = Parsec DealiasingStream ()
 
 
 --

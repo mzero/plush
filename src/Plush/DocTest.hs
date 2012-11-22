@@ -25,7 +25,6 @@ import Data.List (foldl', intercalate, isPrefixOf, partition)
 import System.FilePath (takeFileName)
 
 import Plush.DocTest.Posix
-import Plush.Parser
 import Plush.Run
 import Plush.Utilities
 
@@ -186,7 +185,7 @@ runTests tests = fst $ foldl' go ([],testRunInTest) tests
 runTest :: Test -> TestRunner -> (Result, TestRunner)
 runTest t runner =
     if testCondition t "plush"
-        then either badParse exec $ parseNextCommand $ testInput t
+        then either badParse exec $ testRunParseCommand (testInput t) runner
         else (Skipped, runner)
   where
     exec (c,"") = let ((out,err), runner') = testRunCommandList c runner

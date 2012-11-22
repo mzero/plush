@@ -19,21 +19,6 @@ module Plush.Types where
 import Data.Hashable
 import Data.Monoid
 
-{-
-data Token
-    = Newline
-    | Operator String
-    | IoNumber Int
-    | Token String  -- could be any of the four below, context dependent
-    | Word String
-    | Name String
-    | AssignmentWord String
-    | ReservedWord String
-  deriving (Eq, Show)
-
--}
-
-
 
 type CommandList = [(AndOrList, Execution)]
 data Execution = Sequential | Background    deriving (Eq, Show)
@@ -105,7 +90,7 @@ data RedirectType
 data Word = Word { location :: Location, parts :: Parts }
     deriving (Eq, Show)
 
--- | The is the name of \"for name in xs ...\".
+-- | Simple (unexpanded) names, such as in for loops and function declarations.
 data Name = Name Location String
     deriving (Eq, Show)
 

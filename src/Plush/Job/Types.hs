@@ -176,7 +176,7 @@ instance ToJSON RunResponse where
 -- | Elements of a status report. In practice, for a given job, these can only
 -- occur according to this grammar:
 --
--- >    SiRunning SiOutput* SiFinished
+-- >    (SiRunning SiOutput* | SiParseError) SiFinished
 --
 -- Because these are reported incrementally, and interleaved among jobs, it is
 -- impractical to encode that grammar constraint in the type.
@@ -184,10 +184,13 @@ instance ToJSON RunResponse where
 -- JSON serialized simply as each variant's JSON serialization
 data StatusItem = SiRunning RunningItem
                 | SiOutput OutputItem
+                | SiParseError ParseErrorItem
                 | SiFinished FinishedItem
+
 instance ToJSON StatusItem where
     toJSON (SiRunning i) = toJSON i
     toJSON (SiOutput i) = toJSON i
+    toJSON (SiParseError i) = toJSON i
     toJSON (SiFinished i) = toJSON i
 
 
