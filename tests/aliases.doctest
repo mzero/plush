@@ -85,9 +85,23 @@ Alias can be mutually chained
     # alex two
     expands to two too won
 
-Bizarre things can happen with spaces at the end
+Tricky things with spaces at the end
     # alex alex
     expands to echo expands to
     # alias bob='alex say'
     # bob apples
     expands to echo apples
+
+Tests so bizarre, we can't run them all
+    # alias dog='echo woof'
+    # dog
+    woof
+    # alex dog
+    expands to echo woof
+    # alias no=''
+--  # no dog            # TODO: plush should pass this, as do other shells
+--  woof
+--  # alex no dog       # TODO: shelss disagree, and what should it do?
+--  expands to echo woof    # dash's output
+--  expands to dog          # bash's output
+

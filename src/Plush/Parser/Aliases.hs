@@ -26,10 +26,11 @@ module Plush.Parser.Aliases (
     dealiasRemainder,
 
     aliasSubstitution,
+    originalSourceColumn
     )
 where
 
-import Control.Arrow (second)
+import Control.Arrow (first)
 import Control.Monad
 import Data.Char (isAlpha, isDigit)
 import qualified Data.HashMap.Strict as M
@@ -54,7 +55,10 @@ aliasNameChar _ = False
 -- | A stream of input that can apply aliases as it is streamed. The input is
 -- kept as a stack of string in progress. Each is an alias explansion in
 -- progress, save the last, which is just the original string.
-data DealiasingStream = DAS Aliases [Level]
+--
+-- The `Int` is the column (statring at 1), of the most recent `uncons`
+-- character, in terms of the original string.
+data DealiasingStream = DAS Aliases Int [Level]
 
 instance (Monad m) => Stream DealiasingStream m Char where
     uncons = return . dasUncons
@@ -70,43 +74,73 @@ type Level = (Bool, String, String)
 
 -- | Construct a stream given the aliases to apply, and the original input.
 dealiasStream :: Aliases -> String -> DealiasingStream
-dealiasStream aliases s = DAS aliases [(False, "", s)]
+dealiasStream aliases s = DAS aliases 0 [(False, "", s)]
 
 -- | Return the remainder of the unstreamed input.
 dealiasRemainder :: DealiasingStream -> String
-dealiasRemainder (DAS _ stk) = concatMap (\(_, _, cs)->cs) stk
+dealiasRemainder (DAS _ _ stk) = concatMap (\(_, _, cs)->cs) stk
+
+
+-- Utilities
+
+-- | Return next character and substitution flag, if any,
+nextChar :: DealiasingStream -> Maybe (Bool, Char, DealiasingStream)
+nextChar (DAS _  _   []) = Nothing
+nextChar (DAS as col ((_, _, ""):stk)) = nextChar (DAS as col stk)
+nextChar (DAS as col ((f, an, c:cs):stk)) =
+    Just (f, c, DAS as (col + inc) ((f, an, cs):stk))
+  where inc = if null stk then 1 else 0
+
+-- | Return the next span of valid alias name characters.
+nextNameSpan :: DealiasingStream -> (String, DealiasingStream)
+nextNameSpan d = case nextChar d of
+    Just (_, c, d') | aliasNameChar c -> first (c:) $ nextNameSpan d'
+    _ -> ([], d)
+
+-- | Set the substition flag for the current level.
+setSubst :: Bool -> DealiasingStream -> DealiasingStream
+setSubst f (DAS as col ((_, an, cs):stk)) = DAS as col ((f, an, cs):stk)
+setSubst _ d = d
+
+-- | Push an alais expansion on the level stack.
+stack :: Level -> DealiasingStream -> DealiasingStream
+stack lvl (DAS as col stk) = DAS as col (lvl:stk)
+
+aliasesInProgress :: DealiasingStream -> [String]
+aliasesInProgress (DAS _ _ stk) = map (\(_, an, _) -> an) stk
+
+endsInBlank :: String -> Bool
+endsInBlank [] = False
+endsInBlank [c] = c == ' '
+endsInBlank (_:cs) = endsInBlank cs
+
 
 -- | Workhorse of the stream: Return the next character if any.
-dasUncons (DAS aliases stk0) = second (DAS aliases) `fmap` go stk0
+dasUncons :: DealiasingStream -> Maybe (Char, DealiasingStream)
+dasUncons d@(DAS aliases _ _) =
+    -- trace ("dasUncons of " ++ dasShow d) $
+    nextChar d >>= go
   where
-    go [] = Nothing                             -- empty stack
-    go ((_,      _,     [])     :stk) = go stk  -- pop completed level
-    go ((False, aname, (c  :cs)):stk) = Just (c, (False, aname, cs):stk)
-        -- if not doing alias substitution, just return next character
-    go ((True,  aname, (' ':cs)):stk) = Just (' ', (True, aname, cs):stk)
-        -- if doing alias substitution, slew blanks out
-    go ((True,  aname,  cs)     :stk) =
-        -- if doing alias substitution, see if next word is an alias
-        let (w,cs') = span aliasNameChar $ cs
-            mr = if w `elem` (aname:map (\(_,a,_)->a) stk)
-                    then Nothing             -- already in progress
-                    else M.lookup w aliases  -- see if it is an alias
+    go (False, c, d') = Just (c, d')     -- not doing alias substitution (AS)
+    go (True, ' ', d') = Just (' ', d')  -- slew blanks out, even if doing AS
+    go (True, c, d') =                    -- doing AS, so look at next name
+        let (w, dw') = nextNameSpan d
+            mr = if w `elem` aliasesInProgress d
+                then Nothing             -- already in progress
+                else M.lookup w aliases  -- see if it is an alias
         in case mr of
-            Nothing -> go ((False, aname, cs):stk)  -- treat as normal
-            Just replace -> go ((True, w, replace)  -- stack replacement
-                               :(endsInBlank replace, aname, cs')  -- remainder
-                               :stk)
-
-    endsInBlank [] = False
-    endsInBlank [c] = c == ' '
-    endsInBlank (_:cs) = endsInBlank cs
-
+            Nothing -> Just (c, setSubst False d')      -- turn off AS
+            Just replace -> dasUncons
+                            $ stack (True, w, replace)  -- stack the replacement
+                            $ setSubst (endsInBlank replace) dw'
+                                         -- blank at the end retriggers AS
 
 -- | Enable alias substition for the next word
 aliasSubstitution :: Parsec DealiasingStream u ()
 aliasSubstitution = void $
-    updateParserState $ \s -> s { stateInput = mark $ stateInput s}
-  where
-    mark (DAS as ((_, aname, cs):stk)) = DAS as ((True, aname, cs):stk)
-    mark d = d
+    updateParserState $ \s -> s { stateInput = setSubst True $ stateInput s}
 
+originalSourceColumn :: Parsec DealiasingStream u Int
+originalSourceColumn = (dasColumn . stateInput) `fmap` getParserState
+  where
+    dasColumn (DAS _ c _) = c
