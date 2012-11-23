@@ -15,6 +15,7 @@ limitations under the License.
 -}
 
 module Plush.Run.BuiltIns.Trivial (
+    colon,
     true, false,
     echo,
     recho, rechoExec,
@@ -28,6 +29,11 @@ import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
 import Plush.Run.Types
 
+
+colon :: (PosixLike m) => SpecialUtility m
+colon = SpecialUtility . const $ Utility colonExec noArgsAnnotate
+  where
+    colonExec _ = success
 
 true :: (PosixLike m) => DirectUtility m
 true = DirectUtility . const $ Utility trueExec noArgsAnnotate
