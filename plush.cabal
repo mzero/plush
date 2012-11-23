@@ -67,6 +67,7 @@ Library
     Plush.Pretty
     Plush.Run.Annotate
     Plush.Run.BuiltIns
+    Plush.Run.BuiltIns.Evaluation
     Plush.Run.BuiltIns.FileSystem
     Plush.Run.BuiltIns.Grep
     Plush.Run.BuiltIns.ShellState
