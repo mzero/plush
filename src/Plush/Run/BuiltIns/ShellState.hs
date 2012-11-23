@@ -20,6 +20,7 @@ module Plush.Run.BuiltIns.ShellState (
     complete,
     context,
     set,
+    shift,
     export,
     readonly,
     unset,
@@ -119,6 +120,24 @@ complete = SpecialUtility $ stdSyntax [argOpt 'c'] "" go
 
     ct :: String -> Pair
     ct = ("commandType" .=)
+
+
+shift :: (PosixLike m) => SpecialUtility m
+shift = SpecialUtility . const $ Utility shiftExec emptyAnnotate
+  where
+    shiftExec [] = doShift 1
+    shiftExec [arg] = case readMaybe arg of
+        Nothing -> exitMsg 1 "shift argument not numeric"
+        Just n -> doShift n
+    shiftExec _ = exitMsg 1 "shift takes at most one argument"
+
+    doShift n = do
+        args <- getArgs
+        case () of
+            _ | n < 0 -> exitMsg 1 "shift count can't be negative"
+              | n == 0 -> success
+              | n <= length args -> setArgs (drop n args) >> success
+              | otherwise -> exitMsg 1 "shift count too large"
 
 
 -- | The set special built-in is a marvel:
