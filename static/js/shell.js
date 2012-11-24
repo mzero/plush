@@ -199,7 +199,7 @@ function(history, cwd, status, jobs, input, help, $){
         }
       }
       if ('parseError' in d) {
-        j.addOutput('error', data.parseError);
+        j.addOutput('error', d.parseError);
       }
     });
     if (jobsRunning) {

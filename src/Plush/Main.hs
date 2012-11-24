@@ -28,7 +28,6 @@ import System.Exit (exitFailure, exitSuccess)
 import System.IO (hIsTerminalDevice, stdin)
 
 import Plush.DocTest
-import Plush.Parser
 import Plush.Run
 import Plush.Server
 import Plush.Utilities
@@ -144,8 +143,9 @@ runCommands "" _ = return ()
 runCommands cmds runner = runCommand cmds runner >>= uncurry runCommands
 
 runCommand :: String -> Runner -> IO (String, Runner)
-runCommand cmds runner =
-    case parseNextCommand cmds of
+runCommand cmds runner = do
+    pr <- runParseCommand cmds runner
+    case pr of
         Left errs -> putStrLn errs >> return ("", runner)
         Right (cl, rest) -> runCommandList cl runner
                                 >>= return . (\runner' -> (rest, runner'))

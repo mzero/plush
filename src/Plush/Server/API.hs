@@ -33,7 +33,6 @@ import qualified Data.HashMap.Lazy as HM
 import Plush.Job
 import Plush.Job.History
 import Plush.Job.Types
-import Plush.Parser
 import Plush.Server.Utilities
 
 
@@ -55,13 +54,9 @@ instance ToJSON NullJson where
 -- | Run a command in the shell.
 runApp :: ShellThread
     -> JsonApplication CommandRequest (ReportOne RunResponse)
-runApp shellThread cr@(CommandRequest job _ (CommandItem cmd)) = do
-    r <- case parseNextCommand cmd of
-        Left errs -> return $ RrParseError $ ParseErrorItem errs
-        Right _ -> do
-            liftIO $ submitJob shellThread cr
-            return $ RrRunning RunningItem
-    returnJson $ ReportOne job r
+runApp shellThread cr@(CommandRequest job _ _) = do
+    liftIO $ submitJob shellThread cr
+    returnJson $ ReportOne job (RrRunning RunningItem)
 
 
 

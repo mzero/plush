@@ -25,6 +25,7 @@ module Plush.Run.ShellExec (
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
     getFun, setFun, unsetFun, withFunContext,
+    getAliases, setAliases,
     getEnv,
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
@@ -55,6 +56,7 @@ data VarMode = VarReadWrite | VarReadOnly   deriving (Eq, Ord, Bounded, Enum)
 type VarEntry = (VarScope, VarMode, Maybe String)
 type Vars = M.HashMap String VarEntry
 type Funs = M.HashMap String FunctionBody
+type Aliases = M.HashMap String String
 
 varValue :: VarEntry -> String
 varValue (_,_,s) = fromMaybe "" s
@@ -65,6 +67,7 @@ data ShellState = ShellState
     , ssFlags :: Flags
     , ssVars :: Vars
     , ssFuns :: Funs
+    , ssAliases :: Aliases
     , ssLastExitCode :: ExitCode
     , ssSummaries :: M.HashMap String CommandSummary
     }
@@ -72,8 +75,9 @@ data ShellState = ShellState
 
 initialShellState :: ShellState
 initialShellState = ShellState
-    { ssName = "plush", ssArgs = [], ssFlags = defaultFlags, ssVars = M.empty,
-      ssFuns = M.empty, ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
+    { ssName = "plush", ssArgs = [], ssFlags = defaultFlags,
+      ssVars = M.empty, ssFuns = M.empty, ssAliases = M.empty,
+      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
 
 -- Shell Execution Monad
@@ -193,6 +197,12 @@ withFunContext args body = do
     r <- body   -- TODO: this should be in some protected bracket
     modify $ \s -> s { ssArgs = origArgs }
     return r
+
+getAliases :: (Monad m, Functor m) => ShellExec m Aliases
+getAliases = gets ssAliases
+
+setAliases :: (Monad m) => Aliases -> ShellExec m ()
+setAliases aliases = modify $ \s -> s { ssAliases = aliases }
 
 getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
