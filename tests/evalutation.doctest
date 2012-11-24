@@ -50,3 +50,50 @@ Execution is in the context of the current shell
     # eval 'x=2'
     # echo $x
     2
+
+
+. (dot) reads a script and runs it in the shell
+
+set up
+    # cd /tmp
+    # rm -rf doctest
+    # mkdir doctest
+    # cd doctest
+    # echo 'echo running dottest:' > dottest
+    # echo 'recho $*' >> dottest
+    # echo 'nargs=$#' >> dottest
+    # echo 'shift' >> dottest
+    # set a b c
+
+running the script should affect the shel environment
+    # . ./dottest
+    running dottest:
+    argv[1] = <a>
+    argv[2] = <b>
+    argv[3] = <c>
+    # echo $nargs $*
+    3 b c
+
+running with args, doesn't affect the args, but all else does
+    # . ./dottest w x y z           # SKIP dash
+    running dottest:
+    argv[1] = <w>
+    argv[2] = <x>
+    argv[3] = <y>
+    argv[4] = <z>
+    # echo $nargs $*                # SKIP dash
+    4 b c
+
+can be found via PATH
+    # cd /tmp
+    # PATH="/tmp/doctest:$PATH"
+    # . dottest
+    running dottest:
+    argv[1] = <b>
+    argv[2] = <c>
+    # echo $nargs $*
+    2 c
+
+clean up
+    # cd /tmp
+    # rm -rf doctest

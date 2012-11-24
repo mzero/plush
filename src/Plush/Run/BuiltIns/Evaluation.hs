@@ -15,11 +15,18 @@ limitations under the License.
 -}
 
 module Plush.Run.BuiltIns.Evaluation (
+    dot,
     eval
     )
 where
 
+import Control.Applicative ((<$>))
+import Control.Monad (unless)
 import Data.List (intercalate)
+import qualified Data.Text.Encoding.Error as T
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Encoding as T
+import System.FilePath
 
 import Plush.Parser
 import Plush.Run.BuiltIns.Utilities
@@ -42,4 +49,45 @@ eval = SpecialUtility . const $ Utility evalExec emptyAnnotate
         case parseCommand aliases cmdline of
             Left errs -> exitMsg 127 errs
             Right (cl, _rest) -> shellExec cl >> getLastExitCode
+
+
+dot :: (PosixLike m) => SpecialUtility m
+dot = SpecialUtility . const $ Utility dotExec emptyAnnotate
+  where
+    dotExec [] = exitMsg 1 "dot missing name of script"
+    dotExec (script:args) = do
+        scriptPaths <- if '/' `elem` script
+            then return [script]
+            else map (</> script) . splitSearchPath <$> getVarDefault "PATH" ""
+        runFirstFound args scriptPaths
+
+    runFirstFound args (fp:fps) = do
+        b <- doesFileExist fp -- TODO: check if it can be read
+            -- NOTE: dot doesn't require that the script be exectuable
+        if b
+            then do
+                setLastExitCode ExitSuccess
+                oldArgs <- getArgs
+                unless (null args) $ setArgs args -- TODO: should be bracketed
+                fd <- openFd fp ReadOnly Nothing defaultFileFlags
+                    -- TODO: should be bracketed
+                script <- readAll fd
+                closeFd fd
+                ec <- runScript $ T.unpack
+                    $ T.decodeUtf8With T.lenientDecode script
+                unless (null args) $ setArgs oldArgs
+                return ec
+            else
+                runFirstFound args fps
+
+    runFirstFound _ [] = exitMsg 127 "script file not found"
+        -- TODO: should be a shell error, exiting non-interactive shells
+
+    runScript "" = getLastExitCode;
+    runScript cmds = do
+        aliases <- getAliases
+        case parseCommand aliases cmds of
+            Left errs -> exitMsg 127 errs
+            Right (cl, rest) -> shellExec cl >> runScript rest
+
 
