@@ -20,15 +20,18 @@ Start with a blank slate
     # alias
 
 Simple command usage
-bash is skipped here because its output is non-compliant
     # alias aaa=apple
-    # alias | tr \" \'              # SKIP bash
+    # alias | tr \" \'              # SKIP bash - output is non-compliant
     aaa='apple'
     # alias bbb=banana ccc=casava
-    # alias aaa bbb ccc | tr \" \'  # SKIP bash
+    # alias aaa bbb ccc | tr \" \'  # SKIP bash - output is non-compliant
     aaa='apple'
     bbb='banana'
     ccc='casava'
+    # alias -p | tr \" \'           # SKIP dash - a bashism plush supports
+    alias aaa='apple'
+    alias bbb='banana'
+    alias ccc='casava'
     # unalias bbb
     # alias | fgrep bbb
     # unalias -a

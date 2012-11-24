@@ -208,21 +208,29 @@ readonly = modifyVar "readonly" isReadOnly (\v -> (VarShellOnly, VarReadOnly, v)
     isReadOnly _ = False
 
 alias :: (PosixLike m) => DirectUtility m
-alias = DirectUtility . const $ Utility doAlias emptyAnnotate
+alias = DirectUtility $ stdSyntax options "" (doAlias . format)
   where
-    doAlias [] = getAliases >>= mapM_ showAlias . sort . M.toList >> success
-    doAlias args = modifyAliases $ \m -> foldl' doOne ([],m) args
+    options = [ flag 'p' ]
+        -- not POSIX, but common and matches -p in other
+        -- POSIX commands like readonly and export
 
-    doOne (us, m) arg = let (n,w) = break (== '=') arg in
+    doAlias fmt [] = do
+        getAliases >>= mapM_ (outStrLn . uncurry fmt) . sort . M.toList
+        success
+    doAlias fmt args =
+        modifyAliases $ \m -> foldl' (doOne fmt) ([],m) args
+
+    doOne fmt (us, m) arg = let (n,w) = break (== '=') arg in
         if all aliasNameChar n
             then case w of
                 [] -> ((maybe (Left $ "unknown alias: " ++ n)
-                              (\v -> Right $ n ++ '=' : quote v)
+                              (\v -> Right $ fmt n v)
                               $ M.lookup n m):us, m)
                 (_:v) -> (us, M.insert n v m)  -- the first char is the '='
             else (Left ("invalid alias name: " ++ n) : us, m)
 
-    showAlias (n,v) = outStrLn $ n ++ '=' : quote v
+    format flags n v = prefix flags ++ n ++ '=' : quote v
+    prefix flags = if ('p' `elem` flags) then "alias " else ""
 
 unalias :: (PosixLike m) => DirectUtility m
 unalias = DirectUtility $ stdSyntax [ flag 'a' ] "" doUnalias
