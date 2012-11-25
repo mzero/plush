@@ -424,12 +424,14 @@ h1,h2,h3,h4,blockquote,q {
 .job .view-controls {
   float: right;
   width: 6em;
+  height: 1em;
   font-family: "Courier New", Courier, mono;
 }
 
 .job .input-controls {
   float: right;
-  width: 9em;
+  width: 11em;
+  height: 1em;
   padding-top: 0.25em;
   z-index: 1;
 }
@@ -573,8 +575,8 @@ ul.horiz-menu li {
   padding-left: 1em;
   cursor: none;
 }
-#status-ls td .hidden { right: -9999em; }
-#status-ls td:hover .hidden { right: 0; }
+#status-ls td .hidden { left: -9999em; }
+#status-ls td:hover .hidden { left: inherit; right: 0; }
 
 #status-ls dl {
   font-size: 90%;
