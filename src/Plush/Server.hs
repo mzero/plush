@@ -24,7 +24,7 @@ module Plush.Server (
 
 import Control.Concurrent (forkIO)
 import Control.Monad (replicateM, void)
-import Control.Monad.Trans (liftIO)
+import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy (fromChunks)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T

@@ -27,7 +27,7 @@ where
 
 import Control.Applicative ((<$>))
 import Control.Monad (foldM)
-import Control.Monad.Error.Class
+import Control.Monad.Exception (catchIOError)
 import Data.Char (isSpace)
 import Data.List (foldl', intercalate, partition, sort, tails)
 import System.FilePath (combine)
@@ -167,7 +167,7 @@ pathnameGlob = either (\_err -> return []) match . parse patP ""
 
         step (MatchContents p) dir = do
             entries <- getDirectoryContents (if null dir then "." else dir)
-                `catchError` (\_ -> return [])
+                `catchIOError` (\_ -> return [])
             return $ map (combine dir) $ sort $ filter (patMatch p) entries
         step (AddSlash) path = do
             isDir <- doesDirectoryExist (if null path then "/" else path)
@@ -181,12 +181,12 @@ pathnameGlob = either (\_err -> return []) match . parse patP ""
         <|> (char '\\' >> anyChar >>= return . Literal)
         <|> (try $ do _ <- char '['
                       c <- noneOf "/"
-                      first <- if c == '!' 
+                      first <- if c == '!'
                                then noneOf "/"
                                else return c
                       rest <- many $ noneOf "]/"
                       _ <- char ']'
-                      let f = if c == '!' 
+                      let f = if c == '!'
                               then flip notElem
                               else flip elem
                       return $ CharTest (f $ makeCharClass (first:rest)))

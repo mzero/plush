@@ -44,7 +44,6 @@ module Plush.Run.Posix (
     simplifyPath, reducePath,
     -- ** 'ExitCode' utilities
     andThen, andThenM, untilFailureM,
-    finally,
 
     -- * Re-exports
     -- ** from System.Exit
@@ -62,8 +61,8 @@ module Plush.Run.Posix (
 ) where
 
 import Control.Applicative ((<$>))
-import qualified Control.Exception as Exception
-import Control.Monad.Error
+import Control.Monad (liftM2, when)
+import Control.Monad.Exception (MonadException, catchIf, catchIOError)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
@@ -98,7 +97,7 @@ type Bindings = [(String, String)]
 -- These are just the operations needed to implement the shell command language
 -- and the built-in commands. The shell can operate entirely within a monad
 -- of this class. See 'TextExec' for one such monad. 'IO' is another.
-class (Functor m, Monad m, MonadError IOError m,
+class (Functor m, Monad m, MonadException m,
         PosixLikeFileStatus (FileStatus m)) => PosixLike m where
     -- from System.Posix.Directory
 
@@ -213,9 +212,7 @@ instance PosixLike IO where
 
     getUserHomeDirectoryForName s =
         (Just . P.homeDirectory <$> P.getUserEntryForName s)
-            -- TODO(elaforge): catch something more specific
-            `Exception.catch` \(_ :: Exception.SomeException) ->
-                return Nothing
+            `catchIOError` (\_ -> return Nothing)
 
     execProcess env cmd args = do
         (_, _, _, h) <- IO.createProcess $
@@ -242,7 +239,7 @@ ioReadAll fd = do
     go [] >>= return . L.fromChunks . reverse
   where
     go bs = next >>= maybe (return bs) (go . (:bs))
-    next = readBuf `catchError` (\_ -> return Nothing)
+    next = readBuf `IO.catchIOError` (\_ -> return Nothing)
     readBuf = do
       b <- B.createAndTrim bufSize $ (\buf ->
                 fromIntegral `fmap` P.fdReadBuf fd buf bufSize)
@@ -297,11 +294,10 @@ ioPipeline = next Nothing
 
 
 ignoreUnsupportedOperation :: IO a -> IO ()
-ignoreUnsupportedOperation act = (act >> return ()) `catchError` catcher
-  where
-    catcher err
-        | IO.ioeGetErrorType err == GHC.UnsupportedOperation = return ()
-        | otherwise = throwError err
+ignoreUnsupportedOperation act =
+    catchIf ((== GHC.UnsupportedOperation) . IO.ioeGetErrorType)
+        (act >> return ())
+        (const $ return ())
 
 
 -- $outstr
@@ -358,11 +354,11 @@ ioGetDirectoryContents fp = do
 
 doesFileExist :: (PosixLike m) => FilePath -> m Bool
 doesFileExist fp =
-    catchError (getFileStatus fp >>= return . isRegularFile) (\_ -> return False)
+    catchIOError (getFileStatus fp >>= return . isRegularFile) (\_ -> return False)
 
 doesDirectoryExist :: (PosixLike m) => FilePath -> m Bool
 doesDirectoryExist fp =
-    catchError (getFileStatus fp >>= return . isDirectory) (\_ -> return False)
+    catchIOError (getFileStatus fp >>= return . isDirectory) (\_ -> return False)
 
 
 -- | Simplify a file path, elminiating . and .. components (if possible)
@@ -398,8 +394,3 @@ andThenM = liftM2 andThen
 untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
 untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
 
-finally :: MonadError e m => m a -> m b -> m a
-finally body finalizer = do
-    rv <- body `catchError` \err -> do _ <- finalizer; throwError err
-    _ <- finalizer
-    return rv

@@ -36,8 +36,9 @@ module Plush.Run (
 where
 
 import Control.Arrow (first)
-import Control.Monad.Error
-import Control.Monad.Trans.State
+import qualified Control.Exception as Ex
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State (runStateT)
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -98,7 +99,7 @@ run act runner = case runner of
 
     RunInTest s t -> do
         let (r,t') = runTest (runStateT act s) t
-        (a, s') <- either throwError return r
+        (a, s') <- either Ex.throwIO return r
         let (oe, t'') = runTest testOutput t'
         putStr $ either show (uncurry (++)) oe
         return (a, RunInTest s' t'')

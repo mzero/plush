@@ -20,7 +20,7 @@ module Plush.Run.Redirection (
     where
 
 import Control.Applicative ((<$>))
-import Control.Monad.Error
+import Control.Monad.Exception (bracket, catchIOError)
 import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
@@ -109,15 +109,15 @@ withRedirection (r:rs) act = do
             withRedirection rs act
 
   where
-    saveAway destFd inner = do
-        moved <- (Just <$> dupFdCloseOnExec destFd safeFdArea)
-                    `catchError` (\_ -> return Nothing)
-        a <- inner -- TODO: should catch errors here
-        case moved of
+    saveAway destFd inner = bracket
+        ((Just <$> dupFdCloseOnExec destFd safeFdArea)
+                    `catchIOError` (\_ -> return Nothing))
+        (\moved -> case moved of
             Just savedFd -> dupTo savedFd destFd >> closeFd savedFd
             Nothing      -> safeCloseFd destFd
-        return a
+            )
+        (const inner)
 
-    safeCloseFd fd = closeFd fd `catchError` (\_ -> return ())
+    safeCloseFd fd = closeFd fd `catchIOError` (\_ -> return ())
     safeFdArea = 30 -- minimum Fd to use for storing away Fds
 

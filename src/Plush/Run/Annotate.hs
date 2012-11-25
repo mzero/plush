@@ -23,7 +23,7 @@ where
 
 import Control.Applicative ((<$>))
 import Control.Monad (filterM)
-import Control.Monad.Error.Class
+import Control.Monad.Exception (catchIOError)
 import Data.List ((\\), isPrefixOf)
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, maybeToList)
@@ -105,7 +105,7 @@ annotate cl cursor = coallesce <$> annoCommandList cl
           return $ map takeFileName matchingPaths
         execAndPrefix p x =
             if isFilePrefixOf p x
-                then isExecutable x `catchError` (\_ -> return False)
+                then isExecutable x `catchIOError` (\_ -> return False)
                 else return False
         isFilePrefixOf p x = p `isPrefixOf` takeFileName x
         allPathFiles = do
@@ -113,7 +113,7 @@ annotate cl cursor = coallesce <$> annoCommandList cl
             pathFiles <- mapM safeGetDirectoryPaths $ splitSearchPath path
             return $ concat pathFiles
         safeGetDirectoryPaths p = do
-            files <- getDirectoryContents p `catchError` (\_ -> return [])
+            files <- getDirectoryContents p `catchIOError` (\_ -> return [])
             return $ map (p </>) files
 
     coallesce = M.toAscList . M.fromListWith (++)
