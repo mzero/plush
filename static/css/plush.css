@@ -265,7 +265,7 @@ h1,h2,h3,h4,em,i {
 }
 
 h1,h2,h3,h4,blockquote,q {
-  font-family: "open sans",arial,sans-serif
+  font-family: "Helvetica Neue", Helvetica, sans-serif;
 }
 
 #header h1 {
