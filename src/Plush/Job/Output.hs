@@ -36,11 +36,11 @@ import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.Concurrent
 import Control.Monad (msum, mzero)
-import Control.Monad.Error (catchError)
 import Data.Aeson (json', Value)
 import qualified Data.Attoparsec as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B (createAndTrim)
+import System.IO.Error (catchIOError)
 import System.Posix
 
 
@@ -133,7 +133,7 @@ readAvailable :: Fd -> IO B.ByteString -- TODO: should merge with parsing logic
 readAvailable fd = go [] >>= return . B.concat . reverse
   where
     go bs = next >>= maybe (return bs) (go . (:bs))
-    next = readBuf `catchError` (\_ -> return Nothing)
+    next = readBuf `catchIOError` (\_ -> return Nothing)
     readBuf = do
       b <- B.createAndTrim bufSize $ (\buf ->
                 fromIntegral `fmap` fdReadBuf fd buf bufSize)

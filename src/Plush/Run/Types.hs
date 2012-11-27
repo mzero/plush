@@ -28,7 +28,7 @@ module Plush.Run.Types (
     )
 where
 
-import Control.Monad.Error.Class
+import Control.Monad.Exception (catchIOError)
 import qualified Data.Text as T
 
 import Plush.Run.Posix
@@ -45,7 +45,7 @@ failure = return $ ExitFailure 1
 
 exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
 exitMsg e msg = do
-    errStrLn msg `catchError` (\_ -> return ())
+    errStrLn msg `catchIOError` (\_ -> return ())
     return $ if (e == 0) then ExitSuccess else ExitFailure e
 
 notSupported :: (PosixLike m) => String -> m ExitCode

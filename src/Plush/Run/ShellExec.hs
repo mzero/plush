@@ -35,7 +35,9 @@ module Plush.Run.ShellExec (
     )
     where
 
-import Control.Monad.Error
+import Control.Monad (msum, mplus)
+import Control.Monad.Exception (bracket_)
+import Control.Monad.Trans.Class (lift, MonadTrans)
 import Control.Monad.Trans.State
 import qualified Data.HashMap.Strict as M
 import Data.List (intercalate)
@@ -190,13 +192,13 @@ setFun fname fun =
 unsetFun :: (Monad m) => String -> ShellExec m ()
 unsetFun fname = modify $ \s -> s { ssFuns = M.delete fname $ ssFuns s }
 
-withFunContext :: (Monad m) => [String] -> ShellExec m a -> ShellExec m a
+withFunContext :: (PosixLike m) => [String] -> ShellExec m a -> ShellExec m a
 withFunContext args body = do
     origArgs <- gets ssArgs
-    modify $ \s -> s { ssArgs = args }
-    r <- body   -- TODO: this should be in some protected bracket
-    modify $ \s -> s { ssArgs = origArgs }
-    return r
+    bracket_
+        (modify $ \s -> s { ssArgs = args })
+        (modify $ \s -> s { ssArgs = origArgs })
+        body
 
 getAliases :: (Monad m, Functor m) => ShellExec m Aliases
 getAliases = gets ssAliases

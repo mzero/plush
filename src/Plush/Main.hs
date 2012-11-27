@@ -19,7 +19,7 @@ limitations under the License.
 module Plush.Main (plushMain) where
 
 import Control.Monad (when)
-import Control.Monad.Trans (liftIO)
+import Control.Monad.IO.Class (liftIO)
 import Data.List (foldl')
 import System.Console.GetOpt
 import System.Console.Haskeline

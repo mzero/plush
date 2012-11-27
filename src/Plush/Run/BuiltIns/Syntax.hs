@@ -37,7 +37,7 @@ module Plush.Run.BuiltIns.Syntax (
 
 import Control.Arrow (first, second)
 import Control.Monad (liftM2)
-import Control.Monad.Error (catchError)
+import Control.Monad.Exception (catchAll)
 import Data.List ((\\))
 import Data.Maybe (listToMaybe)
 import Data.Monoid
@@ -175,7 +175,7 @@ perArg cmd opts args = mapM (reportError . cmd opts) args >>= return . maximum
 
 -- | Catch any errors, report them, and return an error exit code.
 reportError :: (PosixLike m) => m ExitCode -> m ExitCode
-reportError act = act `catchError`  (exitMsg 1 . show)
+reportError act = act `catchAll`  (exitMsg 1 . show)
 
 
 -- | A type that can collect information about arguments. The type takes one

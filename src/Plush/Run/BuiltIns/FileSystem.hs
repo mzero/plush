@@ -23,7 +23,7 @@ module Plush.Run.BuiltIns.FileSystem (
 where
 
 import Control.Monad (when)
-import Control.Monad.Error (catchError)
+import Control.Monad.Exception (bracket, catchIOError)
 import System.FilePath
 
 import Plush.Run.BuiltIns.Syntax
@@ -59,7 +59,7 @@ touch = BuiltInUtility $ stdSyntax options "" (perArg go)
         , flag 'm'  -- set modify time"
         ]
 
-    go _flags fp = update `catchError` (\_ -> create) >> success
+    go _flags fp = update `catchIOError` (\_ -> create) >> success
       where
         update = getFileStatus fp >> touchFile fp
             -- should respect the -a and -m flags
@@ -77,7 +77,8 @@ rm = BuiltInUtility $ stdSyntax options "" (perArg go)
         -- TODO: implement -i correctly
         -- TODO: implement proper messaging
 
-    go flags fp = (getFileStatus fp >>= doRm) `catchError` (\_ -> reportMissing)
+    go flags fp = (getFileStatus fp >>= doRm)
+                    `catchIOError` (\_ -> reportMissing)
       where
         doRm s = case (isDirectory s, 'r' `elem` flags) of
             (True, False) -> exitMsg 1 (fp ++ ": is a directory")
@@ -106,9 +107,7 @@ cat = BuiltInUtility $ stdSyntax options "" go
     go _flags [] = go _flags ["-"]
     go _flags args = mapM_ (\fp -> get fp >>= write stdOutput) args >> success
     get "-" = readAll stdInput
-    get fp = do
-        fd <- openFd fp ReadOnly Nothing defaultFileFlags
-        c <- readAll fd
-        closeFd fd
-        return c
-
+    get fp = bracket
+        (openFd fp ReadOnly Nothing defaultFileFlags)
+        closeFd
+        readAll

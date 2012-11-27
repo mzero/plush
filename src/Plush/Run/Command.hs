@@ -27,6 +27,7 @@ module Plush.Run.Command (
 
 import Control.Applicative ((<$>))
 import Control.Monad
+import Control.Monad.Exception (finally)
 import System.FilePath
 
 import {-# SOURCE #-} Plush.Run.BuiltIns -- see BuiltIns.hs-boot

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language TypeSynonymInstances, TypeFamilies, FlexibleInstances #-}
+{-# Language FlexibleInstances, TypeSynonymInstances, TypeFamilies  #-}
 
 module Plush.Run.TestExec (
     TestState(), initialTestState,
@@ -22,7 +22,10 @@ module Plush.Run.TestExec (
     )
     where
 
-import Control.Monad.Error
+import Control.Exception (SomeException)
+import Control.Monad (unless, when)
+import Control.Monad.Exception (ExceptionT, runExceptionT, throwM)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State
 import qualified Data.ByteString.Lazy as L
 --import qualified Data.ByteString.Lazy.UTF8 as L
@@ -199,9 +202,11 @@ nextFreeAfter m i = if i `I.notMember` m then i else nextFreeAfter m (succ i)
 
 -- Test Execution Monad
 
-type TestExec = ErrorT IOError (State TestState)
-runTest :: TestExec a -> TestState -> (Either IOError a, TestState)
-runTest = runState . runErrorT
+type TestExec = ExceptionT (State TestState)
+runTest :: TestExec a -> TestState -> (Either SomeException a, TestState)
+runTest = runState . runExceptionT
+
+
 
 testOutput :: TestExec (String, String)
 testOutput = do
@@ -304,6 +309,7 @@ instance PosixLike TestExec where
             readAll stdOutput >>= write stdInput
             c >>= next cs'
 
+
 instance PosixLikeFileStatus Entry where
     accessTime _ = fromInteger 0
     modificationTime _ = fromInteger 0
@@ -332,9 +338,8 @@ runFdPrim fn fd prim = do
     s <- lift get
     let fds = tsFDescs s
     case (I.lookup (fromIntegral fd) fds) of
-        Nothing -> throwError $
-            mkIOError illegalOperationErrorType fn
-                Nothing (Just $ "<" ++ show fd ++ ">")
+        Nothing -> throwM $ mkIOError illegalOperationErrorType fn
+                                Nothing (Just $ "<" ++ show fd ++ ">")
         Just desc -> prim s fds desc
 
 
@@ -378,5 +383,5 @@ directoryMustNotExist fn fp fs dp =
     when (fsDirectoryExists fs dp) $ raise alreadyExistsErrorType fn fp
 
 
-raise :: (PosixLike m) => IOErrorType -> String -> FilePath -> m a
-raise iot fn fp = throwError $ mkIOError iot fn Nothing (Just fp)
+raise :: IOErrorType -> String -> FilePath -> TestExec a
+raise iot fn fp = throwM $ mkIOError iot fn Nothing (Just fp)

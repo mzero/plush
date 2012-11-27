@@ -23,6 +23,7 @@ where
 
 import Control.Applicative ((<$>))
 import Control.Monad (when)
+import Control.Monad.Exception (bracket)
 import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
@@ -71,12 +72,10 @@ doGrep flags (pat:args) = do
             if found then success else failure
   where
     gofile df "-" = gofd df "(standard input)" stdInput
-    gofile df f = do
-        fd <- openFd f ReadOnly Nothing defaultFileFlags
-            -- TODO: handle errors here gracefully
-        found <- gofd df f fd
-        closeFd fd
-        return found
+    gofile df f = bracket
+        (openFd f ReadOnly Nothing defaultFileFlags)
+        closeFd
+        (gofd df f)
 
     gofd df f fd = do
         contents <- readAll fd
