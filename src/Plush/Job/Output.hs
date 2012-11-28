@@ -36,11 +36,11 @@ import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.Concurrent
 import Control.Monad (msum, mzero)
+import Control.Monad.Exception (catchIOError)
 import Data.Aeson (json', Value)
 import qualified Data.Attoparsec as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B (createAndTrim)
-import System.IO.Error (catchIOError)
 import System.Posix
 
 

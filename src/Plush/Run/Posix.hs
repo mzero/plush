@@ -239,7 +239,7 @@ ioReadAll fd = do
     go [] >>= return . L.fromChunks . reverse
   where
     go bs = next >>= maybe (return bs) (go . (:bs))
-    next = readBuf `IO.catchIOError` (\_ -> return Nothing)
+    next = readBuf `catchIOError` (\_ -> return Nothing)
     readBuf = do
       b <- B.createAndTrim bufSize $ (\buf ->
                 fromIntegral `fmap` P.fdReadBuf fd buf bufSize)

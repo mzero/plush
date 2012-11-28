@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language GeneralizedNewtypeDeriving, RankNTypes #-}
+{-# Language CPP, GeneralizedNewtypeDeriving, RankNTypes #-}
 
 {-| This module supports monads that can throw extensible exceptions. The
     exceptions are the very same from "Control.Exception", and the operations
@@ -59,8 +59,10 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans.Class (lift, MonadTrans)
 import qualified Control.Monad.Trans.Error as Error
 import qualified Control.Monad.Trans.State.Lazy as LazyState
+#if MIN_VERSION_transformers(0,3,0)
 import Data.Foldable (Foldable)
 import Data.Traversable (Traversable)
+#endif
 
 -- $mtl
 -- The mtl style typeclass
@@ -103,8 +105,13 @@ instance (MonadException m) => MonadException (LazyState.StateT s m) where
 -- | Add exception abilities to a monad.
 newtype ExceptionT m a =
     ExceptionT { unEx :: Error.ErrorT WrappedException m a }
+#if MIN_VERSION_transformers(0,3,0)
   deriving (Functor, Foldable, Traversable, Applicative, Alternative,
             Monad, MonadPlus, MonadFix, MonadTrans, MonadIO)
+#else
+  deriving (Functor, Applicative, Alternative,
+            Monad, MonadPlus, MonadFix, MonadTrans, MonadIO)
+#endif
 
 runExceptionT :: (Monad m) => ExceptionT m a -> m (Either SomeException a)
 runExceptionT = liftM (left unWrapException) . Error.runErrorT . unEx
