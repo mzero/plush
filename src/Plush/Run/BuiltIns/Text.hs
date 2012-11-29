@@ -28,6 +28,7 @@ import qualified Data.Text.Lazy.Encoding as T
 
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.Types
 

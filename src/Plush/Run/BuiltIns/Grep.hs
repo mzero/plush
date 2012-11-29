@@ -23,14 +23,12 @@ where
 
 import Control.Applicative ((<$>))
 import Control.Monad (when)
-import Control.Monad.Exception (bracket)
-import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
 
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 
 egrep :: (PosixLike m) => BuiltInUtility m
@@ -71,17 +69,12 @@ doGrep flags (pat:args) = do
                     -- TODO: should short-circuit
             if found then success else failure
   where
-    gofile df "-" = gofd df "(standard input)" stdInput
-    gofile df f = bracket
-        (openFd f ReadOnly Nothing defaultFileFlags)
-        closeFd
-        (gofd df f)
+    gofile df "-" = readAll stdInput >>= gotext df "(standard input)"
+    gofile df f = readAllFile f >>= gotext df f
 
-    gofd df f fd = do
-        contents <- readAll fd
+    gotext df f contents = do
         let matches = filter (match . snd)
-                        $ zip [(1::Int)..] $ T.lines
-                        $ T.decodeUtf8With T.lenientDecode contents
+                        $ zip [(1::Int)..] $ T.lines $ fromByteString contents
         when showLines $ mapM_ (dispLine df f) matches
         dispFile df f matches
         return $ not $ null matches

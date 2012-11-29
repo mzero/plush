@@ -22,16 +22,15 @@ where
 
 import Control.Applicative ((<$>))
 import Control.Monad (unless)
+import Control.Monad.Exception (bracket_)
 import Data.List (intercalate)
-import qualified Data.Text.Encoding.Error as T
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
 import System.FilePath
 
 import Plush.Parser
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Execute
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types
 
@@ -67,16 +66,12 @@ dot = SpecialUtility . const $ Utility dotExec emptyAnnotate
         if b
             then do
                 setLastExitCode ExitSuccess
+                script <- readAllFile fp
                 oldArgs <- getArgs
-                unless (null args) $ setArgs args -- TODO: should be bracketed
-                fd <- openFd fp ReadOnly Nothing defaultFileFlags
-                    -- TODO: should be bracketed
-                script <- readAll fd
-                closeFd fd
-                ec <- runScript $ T.unpack
-                    $ T.decodeUtf8With T.lenientDecode script
-                unless (null args) $ setArgs oldArgs
-                return ec
+                bracket_
+                    (unless (null args) $ setArgs args)
+                    (unless (null args) $ setArgs oldArgs)
+                    (runScript script)
             else
                 runFirstFound args fps
 

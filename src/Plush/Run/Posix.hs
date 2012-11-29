@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language FlexibleContexts, FlexibleInstances,
-             TypeFamilies, TypeSynonymInstances, ScopedTypeVariables #-}
+{-# Language FlexibleContexts, TypeFamilies, ScopedTypeVariables #-}
 
 {-| This module represents the low level Posix interface. It is mostly a
     re-export of the interface from the System.Posix module tree. However,
@@ -31,19 +30,9 @@ module Plush.Run.Posix (
     PosixLike(..),
     PosixLikeFileStatus(..),
 
-    -- * Utilities
+    -- * Misc
     -- ** Environment bindings
     Bindings,
-    -- ** Output convenience functions
-    -- $outstr
-    PosixOutStr(..),
-    outStr, outStrLn, errStr, errStrLn, jsonOut,
-    -- ** File and directory existance
-    doesFileExist, doesDirectoryExist,
-    -- ** Path simplification
-    simplifyPath, reducePath,
-    -- ** 'ExitCode' utilities
-    andThen, andThenM, untilFailureM,
 
     -- * Re-exports
     -- ** from System.Exit
@@ -61,21 +50,15 @@ module Plush.Run.Posix (
 ) where
 
 import Control.Applicative ((<$>))
-import Control.Monad (liftM2, when)
+import Control.Monad (when)
 import Control.Monad.Exception (MonadException, catchIf, catchIOError)
-import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Internal as B
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
 import Foreign.Ptr (castPtr, plusPtr)
 import qualified GHC.IO.Exception as GHC
 import System.Exit
-import System.FilePath
 import System.Posix.Files (stdFileMode, accessModes)
 import System.Posix.IO (stdInput, stdOutput, stdError,
     OpenMode, OpenFileFlags, defaultFileFlags)
@@ -85,6 +68,7 @@ import qualified System.IO.Error as IO
 import qualified System.Posix as P
 import qualified System.Process as IO
 import qualified System.Posix.Missing as PM
+
 
 type Bindings = [(String, String)]
 
@@ -300,38 +284,6 @@ ignoreUnsupportedOperation act =
         (const $ return ())
 
 
--- $outstr
--- Use these in place of 'putStr' and 'putStrLn'. Note that these are
--- unbuffered.
-
--- | String like classes that can be used with 'outStr' and friends.
-class PosixOutStr s where
-    toByteString :: s -> L.ByteString
-    toByteStringLn :: s -> L.ByteString
-    toByteStringLn = flip L.snoc nl . toByteString
-      where nl = toEnum $ fromEnum '\n'
-
-instance PosixOutStr String where
-    toByteString = toByteString . LT.pack
-    toByteStringLn = toByteStringLn . LT.pack
-
-instance PosixOutStr LT.Text where
-    toByteString = LT.encodeUtf8
-    toByteStringLn = LT.encodeUtf8 . flip LT.snoc '\n'
-
-instance PosixOutStr T.Text where
-    toByteString = L.fromChunks . (:[]) . T.encodeUtf8
-    toByteStringLn = L.fromChunks . (:[B.singleton nl]) . T.encodeUtf8
-      where nl = toEnum $ fromEnum '\n'
-
-outStr, outStrLn, errStr, errStrLn :: (PosixOutStr s, PosixLike m) => s -> m ()
-outStr = write stdOutput . toByteString
-errStr = write stdError . toByteString
-outStrLn = write stdOutput . toByteStringLn
-errStrLn = write stdError . toByteStringLn
-
-jsonOut :: (A.ToJSON a, PosixLike m) => a -> m ()
-jsonOut = write stdJsonOutput . A.encode
 
 stdJsonInput, stdJsonOutput :: Fd
 stdJsonInput = Fd 3
@@ -350,47 +302,4 @@ ioGetDirectoryContents fp = do
         if null entry
             then return []
             else readUntilNull ds >>= return . (entry :)
-
-
-doesFileExist :: (PosixLike m) => FilePath -> m Bool
-doesFileExist fp =
-    catchIOError (getFileStatus fp >>= return . isRegularFile) (\_ -> return False)
-
-doesDirectoryExist :: (PosixLike m) => FilePath -> m Bool
-doesDirectoryExist fp =
-    catchIOError (getFileStatus fp >>= return . isDirectory) (\_ -> return False)
-
-
--- | Simplify a file path, elminiating . and .. components (if possible)
-simplifyPath :: FilePath -> FilePath
-simplifyPath = joinPath . reverse . reducePath
-
-
--- | Reduce the path, elminiating . and .. components if possible.
--- Returns a list of path elements, in reverse order. Each has no slash,
--- except the last, which is a single slash if the path is absolute.
-reducePath :: FilePath -> [String]
-reducePath = simp [] . splitDirectories
-  where
-    simp       ys          []  = ys
-    simp       ys (('/':_):xs) = simp ("/":ys) xs
-    simp       ys    ( ".":xs) = simp      ys  xs
-    simp ya@(y:ys)   ("..":xs)
-          | y == "/"           = simp      ya  xs
-          | y /= ".."          = simp      ys  xs
-    simp       ys    (   x:xs) = simp   (x:ys) xs
-
--- | Returns the first 'ExitCode' that fails. (Could have been a
--- | Monoid if we owned ExitCode.)
-andThen :: ExitCode -> ExitCode -> ExitCode
-andThen ExitSuccess exitCode = exitCode
-andThen exitCode _ = exitCode
-
--- | Sequence 'ExitCode'-returning operations until failure.
-andThenM :: (Monad m) => m ExitCode -> m ExitCode -> m ExitCode
-andThenM = liftM2 andThen
-
--- | Sequence a list of 'ExitCode'-returning operations until failure.
-untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
-untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
 

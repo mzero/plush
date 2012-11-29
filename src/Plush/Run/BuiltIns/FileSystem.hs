@@ -23,12 +23,13 @@ module Plush.Run.BuiltIns.FileSystem (
 where
 
 import Control.Monad (when)
-import Control.Monad.Exception (bracket, catchIOError)
+import Control.Monad.Exception (catchIOError)
 import System.FilePath
 
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 
 
@@ -107,7 +108,4 @@ cat = BuiltInUtility $ stdSyntax options "" go
     go _flags [] = go _flags ["-"]
     go _flags args = mapM_ (\fp -> get fp >>= write stdOutput) args >> success
     get "-" = readAll stdInput
-    get fp = bracket
-        (openFd fp ReadOnly Nothing defaultFileFlags)
-        closeFd
-        readAll
+    get fp = readAllFile fp

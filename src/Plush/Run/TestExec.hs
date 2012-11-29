@@ -40,6 +40,7 @@ import System.FilePath
 import System.IO.Error
 
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 
 

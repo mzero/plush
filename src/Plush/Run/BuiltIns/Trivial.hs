@@ -27,6 +27,7 @@ import Data.List (intercalate)
 
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 
 

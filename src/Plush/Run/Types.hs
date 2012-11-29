@@ -32,6 +32,7 @@ import Control.Monad.Exception (catchIOError)
 import qualified Data.Text as T
 
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Types.CommandSummary
 
 

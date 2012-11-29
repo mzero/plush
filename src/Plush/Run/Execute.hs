@@ -32,6 +32,7 @@ import Data.Monoid
 import Plush.Run.Command
 import Plush.Run.Expansion
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Redirection
 import Plush.Run.ShellExec
 import Plush.Run.Types

@@ -26,6 +26,7 @@ import System.FilePath
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types
 

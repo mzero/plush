@@ -32,6 +32,7 @@ import System.FilePath
 
 import {-# SOURCE #-} Plush.Run.BuiltIns -- see BuiltIns.hs-boot
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types

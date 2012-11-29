@@ -80,6 +80,7 @@ Library
     Plush.Run.Execute
     Plush.Run.Expansion
     Plush.Run.Posix
+    Plush.Run.Posix.Utilities
     Plush.Run.Redirection
     Plush.Run.ShellExec
     Plush.Run.ShellFlags
