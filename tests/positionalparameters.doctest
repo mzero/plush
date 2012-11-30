@@ -43,3 +43,34 @@ Positionals are not settable via readonly or export
 --  seven
 --  # env | fgrep 7=
 
+Shift parameters
+    # shift
+    # echo $*
+    two three four five six seven eight nine ten eleven twelve
+    # shift 3
+    # echo $*
+    five six seven eight nine ten eleven twelve
+    # shift 0
+    # echo $*
+    five six seven eight nine ten eleven twelve
+
+Shift errors codes
+    # shift && echo ok || echo fail
+    ok
+TODO: these are commented out for the same reasons as above
+shift too big
+--  # shift 9 2>/dev/null && echo ok || echo fail
+--  fail
+--  # echo $*
+--  six seven eight nine ten eleven twelve
+shift negative
+--  # shift -1 2>/dev/nulll && echo ok || echo fail
+--  fail
+--  # echo $*
+--  six seven eight nine ten eleven twelve
+shift non-numeric
+--  # shift less 2>/dev/nulll && echo ok || echo fail
+--  fail
+--  # echo $*
+--  six seven eight nine ten eleven twelve
+

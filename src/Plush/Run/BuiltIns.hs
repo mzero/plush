@@ -23,6 +23,7 @@ where
 
 import qualified Data.HashMap.Strict as M
 
+import Plush.Run.BuiltIns.Evaluation
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
 import Plush.Run.BuiltIns.ShellState
@@ -42,14 +43,18 @@ special :: (PosixLike m) => String -> Maybe (ShellUtility m)
 special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
     [ ("complete", complete)
     , ("context", context)
+    , (":", colon)
     , ("set", set)
     , ("export", export)
     , ("readonly", readonly)
     , ("unset", unset)
+    , ("shift", shift)
+    , (".", dot)
+    , ("eval", eval)
     ]
     -- eventually will include:
-    -- break, colon(:), continue, dot(.), eval, exec, exit
-    -- return, shift, times, trap
+    -- break, continue, exec, exit
+    -- return, times, trap
     -- plush extensions:
     -- complete, context
 

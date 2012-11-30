@@ -44,6 +44,7 @@ import Data.Monoid
 import qualified Data.Text as T
 
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 import Plush.Types.CommandSummary
 

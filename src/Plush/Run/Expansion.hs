@@ -34,6 +34,7 @@ import System.FilePath (combine)
 import Text.Parsec
 
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Types
 

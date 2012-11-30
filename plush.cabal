@@ -67,6 +67,7 @@ Library
     Plush.Pretty
     Plush.Run.Annotate
     Plush.Run.BuiltIns
+    Plush.Run.BuiltIns.Evaluation
     Plush.Run.BuiltIns.FileSystem
     Plush.Run.BuiltIns.Grep
     Plush.Run.BuiltIns.ShellState
@@ -79,6 +80,7 @@ Library
     Plush.Run.Execute
     Plush.Run.Expansion
     Plush.Run.Posix
+    Plush.Run.Posix.Utilities
     Plush.Run.Redirection
     Plush.Run.ShellExec
     Plush.Run.ShellFlags

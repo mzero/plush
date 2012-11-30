@@ -42,7 +42,8 @@ import Plush.Job.Output
 import Plush.Job.Types
 import Plush.Run
 import Plush.Run.Execute
-import Plush.Run.Posix (stdJsonOutput, toByteString, write)
+import Plush.Run.Posix (stdJsonOutput, write)
+import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 
 
