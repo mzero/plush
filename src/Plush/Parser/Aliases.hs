@@ -56,8 +56,8 @@ aliasNameChar _ = False
 -- kept as a stack of string in progress. Each is an alias explansion in
 -- progress, save the last, which is just the original string.
 --
--- The `Int` is the column (statring at 1), of the most recent `uncons`
--- character, in terms of the original string.
+-- The `Int` is the column (statring at 1), of the next character that will be
+-- `uncons`'d, in terms of the original string.
 data DealiasingStream = DAS Aliases Int [Level]
 
 instance (Monad m) => Stream DealiasingStream m Char where
@@ -74,7 +74,7 @@ type Level = (Bool, String, String)
 
 -- | Construct a stream given the aliases to apply, and the original input.
 dealiasStream :: Aliases -> String -> DealiasingStream
-dealiasStream aliases s = DAS aliases 0 [(False, "", s)]
+dealiasStream aliases s = DAS aliases 1 [(False, "", s)]
 
 -- | Return the remainder of the unstreamed input.
 dealiasRemainder :: DealiasingStream -> String
