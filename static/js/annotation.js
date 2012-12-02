@@ -15,7 +15,7 @@
 define(['jquery', 'api', 'input'], function($, api, input) {
   "use strict";
 
-  var COMPLETION_DELAY = 100;
+  var COMPLETION_DELAY = 50;
 
 
   function repeat(s,n) {
@@ -45,6 +45,7 @@ define(['jquery', 'api', 'input'], function($, api, input) {
   var completionSpan;
   var completionArray;
   var completionCommonPrefix;
+  var completionElem;
 
   var commandline = $('#commandline');
 
@@ -58,6 +59,7 @@ define(['jquery', 'api', 'input'], function($, api, input) {
     completionSpan = null;
     completionArray = null;
     completionCommonPrefix = null;
+    completionElem = null;
   }
 
   function updateAnnotations(comp) {
@@ -119,17 +121,15 @@ define(['jquery', 'api', 'input'], function($, api, input) {
           completionArray = c;
           completionCommonPrefix = c[0];
 
-          var compElem = $('<ul></ul>', { "class": "completions" });
+          completionElem = $('<ul></ul>', { "class": "completions" });
           c.forEach(function(t) {
             var textElem = $('<li></li>');
-            textElem.attr('tabindex', '100');
             textElem.text(t);
-            compElem.append(textElem);
+            completionElem.append(textElem);
             completionCommonPrefix = commonPrefix(completionCommonPrefix, t);
           });
-          compElem.hide();
-          blockElem.append(compElem);
-          a.compElem = compElem;
+          completionElem.hide();
+          blockElem.append(completionElem);
         }
 
         annotations.push(a);
@@ -138,6 +138,8 @@ define(['jquery', 'api', 'input'], function($, api, input) {
   }
 
   function commandChange() {
+    if (completing) return;
+
     var loc = commandline[0].selectionStart;
     if (typeof loc !== 'number') return;
 
@@ -161,37 +163,102 @@ define(['jquery', 'api', 'input'], function($, api, input) {
   }
 
 
+  var completing = false;
+  var completingPrefix;
+  var completingOriginal
+  var completingPostfix;
+  var completingFocus;
 
   function startCompletions() {
+    if (!completionSpan) return;
+
+    completing = true;
+    clearTimeout(checkTimer);
+
     var input = commandline.val();
-    var comp = input.substring(completionSpan.start - 1,
-                               completionSpan.end);
-    if (completionCommonPrefix === comp) {
-      $('.completions').show();
-      $('.completions li:first').focus();
+    completingPrefix = input.substring(0, completionSpan.start - 1);
+    completingOriginal = input.substring(completionSpan.start - 1,
+                                          completionSpan.end);
+    completingPostfix = input.substring(completionSpan.end);
+
+    insertCompletion(completionCommonPrefix);
+    $('.completions').show();
+  }
+
+  function insertCompletion(text) {
+    commandline.val(completingPrefix + text + completingPostfix);
+      // TODO: should shell escape test here
+    var s = completingPrefix.length + text.length;
+    commandline[0].setSelectionRange(s,s);
+  }
+
+  function nextCompletion(dir) {
+    var nextFocus;
+    if (completingFocus) {
+      var oldFocus = completingFocus;
+      switch (dir) {
+        case -1: nextFocus = oldFocus.prevAll('li').first(); break;
+        case  1: nextFocus = oldFocus.nextAll('li').first(); break;
+      }
+      oldFocus.removeClass('focus');
+    }
+    if (!nextFocus) {
+      switch(dir) {
+        case -1: nextFocus = completionElem.find('li').last(); break;
+        case  1: nextFocus = completionElem.find('li').first(); break;
+      }
+    }
+    if (nextFocus && nextFocus.length > 0) {
+      nextFocus.addClass('focus');
+      completingFocus = nextFocus;
+      insertCompletion(nextFocus.text());
     } else {
-      insertCompletion(completionCommonPrefix);
-      requestRunComplete();
+      completingFocus = null;
     }
   }
 
-  function insertCompletion(completion) {
-    var input = commandline.val();
-    commandline.val(
-      input.substr(0, completionSpan.start - 1)
-      + completion
-      + input.substr(completionSpan.end - 1));
+  function finishCompletion() {
+    $('.completions').hide();
+    completing = false;
+    commandline.focus();
+    requestRunComplete();
   }
 
-  $('#input-area').on('keydown', '.completions', function(e) {
-    switch (e.keyCode) {
-      case 13:
-        insertCompletion($(e.target).text());
-        commandline.focus();
-        $('.completions').hide();
-        return false;
-    }
+  function finishCompletionAll() {
+    insertCompletion(completionArray.join(' ') + ' ');
+    finishCompletion();
+  }
+
+  function cancelCompletion() {
+    insertCompletion(completingOriginal);
+    finishCompletion();
+  }
+
+
+  var triggerCompletionKeydown = input.keyHandler({
+    'TAB':            function() { startCompletions(); },
   });
+
+  var completionModeKeydown = input.keyHandler({
+    bindings: {
+      'DOWN, TAB':          function() { nextCompletion(1); },
+      'UP, SHIFT+TAB':      function() { nextCompletion(-1); },
+      'RETURN':             function() { finishCompletion(); },
+      'ASTERISK, EQUALS, EQUALS2':
+                            function() { finishCompletionAll(); },
+      'ESCAPE':             function() { cancelCompletion(); }
+    },
+    default: function() { finishCompletion(); return input.PASS; }
+  });
+
+  function keydown(e) {
+    if (!completing) {
+      return triggerCompletionKeydown(e);
+    } else {
+      return completionModeKeydown(e);
+    }
+  }
+
 
 
   var checkTimer = null;
@@ -199,6 +266,7 @@ define(['jquery', 'api', 'input'], function($, api, input) {
 
   function requestRunComplete() {
     clearTimeout(checkTimer);
+    if (completing) return;
     checkTimer = setTimeout(runComplete, COMPLETION_DELAY);
   }
 
@@ -223,7 +291,7 @@ define(['jquery', 'api', 'input'], function($, api, input) {
   return {
     clearAnnotations: clearAnnotations,
     commandChange: commandChange,
-    startCompletions: startCompletions,
+    keydown: keydown,
     requestRunComplete: requestRunComplete
   }
 });

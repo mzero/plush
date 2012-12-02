@@ -107,7 +107,6 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
 
 
   var commandlineKeydown = input.keyHandler({
-    'TAB':                  function() { annotation.startCompletions(); },
     'RETURN':               function() { runCommandline(); },
     'SPACE, LEFT, RIGHT':   function() { return input.STOP_PROPIGATION; }
   });
@@ -115,6 +114,7 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   commandline.keydown(function(e) {
     var r;
     r = help.keydown(e);        if (r !== undefined) return r;
+    r = annotation.keydown(e);  if (r !== undefined) return r;
     r = history.keydown(e);     if (r !== undefined) return r;
     r = commandlineKeydown(e);  if (r !== undefined) return r;
   });
@@ -143,11 +143,13 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   $(window).on('keydown', function(e) {
     var r;
     r = help.keydown(e);      if (r !== undefined) return r;
+    r = annotation.keydown(e);if (r !== undefined) return r;
     r = history.keydown(e);   if (r !== undefined) return r;
     r = shellKeydown(e);      if (r !== undefined) return r;
     r = jobs.keydown(e);      if (r !== undefined) return r;
   });
 
 
+  commandline.focus();
   runContext();
 });

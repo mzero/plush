@@ -193,6 +193,7 @@ define(['jquery'], function($) {
   keyCodes['OPEN_CURLY_BRACKET'] = 174;
   keyCodes['CLOSE_CURLY_BRACKET'] = 175;
   keyCodes['TILDE'] = 176;
+  keyCodes['EQUALS2'] = 187;  // for Chrome
   keyCodes['COMMA'] = 188;
   keyCodes['PERIOD'] = 190;
   keyCodes['SLASH'] = 191;
