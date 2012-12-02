@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery'], function($) {
+define(['jquery', 'api'], function($, api) {
   "use strict";
 
   var lsStatusPane = $('#status-ls');
@@ -21,14 +21,8 @@ define(['jquery'], function($) {
     .detach()
     .removeClass('proto');
 
-  var currentlyWaitingFor = '';
-  var queuedDirectory = '';
-  var collectedStdOut = '';
-  var collectedStdErr = '';
-
-  // ugly hack, until these functions are in a separate module
+  // ugly hack, until this function is in a separate module
   var runCommandFn;
-  var apiFn;
 
   var fileTypeNames = {
     '-': "File",
@@ -39,61 +33,41 @@ define(['jquery'], function($) {
     'b': "Block special file"
   };
 
-  function results(data) {
+  function statusResults(dir, data) {
+    $('#status-ls-cwd').text(dir);
+
+    lsStatusPaneTBody.children('.file').detach();
+
     if ('stdout' in data) {
-      collectedStdOut = collectedStdOut + data.stdout;
+     parseLsOutput(data.stdout).forEach(function(file) {
+        var fileTr = fileTrProto.clone();
+
+        formatFileName(fileTr, dir, file);
+
+        var dl = fileTr.find('.details');
+
+        formatFileType(dl, file);
+        formatFileSize(dl, file);
+        formatFileDeviceInfo(dl, file);
+        fileDetailLine(dl, 'owner', file.owner);
+        fileDetailLine(dl, 'group', file.group);
+        fileDetailLine(dl, 'time', file.datetime);
+        formatFilePerms(dl, file);
+        fileDetailLine(dl, 'links', file.linkCount);
+        fileDetailLine(dl, 'target', file.target);
+
+        lsStatusPaneTBody.append(fileTr);
+      });
     }
+
     if ('stderr' in data) {
-      collectedStdErr = collectedStdErr + data.stderr;
-    }
-    if ('running' in data) {
-      if (!data.running) {
-        $('#status-ls-cwd').text(currentlyWaitingFor);
-
-        lsStatusPaneTBody.children('.file').detach();
-
-        if (collectedStdOut !== '') {
-          parseLsOutput(collectedStdOut).forEach(function(file) {
-            var fileTr = fileTrProto.clone();
-
-            formatFileName(fileTr, file);
-
-            var dl = fileTr.find('.details');
-
-            formatFileType(dl, file);
-            formatFileSize(dl, file);
-            formatFileDeviceInfo(dl, file);
-            fileDetailLine(dl, 'owner', file.owner);
-            fileDetailLine(dl, 'group', file.group);
-            fileDetailLine(dl, 'time', file.datetime);
-            formatFilePerms(dl, file);
-            fileDetailLine(dl, 'links', file.linkCount);
-            fileDetailLine(dl, 'target', file.target);
-
-            lsStatusPaneTBody.append(fileTr);
-          });
-        }
-
-        if (collectedStdErr != '') {
-          $('<pre></pre>')
-            .text(collectedStdErr)
-            .appendTo(lsStatusPane);
-        }
-
-        collectedStdOut = '';
-        collectedStdErr = '';
-        currentlyWaitingFor = '';
-
-        if (queuedDirectory) {
-          var temp = queuedDirectory;
-          queuedDirectory = '';
-          updateStatusPane(temp, apiFn, runCommandFn);
-        }
-      }
+      $('<pre></pre>')
+        .text(data.stderr)
+        .appendTo(lsStatusPane);
     }
   }
 
-  function formatFileName(tr, file) {
+  function formatFileName(tr, dir, file) {
     var linkToDir = file.type === 'l' && file.typeSymbol === '/';
     var span = tr.find('.name');
 
@@ -104,7 +78,7 @@ define(['jquery'], function($) {
     }
 
     if (file.type === 'd' || linkToDir) {
-      var cmd = 'cd ' + currentlyWaitingFor + '/' + file.name;
+      var cmd = 'cd ' + dir + '/' + file.name;
 
       $('<a>')
         .prop('href', '#')
@@ -131,7 +105,7 @@ define(['jquery'], function($) {
       node.find('.value.type').text(name).prop('title', file.type);
     } else {
       node.find('.value.type').text(file.type);
-    } 
+    }
   }
 
   function formatFilePerms(node, file) {
@@ -164,19 +138,10 @@ define(['jquery'], function($) {
     }
   }
 
-  function updateStatusPane(cwd, api, runCommand) {
-    apiFn = api;
+  function updateStatusPane(cwd, runCommand) {
     runCommandFn = runCommand;
-
-    if (currentlyWaitingFor) {
-      queuedDirectory = cwd;
-    } else {
-      currentlyWaitingFor = cwd;
-
-      var lsCmd = 'ls -lF ' + cwd;
-
-      api('run', {job: 'ls-status', cmd: lsCmd, record: false});
-    }
+    var lsCmd = 'ls -lF ' + cwd;
+    api.runStatus(lsCmd, function (d) { statusResults(cwd, d); });
   }
 
   function parseLsOutput(out) {
@@ -246,7 +211,6 @@ define(['jquery'], function($) {
 
   return {
     updateStatusPane: updateStatusPane,
-    results: results,
   }
 
 });

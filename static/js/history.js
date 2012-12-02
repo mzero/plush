@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['util', 'input', 'jobs'], function(util, input, jobs) {
+define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   "use strict";
-
-  var api;
 
   var historyJobs = Object.create(null);
   var historyOutputToFetch = [];
+  var HISTORY_STARTUP_DELAY = 100;
   var OUTPUT_UPDATE_RATE = 50;
   var OUTPUT_PREFETCH = 0;
-
-  function initHistory(a){
-    api = a;
-    api('history', null, listResult);
-  };
 
   function listResult(items) {
     for (var i in items) {
@@ -36,7 +30,7 @@ define(['util', 'input', 'jobs'], function(util, input, jobs) {
         historyOutputToFetch.push(job);
       }
       if ('cmd' in item) {
-        var j = jobs.newJob(api, item.cmd, job);
+        var j = jobs.newJob(item.cmd, job);
         historyJobs[job] = j;
         j.setDeferredOutput(fetchOutput);
       }
@@ -53,7 +47,7 @@ define(['util', 'input', 'jobs'], function(util, input, jobs) {
   }
 
   function fetchOutput(job) {
-      api('history', { historyOutput: [ job ]}, outputResult);
+      api.api('history', { historyOutput: [ job ]}, outputResult);
   }
 
   function outputResult(items) {
@@ -65,7 +59,7 @@ define(['util', 'input', 'jobs'], function(util, input, jobs) {
   function streamFetch() {
     var job = historyOutputToFetch.pop();
     if (job) {
-      api('history', { historyOutput: [ job ]}, streamResult);
+      api.api('history', { historyOutput: [ job ]}, streamResult);
     }
   }
 
@@ -237,8 +231,10 @@ define(['util', 'input', 'jobs'], function(util, input, jobs) {
     }
   }
 
+  setTimeout(function() { api.api('history', null, listResult); },
+    HISTORY_STARTUP_DELAY);
+
   return {
-    initHistory: initHistory,
     keydown: keydown,
     commandChange: commandChange
   };

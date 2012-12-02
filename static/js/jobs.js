@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
+define(['jquery', 'api', 'util', 'input', 'hterm'],
+function($, api, util, input){
   'use strict';
 
   var LINES_IN_TINY = 3;
@@ -171,7 +172,7 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
 
   var jobCount = 0;
 
-  function newJob(api, cmd, job) {
+  function newJob(cmd, job) {
     if (!job) {
       job = "job" + (++jobCount);
     }
@@ -193,12 +194,12 @@ define(['jquery', 'util', 'input', 'hterm'], function($, util, input){
     var terminalNode = null;
 
     function sender(s) {
-      api('input', {job: job, input: s}, function() {});
+      api.api('input', {job: job, input: s}, function() {});
     };
 
     function signaler(s) {
       s = 'kill'; // TODO: remove this when int and quit work
-      api('input', {job: job, signal: s}, function() {});
+      api.api('input', {job: job, signal: s}, function() {});
     };
 
     function sizeOutput(m) {
