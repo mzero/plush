@@ -40,27 +40,14 @@ body {
 }
 
 #header h1 {
+  height: 45px;
   padding-right: 12px;
+  padding-left: 50px;
   float: left;
-}
-
-#header h1 img {
-  padding: 0 3px 0 0;
-  position: relative;
-  top: -1px;
-  vertical-align: middle
 }
 
 #plush-man-search {
   float: right;
-}
-
-#status {
-  position: absolute;
-  top: 68px;
-  bottom: 0;
-  right: 0;
-  width: 20em;
 }
 
 #screen {
@@ -83,7 +70,7 @@ body {
 #status {
   position: absolute;
   top: 68px;
-  bottom: 0;
+  bottom: 3.5em;
   right: 0;
   width: 20em;
 }
@@ -91,6 +78,8 @@ body {
 #status > div {
   margin: 1em 1em 1em 0;
   padding: 1em;
+  max-height: 90%;
+  overflow: scroll;
 }
 
 #scrollback {
@@ -148,17 +137,9 @@ html {
   background:      -o-linear-gradient(top, #ccc 70%, #aaa);
 }
 
-
 #header {
-  background: #f5f5f5;
-  filter: "progid:DXImageTransform.Microsoft.gradient(startColorStr=#fafafa, EndColorStr=#f5f5f5)";
-  background-image: -webkit-gradient(linear,left top,left bottom,color-stop(0,#fafafa),color-stop(1,#f5f5f5));
-  background-image: -webkit-linear-gradient(top,#fafafa,#f5f5f5);
-  background-image:    -moz-linear-gradient(top,#fafafa,#f5f5f5);
-  background-image:      -o-linear-gradient(top,#fafafa,#f5f5f5);
-  background-image:        linear-gradient(top,#fafafa,#f5f5f5);
-  border-bottom: 1px solid #ebebeb;
-  color: #91959c;
+ color: #91959c;
+ background: #f5f5f5 url(../img/chair-tiny.png) no-repeat 10px 11px;
 }
 
 #screen > div {
@@ -315,6 +296,10 @@ h1,h2,h3,h4,blockquote,q {
   background: url(failed.png) no-repeat 4px 0;
 }
 
+.job .command {
+  white-space: pre-wrap;
+}
+
 .job > * {
   margin: 0.5em 1.5em 0;
 }
@@ -467,6 +452,7 @@ ul.horiz-menu li {
   color: #5b89e6;
   background-color: #eef1f7;
   cursor: pointer;
+  margin-right: 0.75em;
 }
 .horiz-menu button:hover {
   color: #ff9134;
@@ -529,6 +515,7 @@ ul.horiz-menu li {
   padding-bottom: 3px;
   border-bottom: solid 3px rgba(229,228,211,1);
   margin-bottom: 3px;
+  word-break: break-all;
 }
 
 #status-ls table {
