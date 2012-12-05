@@ -49,6 +49,16 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
     });
   }
 
+  function runInfoGather() {
+    $('#header-info .info').each(function() {
+      var elem = $(this);
+      api.runStatus(elem.data('cmd'), function (d) {
+        if ('stdout' in d) {
+          elem.text(d.stdout.trim())
+        }
+      })
+    })
+  }
 
   function jobOutput(d) {
     var job = ('job' in d) ? d.job : "unknown";
@@ -151,5 +161,6 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
 
 
   commandline.focus();
+  runInfoGather();
   runContext();
 });

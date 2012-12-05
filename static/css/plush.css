@@ -46,6 +46,10 @@ body {
   float: left;
 }
 
+#header #header-info {
+  text-align: right;
+}
+
 #plush-man-search {
   float: right;
 }
@@ -140,6 +144,12 @@ html {
 #header {
  color: #91959c;
  background: #f5f5f5 url(../img/chair-tiny.png) no-repeat 10px 11px;
+}
+
+#header-info .info {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1px 2px;
 }
 
 #screen > div {
@@ -260,6 +270,14 @@ h1,h2,h3,h4,blockquote,q {
 #header a {
   color: #91959c;
   text-decoration: none
+}
+
+#header-info small {
+  font-size: 80%;
+}
+
+#header-info .info {
+  color: #000;
 }
 
 #screen {
