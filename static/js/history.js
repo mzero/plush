@@ -30,7 +30,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
         historyOutputToFetch.push(job);
       }
       if ('cmd' in item) {
-        var j = jobs.newJob(item.cmd, job);
+        var j = jobs.newJob(item.cmd, job, true);
         historyJobs[job] = j;
         j.setDeferredOutput(fetchOutput);
       }

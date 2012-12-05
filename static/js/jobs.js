@@ -172,7 +172,7 @@ function($, api, util, input){
 
   var jobCount = 0;
 
-  function newJob(cmd, job) {
+  function newJob(cmd, job, historical) {
     if (!job) {
       job = "job" + (++jobCount);
     }
@@ -223,6 +223,9 @@ function($, api, util, input){
     function loadDeferredOutput() {
       if (deferredOutputLoader) {
         deferredOutputLoader(job);
+        deferredOutputLoader = null;
+        node.removeClass('max-deferred');
+        adjustOutput();
       }
     }
 
@@ -250,8 +253,16 @@ function($, api, util, input){
       takeTopic: takeTopic
     });
 
+    util.scrollIntoView(scrollback, node);
+
     var input = node.find('.input-container');
-    input.find('input').focus();
+    if (historical) {
+      input.remove();
+      input = null;
+
+    } else {
+      input.find('input').focus();
+    }
 
     function adjustOutput() {
       var n = linesOutput;
@@ -319,10 +330,6 @@ function($, api, util, input){
     };
 
     function addOutput(cls, txt) {
-      if (deferredOutputLoader) {
-        deferredOutputLoader = null;
-        node.removeClass('max-deferred');
-      }
       if (terminal) {
         return terminal.interpret(txt);
       } else if (txt.match('\u001b[\[]')) {
