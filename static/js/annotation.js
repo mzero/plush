@@ -180,9 +180,12 @@ define(['jquery', 'api', 'input'], function($, api, input) {
     completingOriginal = input.substring(completionSpan.start - 1,
                                           completionSpan.end);
     completingPostfix = input.substring(completionSpan.end);
+    completingFocus = null;
 
     insertCompletion(completionCommonPrefix);
-    $('.completions').show();
+    if (currentShowingElem) currentShowingElem.hide();
+    currentShowingElem = $('.completions');
+    if (currentShowingElem) currentShowingElem.show();
   }
 
   function insertCompletion(text) {
@@ -220,6 +223,8 @@ define(['jquery', 'api', 'input'], function($, api, input) {
   function finishCompletion() {
     $('.completions').hide();
     completing = false;
+    completingFocus = null;
+    currentShowingElem = null;
     commandline.focus();
     requestRunComplete();
   }
