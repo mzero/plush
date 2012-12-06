@@ -17,17 +17,13 @@ define(['jquery'], function($) {
 
   var cwdHistory = [];
 
-  var cwdList = $('#context-cwd');
+  var cwdList = $('#cwd');
 
   var cwdItemProto = cwdList.children('.cwd-item.proto')
     .detach()
     .removeClass('proto');
 
-  var cwdSubsProto = cwdList.children('.cwd-subs.proto')
-    .detach()
-    .removeClass('proto');
-
-  var cwdHistoryList = $('#context-cwd-history-list');
+  var cwdHistoryList = $('#cwd-history-list');
 
   var cwdHistoryItemProto = cwdHistoryList.children('.cwd-history-item.proto')
     .detach()
@@ -49,19 +45,6 @@ define(['jquery'], function($) {
         cwdList.append(cwdItem);
       }
     });
-
-    var cwdSubs = cwdSubsProto.clone();
-    cwdSubs.find('input')
-      .on('keydown', function (e) {
-        if (e.keyCode == 13) {
-          var cmd = 'cd ' + dirSoFar + $(this).val();
-          runCommand(cmd);
-          return false;
-        }
-      })
-      .val('');
-
-    cwdList.append(cwdSubs);
 
     cwdHistory.forEach(function(d) {
       var cwdHistoryItem = cwdHistoryItemProto.clone();

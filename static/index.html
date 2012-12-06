@@ -26,10 +26,23 @@ limitations under the License.
     <div id="header">
       <h1>Plush <small>– the comfy shell</small></h1>
       <div id="header-info">
-        <p><small>logged in as</small>
+        <div><small>logged in as</small>
               <span class="info" data-cmd="logname">-</span>
            <small>on</small>
               <span class="info" data-cmd="uname -n">-</span>
+        </div>
+        <div>
+          <div id="cwd-history">
+            &#x2756;
+            <div class="hidden">
+              <p>Directory History</p>
+              <ol id="cwd-history-list">
+                <li class="cwd-history-item proto"><a href="#"></a></li>
+              </ol>
+            </div>
+          </div>
+          <span id="cwd"><span class="cwd-item proto"><a href="#"></a></span></span>
+        </div>
       </div>
     </div>
     <div id="main">
@@ -65,6 +78,17 @@ limitations under the License.
             </tbody>
           </table>
         </div>
+        <div id="status-vars">
+          Variables
+          <div class="hidden">
+            <p>Environment</p>
+            <dl id="context-env">
+            </dl>
+            <p>Shell Vars</p>
+            <dl id="context-shell">
+            </dl>
+          </div>
+        </div>
       </div>
       <div id="plush-jobs"></div>
       <div id="screen"><div>
@@ -94,33 +118,6 @@ limitations under the License.
           <div id="annotations"></div>
         </div>
       </div></div>
-    </div>
-    <div id="context">
-      <ul class="left">
-        <li id="context-cwd-history">
-          &#x2756;
-          <div class="hidden">
-            <p>Directory History</p>
-            <ol id="context-cwd-history-list">
-              <li class="cwd-history-item proto"><a href="#"></a></li>
-            </ol>
-          </div>
-        </li>
-        <li><ol id="context-cwd"><li class="cwd-item proto"><a href="#"></a></li><li class="cwd-subs proto"><input></input></li></ol></li>
-      </ul>
-      <ul class="right">
-        <li id="context-vars">
-          Variables
-          <div class="hidden">
-            <p>Environment</p>
-            <dl id="context-env">
-            </dl>
-            <p>Shell Vars</p>
-            <dl id="context-shell">
-            </dl>
-          </div>
-        </li>
-      </ul>
     </div>
     <div id="help-holder"></div>
   </body>

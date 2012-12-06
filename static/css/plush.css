@@ -35,19 +35,21 @@ body {
 }
 
 #header {
-  height: 45px;
-  padding: 17px 15px 5px
+  height: 5em;
 }
 
 #header h1 {
-  height: 45px;
-  padding-right: 12px;
-  padding-left: 50px;
   float: left;
+  padding: 0.5em 1em 0 60px;
 }
 
 #header #header-info {
   text-align: right;
+  padding: 0.5em ;
+}
+
+#header #header-info > div {
+  margin: 0 0 1em;
 }
 
 #plush-man-search {
@@ -56,7 +58,7 @@ body {
 
 #screen {
   position: absolute;
-  top: 68px;
+  top: 5em;
   bottom: 0;
   left: 0;
   right: 20em;
@@ -67,14 +69,14 @@ body {
   left: 1em;
   right: 1em;
   top: 1em;
-  bottom: 3.5em;
+  bottom: 1em;
   overflow: hidden;
 }
 
 #status {
   position: absolute;
-  top: 68px;
-  bottom: 3.5em;
+  top: 5em;
+  bottom: 0;
   right: 0;
   width: 20em;
 }
@@ -149,7 +151,7 @@ html {
 #header-info .info {
   border: 1px solid #ccc;
   border-radius: 4px;
-  padding: 1px 2px;
+  padding: 1px 3px;
 }
 
 #screen > div {
@@ -597,98 +599,102 @@ ul.horiz-menu li {
   margin-left: 9em;
 }
 
-#context {
-  height: 2em;
-  z-index: 1;
-  background-color: rgba(229,228,211,1);
-  font-size: 80%;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  color: #919191;
-  padding: 0.625em 1.75em;
-}
 
-#context > ul.left {
-  float: left;
-}
-#context > ul.right {
-  float: right;
-}
-
-#context ul,
-#context ol {
-  display: inline-block;
-}
-
-#context > ul li {
+#cwd-history {
   display: inline;
+  position: relative;
+  padding-right: 1em;
 }
 
-#context > ul li .hidden {
+#cwd-history .hidden {
   position: absolute;
+  top: -0.5em;
+  right: 0.5em;
+  z-index: 100;
+  background-color: rgba(229,228,211,0.9);
+  border: 1px solid #7f7e75;
+  border-radius: 4px;
+  text-align: left;
+  padding: 0.5em 1em;
+}
+
+#cwd-history .hidden { display:  none; }
+#cwd-history:hover .hidden { display: inherit; }
+
+#cwd-history-list > li {
+  list-style-type: none;
+}
+#cwd-history-list > li a {
+  color: #000;
+}
+
+#cwd span {
+  padding: 0 0.5em 0 0;
+}
+
+#cwd span a {
+  color: #000;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1px 3px;
+}
+
+#cwd span + span:after {
+  content: "/";
+  padding: 0 0 0 0.5em;
+}
+
+
+#status-vars {
+  position: absolute;
+  z-index: 0;
   bottom: 0;
-  background-color: rgba(229,228,211,0.7);
+  right: 0;
+  height: 1em;
 }
 
-#context > ul.left li .hidden { left: -9999em; }
-#context > ul.left li:hover .hidden { left: 0; }
-#context > ul.right li .hidden { right: 9999em; }
-#context > ul.right li:hover .hidden { right: 0; }
-
-#context-cwd li {
-  list-style: none;
-  padding: 0 0.5em 0 0;
+#status-vars div.hidden {
+  display: none;
+  position: fixed;
+  bottom: 1em;
+  right: 1em;
+  width: 21.5em;
+  background-color: rgba(229,228,211,0.9);
+  border: 1px solid #7f7e75;
+  border-radius: 4px;
+  text-align: left;
+  padding: 0.5em 1em;
+  z-index: 100;
 }
 
-#context-cwd li a {
+#status-vars:hover div {
+  display: inherit;
 }
 
-#context-cwd li+li:before {
-  content: "›";
-  padding: 0 0.5em 0 0;
-}
-
-#context-cwd-history div {
-  width: 20em;
-  overflow: hidden;
-  padding: 0 2em 2em;
-}
-
-#context #context-cwd-history-list > li {
-  list-style-type: disc;
-  display: list-item;
-}
-
-#context-vars div {
-  width: 20em;
-  overflow: hidden;
-  padding: 0 2em 2em;
-}
-
-#context-vars div p {
+#status-vars div p {
   text-align: center;
   margin-top: 1em;
   margin-bottom: 1em;
 }
 
-#context-vars div dl {
+#status-vars div dl {
   color: #333;
 }
 
-#context-vars div dl dt {
+#status-vars div dl dt {
   width: 8em;
   text-align: right;
   float: left;
   overflow: hidden;
 }
 
-#context-vars div dl dd {
+#status-vars div dl dd {
   margin-left: 9em;
+  margin-bottom: 0.5em;
+  word-break: break-all;
 }
 
-#context-vars div dl .ro {
+#status-vars div dl .ro {
   font-style: italic;
 }
 
