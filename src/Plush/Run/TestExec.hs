@@ -39,6 +39,7 @@ import qualified Data.Text.Lazy.Encoding as LT
 import System.FilePath
 import System.IO.Error
 
+import Plush.Run.BuiltIns
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.Types
@@ -50,7 +51,7 @@ type DirPath = FilePath
 type Name = String
 data Entry = FileItem Int | DirItem
 
-data IType = IDevNull | IFile | IPipe
+data IType = IDevNull | IFile | IExec | IPipe
 data INode = INode IType L.ByteString
 
 data FileSystem = FileSystem
@@ -70,6 +71,15 @@ fsFileExists fs dp n = maybe False isFile $ fsItemEntry fs dp n
   where
     isFile (FileItem _) = True
     isFile _ = False
+
+fsExecutable :: FileSystem -> DirPath -> Name -> Maybe (Utility TestExec)
+fsExecutable fs dp n = fsItemEntry fs dp n >>= iNode >>= getExec
+  where
+    iNode (FileItem i) = I.lookup i (fsStore fs)
+    iNode _ = Nothing
+    getExec (INode IExec _) = M.lookup n testExecs
+    getExec _ = Nothing
+    -- TODO(mzero): should return Either String with erorr messages
 
 fsItemEntry :: FileSystem -> DirPath -> Name -> Maybe Entry
 fsItemEntry _ "/" "." = Just DirItem
@@ -126,15 +136,26 @@ fsTruncFile fs@(FileSystem _tree store) dp n =
 
 initialFileSystem :: FileSystem
 initialFileSystem = foldl' (flip ($)) rootFS $
-    map addDir [("/", "home"), ("/", "tmp"), ("/", "dev"), ("/", "proc")]
+    map addDir [ ("/", "bin")
+               , ("/", "dev")
+               , ("/", "home")
+               , ("/", "tmp")
+               , ("/", "proc")
+               ]
     ++ map addDev [("null", IDevNull)]
     ++ map addPipe ["stdin", "stdout", "stderr"]
+    ++ map addExec (M.keys testExecs)
   where
     rootFS = FileSystem rootTree I.empty
     rootTree = M.singleton "/" M.empty
     addDir (dp, n) fs = fsAddDirectory fs dp n
     addDev (n, itype) fs = fsAddINode itype fs "/dev" n
     addPipe n fs = fsAddINode IPipe fs "/proc" n
+    addExec n fs = fsAddINode IExec fs "/bin" n
+
+
+testExecs :: M.HashMap String (Utility TestExec)
+testExecs = pseudoExecs
 
 
 data FDesc = FDesc {
@@ -152,6 +173,7 @@ iNodeFDesc i itype = FDesc iReadAll iWrite
             Nothing -> return L.empty
             Just (INode IDevNull _) -> return L.empty
             Just (INode IFile bs) -> return bs
+            Just (INode IExec _) -> return L.empty
             Just (INode IPipe bs) -> iSetBuf s L.empty >> return bs
     iWrite as = do
         s <- lift get
@@ -159,6 +181,7 @@ iNodeFDesc i itype = FDesc iReadAll iWrite
             Nothing -> return ()
             Just (INode IDevNull _) -> return ()
             Just (INode IFile bs) -> iSetBuf s (L.append bs as)
+            Just (INode IExec _) -> return ()
             Just (INode IPipe bs) -> iSetBuf s (L.append bs as)
     iSetBuf s nbs = do
         let nis = INode itype nbs
@@ -242,7 +265,7 @@ instance PosixLike TestExec where
     getInitialEnvironment = return
         [ ("HOME", "/home")
         , ("LOGNAME", "tester")
-        , ("PATH", "/usr/bin")
+        , ("PATH", "/bin")
         , ("PWD", "/home")
         , ("SHELL", "/usr/bin/plush")
         , ("TMPDIR", "/tmp")
@@ -255,7 +278,8 @@ instance PosixLike TestExec where
         maybe (raise doesNotExistErrorType "getFileStatus" fp) return stat
     getSymbolicLinkStatus = getFileStatus
 
-    isExecutable p = getFileStatus p >>= return . isRegularFile
+    isExecutable fp = runFilePrim fp $ \_s fs _fpc dpc n -> return $
+        isJust $ fsExecutable fs dpc n
 
     removeLink fp = runFilePrim fp $ \_s fs _fpc dpc n -> do
         fileMustExist "removeLink" fp fs dpc n
@@ -297,10 +321,13 @@ instance PosixLike TestExec where
       where
         homeDirs = [("tester","/home"), ("root","/"), ("nobody","/tmp")]
 
-    execProcess _env fp _args = runFilePrim fp $ \_s fs _fpc dpc n -> do
-        if fsFileExists fs dpc n
-            then exitMsg 126 "TestExec cannot run executables"
-            else exitMsg 127 $ fp ++ ": No such file or directory"
+    execProcess _env fp args = runFilePrim fp $ \_s fs _fpc dpc n -> do
+        case fsExecutable fs dpc n of
+            Just util -> utilExecute util args
+                -- TODO(mzero): doesn't handle environment correctly, but
+                -- currently none of the pseudoExecs care about it
+            Nothing -> exitMsg 127
+                        $ fp ++ ": No such file or directory, or not executable"
 
     pipeline [] = return ExitSuccess
     pipeline (c0:cs) = c0 >>= next cs
