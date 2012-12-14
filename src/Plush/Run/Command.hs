@@ -88,12 +88,8 @@ commandSearch cmd
                      -- step 1.d.i.b.: exec from file system
                      external fp
                 else go fps
-        go [] = search builtin withEnvVars (BuiltInCommand "/???") $
-                -- step 1.d.ii.: not found on PATH
+        go [] = -- step 1.d.ii.: not found on PATH
                 unknown
-            -- TODO: technically shouldn't run the builtins if not found in
-            -- during path search. But for now, since the test environemnt
-            -- doesn't have them, this will fail to run anything!
 
     search lkup processBindings fc alt =
         maybe alt (\util ->

@@ -18,6 +18,7 @@ module Plush.Run.BuiltIns (
     special,
     direct,
     builtin,
+    pseudoExecs
     )
 where
 
@@ -33,6 +34,7 @@ import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.WorkingDirectory
 import Plush.Run.Posix
 import Plush.Run.ShellExec
+import Plush.Run.Types
 
 
 -- | Special Built-In Utilities (§2.14)
@@ -84,18 +86,40 @@ direct = flip M.lookup $ M.fromList $ map (fixup unDirect)
 -- affect the shell state.
 builtin :: (PosixLike m) => String -> Maybe (ShellUtility m)
 builtin = flip M.lookup $ M.fromList $ map (fixup unBuiltIn)
+    alwaysBuiltin
+
+-- | Utilities that should act as executables in the TestExec monad.
+-- These will be found by path search, and then "executed". TestExec arranges
+-- that when the corresponding files are exectued, these run.
+pseudoExecs :: (PosixLike m) => M.HashMap String (Utility m)
+pseudoExecs = M.fromList $ map (fixup unUtility) $
+    alwaysBuiltin ++ otherBuiltins
+
+
+-- | Utilities that are always built into the shell. They are also available
+-- as exectuables (in TestExec), since they are subject to path search and
+-- won't be executed (even as builtin) unless they are found and exectuable.
+--
+-- Only put utilities on this list that fully implement the Posix behavior,
+-- as they will override the executables on the user's system.
+alwaysBuiltin :: (PosixLike m) => [(String, BuiltInUtility m)]
+alwaysBuiltin =
+    [ ("echo", echo)
+    , ("recho", recho)
+    ]
+
+-- | Utilities that are only available as executables from the TestExec monad.
+otherBuiltins :: (PosixLike m) => [(String, BuiltInUtility m)]
+otherBuiltins =
     [ ("cat", cat)
-    , ("echo", echo)
 --  , ("egrep", egrep)  -- TODO: enable once regular expressions are implemented
     , ("fgrep", fgrep)
 --  , ("grep", grep)    -- TODO: enable once regular expressions are implemented
     , ("mkdir", mkdir)
-    , ("recho", recho)
     , ("rm", rm)
     , ("touch", touch)
     , ("tr", tr)
     ]
-
 
 fixup :: (a -> b -> c) -> (a, b) -> (a, c)
 fixup f (a, b) = (a, f a b)

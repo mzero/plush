@@ -18,7 +18,7 @@ module Plush.Run.BuiltIns.Utilities (
 
     -- $types
     SpecialUtility(..), DirectUtility(..), BuiltInUtility(..),
-    unSpecial, unDirect, unBuiltIn,
+    unSpecial, unDirect, unBuiltIn, unUtility,
 
     )
     where
@@ -76,11 +76,19 @@ unBuiltIn name (BuiltInUtility csu) = bindSummary name csu'
         (Utility e a) -> Utility (runLifted e) (runLifted a)
     runLifted exec args = lift $ exec args
 
+unUtility :: (PosixLike m) => String -> BuiltInUtility m -> Utility m
+unUtility name (BuiltInUtility csu) = bindName name csu
 
 bindSummary :: (PosixLike m) =>
     String -> (CommandSummary -> ShellUtility m) -> ShellUtility m
 bindSummary name csu = Utility (bind utilExecute) (bind utilAnnotate)
   where
     bind f args = getSummary name >>= ($args) . f . csu . fromMaybe s0
+    s0 = CommandSummary (T.pack name) T.empty []
+
+bindName :: (PosixLike m) =>
+    String -> (CommandSummary -> Utility m) -> Utility m
+bindName name csu = csu s0
+  where
     s0 = CommandSummary (T.pack name) T.empty []
 
