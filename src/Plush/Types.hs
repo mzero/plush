@@ -131,7 +131,7 @@ data Location = Span Int Int  -- ^ character postion [start,end)
     deriving (Eq, Ord, Show)
 
 instance Hashable Location where
-    hash (Span s e) = combine (hash s) (hash e)
+    salt `hashWithSalt` (Span s e) = salt `hashWithSalt` s `hashWithSalt` e
 
 
 modifyParts :: (Parts -> Parts) -> Word -> Word
