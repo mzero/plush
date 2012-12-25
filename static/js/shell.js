@@ -118,7 +118,7 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
 
   var commandlineKeydown = input.keyHandler({
     'RETURN':               function() { runCommandline(); },
-    'SPACE, LEFT, RIGHT':   function() { return input.STOP_PROPIGATION; }
+    'SPACE, LEFT, RIGHT':   function() { return input.STOP_PROPAGATION; }
   });
 
   commandline.keydown(function(e) {

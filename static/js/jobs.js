@@ -103,14 +103,22 @@ function($, api, util, input){
     }
   });
 
-  scrollback.on('keydown', '.input-container input', function(e) {
-    if (e.keyCode == 13) {
-      var s = $(this).val() + '\n';
-      jobFromElement(this).sender(s);
-      $(this).val('');
-      return false;
+  var inputKeydown = input.keyHandler({
+    bindings: {
+      'RETURN': 'sendInput',
+      'SPACE':  function() { return input.STOP_PROPAGATION; }
+    },
+    functions: {
+      sendInput: function(inputElem) {
+        var s = $(inputElem).val() + '\n';
+        jobFromElement(inputElem).sender(s);
+        $(inputElem).val('');
+      }
     }
   });
+
+  scrollback.on('keydown', '.input-container input',
+    function(e) { return inputKeydown(e, this); });
 
   scrollback.on('click', '.send-eof',
     function(e) { jobFromElement(this).sender('\x04'); });
@@ -156,7 +164,7 @@ function($, api, util, input){
       'ALT+2':            function(j) { j.sizeOutput('page'); },
       'ALT+3':            function(j) { j.sizeOutput('full'); },
 
-      'CTRL+D':           function(j) { j.sender('\0x04'); },
+      'CTRL+D':           function(j) { j.sender('\x04'); },
       'CTRL+C':           function(j) { j.signaler('int'); },
       'CTRL+BACK_SLASH':  function(j) { j.signaler('quit'); },
       'CTRL+9':           function(j) { j.signaler('kill'); }

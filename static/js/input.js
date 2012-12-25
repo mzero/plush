@@ -53,7 +53,7 @@
 // handling, one of the following exported values can be returned:
 //    PASS    -- continue to pass on the event for processing
 //    HANDLED -- stop all further event processing, same as returning undefined
-//    STOP_PROPIGATION -- continue processing event on the current DOM element,
+//    STOP_PROPAGATION -- continue processing event on the current DOM element,
 //                        but no longer propigate it
 
 define(['jquery'], function($) {
@@ -278,7 +278,7 @@ define(['jquery'], function($) {
   // handler completion codes
   var PASS = 0;
   var HANDLED = 1;
-  var STOP_PROPIGATION = 2;
+  var STOP_PROPAGATION = 2;
 
 
   function findHandler(lookup, e) {
@@ -299,7 +299,7 @@ define(['jquery'], function($) {
       if (h === undefined) return;
       switch (h(t)) {
         case PASS: return;
-        case STOP_PROPIGATION: e.stopPropagation(); return;
+        case STOP_PROPAGATION: e.stopPropagation(); return;
         default: return false;
       }
     }
@@ -308,7 +308,7 @@ define(['jquery'], function($) {
   return {
     PASS: PASS,
     HANDLED: HANDLED,
-    STOP_PROPIGATION: STOP_PROPIGATION,
+    STOP_PROPAGATION: STOP_PROPAGATION,
     keyHandler: keyHandler
   };
 });
