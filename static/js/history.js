@@ -27,35 +27,83 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   }
 
   var historyJobs = Object.create(null);
-  var historyOutputToFetch = [];
-  var HISTORY_STARTUP_DELAY = 100;
-  var OUTPUT_UPDATE_RATE = 50;
-  var OUTPUT_PREFETCH = 0;
+  var HISTORY_STARTUP_DELAY = 1;
+  var HISTORY_UPDATE_RATE = 200;
 
   function listResult(items) {
+    // first, regroup these by job
+    var byJob = Object.create(null);
+    var jobList = [];
     for (var i in items) {
       var item = items[i];
       var job = item.job;
-      if (!(job in historyJobs)) {
-        historyJobs[job] = true;
-        historyOutputToFetch.push(job);
+      if (!(job in byJob)) {
+        byJob[job] = [];
+        jobList.push(job);
       }
-      if ('cmd' in item) {
-        addEntry(item.cmd);
-        var j = jobs.newJob(item.cmd, job, true);
-        historyJobs[job] = j;
-        j.setDeferredOutput(fetchOutput);
+      byJob[job].push(item);
+    }
+
+    // process them some at a time
+    function handleSome() {
+      var addThisRound = 8;
+        // Sometimes the height of a job is non-integral, but scrollTop can
+        // only be set in integral pixels. Since we've only seen fractions of
+        // 0.5 in the height, this value should be a multiple of 2. Setting to
+        // a power of two just to be cautious.
+
+      var insaneScrollPosition = 4000000; // must be bigger than we ever expect
+      var scrollback = $('#scrollback');
+      var scrollPos0 = scrollback.scrollTop();
+      scrollback.scrollTop(insaneScrollPosition);
+      var scrollMax0 = scrollback.scrollTop();
+        // Remember where the scroll position was, and how big the scrolling
+        // area was. There is no call toactually measure the later, so scroll to
+        // insaneScrollPosition, and read back the maximum scroll position value
+        // which is used as a proxy for height. (Which works so long as the
+        // window doesn't resize during this operaiton.)
+
+      while (jobList.length > 0           // as long as there are jobs....
+          && (scrollback.scrollTop() == 0 // ... and more space to fill
+             || addThisRound > 0)) {      // ... or we've added enough
+        var job = jobList.pop();          // needs to be newest -> oldest
+        var jobItems = byJob[job];
+        delete byJob[job];
+        addThisRound -= 1;
+
+        for (var k in jobItems) {
+          var item = jobItems[k];
+          if ('cmd' in item) {
+            addEntry(item.cmd);
+            var j = jobs.addHistoricalJob(item.cmd, job);
+            historyJobs[job] = j;
+            j.setDeferredOutput(fetchOutput);
+          }
+          else {
+            handleHistoryItem(item);
+          }
+        }
+        scrollback.scrollTop(insaneScrollPosition);
+          // Scrolling to the end. When we read back the scroll position at the
+          // top of loop, it will be non-zero if filled up the area enough to
+          // scroll at all.
       }
-      else {
-        handleHistoryItem(item);
+
+      scrollback.scrollTop(insaneScrollPosition);
+      var scrollMax1 = scrollback.scrollTop();
+      var scrollPos1 = scrollPos0 + (scrollMax1 - scrollMax0);
+      scrollback.scrollTop(scrollPos1);
+        // Using the same technique to find the maximum scroll position after
+        // adding all the entries, now reset the scroll position to where it
+        // started, but adjusting for the measured increase in height.
+
+      if (jobList.length > 0) {
+        setTimeout(handleSome, HISTORY_UPDATE_RATE);
       }
     }
-    if (OUTPUT_PREFETCH > 0) {
-      historyOutputToFetch = historyOutputToFetch.splice(-OUTPUT_PREFETCH);
-      setTimeout(streamFetch, OUTPUT_UPDATE_RATE);
-    } else {
-      historyOutputToFetch = [];
-    }
+
+    // kick it off
+    handleSome();
   }
 
   function fetchOutput(job) {
@@ -66,18 +114,6 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     for (var i in items) {
       handleHistoryItem(items[i]);
     }
-  }
-
-  function streamFetch() {
-    var job = historyOutputToFetch.pop();
-    if (job) {
-      api.api('history', { historyOutput: [ job ]}, streamResult);
-    }
-  }
-
-  function streamResult(items) {
-    outputResult(items);
-    setTimeout(streamFetch, OUTPUT_UPDATE_RATE);
   }
 
   function handleHistoryItem(item) {

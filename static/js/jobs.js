@@ -188,7 +188,12 @@ function($, api, util, input){
     var node = jobProto.clone();
     node.attr('data-job', job);
     node.find('.command').text(cmd);
-    node.appendTo(scrollback);
+    if (historical) {
+      node.prependTo(scrollback);
+    } else {
+      node.appendTo(scrollback);
+      util.scrollIntoView(scrollback, node);
+    }
 
     var output = node.find('.output-container');
     var outputArea = output.find('.output');
@@ -261,13 +266,10 @@ function($, api, util, input){
       takeTopic: takeTopic
     });
 
-    util.scrollIntoView(scrollback, node);
-
     var input = node.find('.input-container');
     if (historical) {
       input.remove();
       input = null;
-
     } else {
       input.find('input').focus();
     }
@@ -414,7 +416,8 @@ function($, api, util, input){
 
 
   return {
-    newJob: newJob,
+    newJob:           function(cmd, job) { return newJob(cmd, job, false); },
+    addHistoricalJob: function(cmd, job) { return newJob(cmd, job, true); },
     fromJob: fromJob,
     unknownJob: unknownJob,
 
