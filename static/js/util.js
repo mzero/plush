@@ -39,7 +39,12 @@ define(['jquery'], function($){
     }
   }
 
+  function escapeShellArgument(text) {
+    return text.replace(/[ \n\\'"$&|;<>]/g, "\\$&");
+  }
+
   return {
-    scrollIntoView: scrollIntoView
+    scrollIntoView: scrollIntoView,
+    escapeShellArgument: escapeShellArgument
   };
 });

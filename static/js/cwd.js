@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery'], function($) {
+define(['jquery', 'util'], function($, util) {
   "use strict";
 
   var cwdHistory = [];
@@ -36,8 +36,8 @@ define(['jquery'], function($) {
     var dirSoFar = "";
     ['/'].concat(cwd.split('/')).forEach(function(piece) {
       if ("" !== piece) {
-        dirSoFar = dirSoFar + piece + (piece == '/' ? '' : '/');
-        var cmd = 'cd ' + dirSoFar;
+        dirSoFar = dirSoFar + piece + (piece === '/' ? '' : '/');
+        var cmd = 'cd ' + util.escapeShellArgument(dirSoFar);
         var cwdItem = cwdItemProto.clone();
         cwdItem.find('a')
           .text(piece)

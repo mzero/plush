@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'api'], function($, api) {
+define(['jquery', 'api', 'util'], function($, api, util) {
   "use strict";
 
   var lsStatusPane = $('#status-ls');
@@ -78,7 +78,7 @@ define(['jquery', 'api'], function($, api) {
     }
 
     if (file.type === 'd' || linkToDir) {
-      var cmd = 'cd ' + dir + '/' + file.name;
+      var cmd = 'cd ' + util.escapeShellArgument(dir + '/' + file.name);
 
       $('<a>')
         .prop('href', '#')
@@ -140,14 +140,14 @@ define(['jquery', 'api'], function($, api) {
 
   function updateStatusPane(cwd, runCommand) {
     runCommandFn = runCommand;
-    var lsCmd = 'ls -lF ' + cwd;
+    var lsCmd = 'ls -lF ' + util.escapeShellArgument(cwd);
     api.runStatus(lsCmd, function (d) { statusResults(cwd, d); });
   }
 
   function parseLsOutput(out) {
     var files = [];
 
-    out.split("\n").slice(1, -1).forEach(function(line) {
+    out.split(/\r?\n/).slice(1, -1).forEach(function(line) {
       var items = line.split(/ +/);
       var mode = items[0];
       var type = mode.substring(0, 1);
@@ -164,20 +164,20 @@ define(['jquery', 'api'], function($, api) {
       }
 
       if (type === 'b' || type === 'c') {
-        var extra = items.length - 9;
-        file.deviceInfo = items.slice(4, 5 + extra).join(" ");
-        file.datetime = items.slice(5 + extra, 8 + extra).join(" ");
-        file.name = items[8 + extra];
+        file.deviceInfo = items.slice(4, 6).join(" ");
+        file.datetime = items.slice(6, 9).join(" ");
+
+        file.name = line.match(/^([^ ]+[ ]+){9}(.+)$/)[2];
       } else {
         file.size = items[4];
         file.datetime = items.slice(5, 8).join(" ");
-        file.name = items[8];
 
         if (type === 'l') {
-          if (items.length !== 11) {
-            console.error('unexpected ls line:', items);
-          }
-          file.target = items[10];
+          var nameAndTarget = line.match(/^([^ ]+[ ]+){8}(.+)$/)[2].split(' -> ');
+          file.name = nameAndTarget[0];
+          file.target = nameAndTarget[1];
+        } else {
+          file.name = line.match(/^([^ ]+[ ]+){8}(.+)$/)[2];
         }
       }
 

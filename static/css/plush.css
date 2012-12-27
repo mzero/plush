@@ -548,6 +548,7 @@ ul.horiz-menu li {
 
 #status-ls .file .name {
   text-decoration: underline;
+  white-space: pre-wrap;
 }
 
 #status-ls .file .name.type-- {
