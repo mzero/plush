@@ -457,11 +457,16 @@ h1,h2,h3,h4,blockquote,q {
   display: inherit;
 }
 
-#history .command {
+#history pre {
   white-space: pre-wrap;
   margin: 0.5em 1.5em 0;
 }
 
+#history .count {
+  color: #777;
+  font-style: italic;
+  float: right;
+}
 #history .focus {
   background-color: #ffe;
 }

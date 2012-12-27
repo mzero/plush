@@ -19,12 +19,43 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   var historyItemProto = historyPanel.children('.proto')
     .detach()
     .removeClass('proto');
+  var historyList = Object.create(null);
 
-  function addEntry(cmd) {
+  function addEntry(cmd, historical) {
+    var key = 'h-' + cmd;
     var item = historyItemProto.clone();
     item.find('.command').text(cmd);
-    historyPanel.append(item);
+
+    if (key in historyList) {
+      var entry = historyList[key];
+      var duplicateItem;
+      var countingItem;
+      if (historical) {
+        duplicateItem = item;
+        countingItem = entry.item;
+      } else {
+        duplicateItem = entry.item;
+        countingItem = item;
+      }
+      entry.count += 1;
+      duplicateItem.data('duplicate', true);
+      duplicateItem.find('.count').text('');
+      countingItem.find('.count').text(' ×' + entry.count);
+    } else {
+      historyList[key] = {
+        count: 1,
+        item: item
+      }
+    }
+
+    if (historical) {
+      historyPanel.prepend(item);
+    } else {
+      historyPanel.append(item);
+    }
   }
+
+  function addHistoricalEntry(cmd) { addEntry(cmd, true); }
 
   var historyJobs = Object.create(null);
   var HISTORY_STARTUP_DELAY = 1;
@@ -74,7 +105,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
         for (var k in jobItems) {
           var item = jobItems[k];
           if ('cmd' in item) {
-            addEntry(item.cmd);
+            addHistoricalEntry(item.cmd);
             var j = jobs.addHistoricalJob(item.cmd, job);
             historyJobs[job] = j;
             j.setDeferredOutput(fetchOutput);
@@ -172,7 +203,9 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     historyPanel.children() // NOTE: faster than .find('.item')
       .each(function(idx) {
           var n = $(this);
-          if (s.length === 0 || n.find('.command').text().indexOf(s) >= 0) {
+          if (s.length === 0 || 
+              (n.data('duplicate') !== true
+               && n.find('.command').text().indexOf(s) >= 0)) {
             n.addClass('match');
           } else {
             n.removeClass('match');
@@ -275,7 +308,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     HISTORY_STARTUP_DELAY);
 
   return {
-    addEntry: addEntry,
+    addEntry: function(cmd) { addEntry(cmd, false); },
     keydown: keydown,
     commandChange: commandChange
   };
