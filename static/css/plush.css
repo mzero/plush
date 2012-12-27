@@ -627,6 +627,7 @@ ul.horiz-menu li {
 }
 #cwd-history-list > li a {
   color: #000;
+  white-space: pre;
 }
 
 #cwd span {

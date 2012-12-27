@@ -15,8 +15,6 @@
 define(['jquery', 'util'], function($, util) {
   "use strict";
 
-  var cwdHistory = [];
-
   var cwdList = $('#cwd');
 
   var cwdItemProto = cwdList.children('.cwd-item.proto')
@@ -46,9 +44,15 @@ define(['jquery', 'util'], function($, util) {
       }
     });
 
+    var cwdHistory = [];
+
+    if (localStorage.getItem('cwdHistory')) {
+      cwdHistory = JSON.parse(localStorage.getItem('cwdHistory'));
+    }
+
     cwdHistory.forEach(function(d) {
       var cwdHistoryItem = cwdHistoryItemProto.clone();
-      var cmd = 'cd ' + d;
+      var cmd = 'cd ' + util.escapeShellArgument(d);
 
       cwdHistoryItem.find('a')
         .text(d)
@@ -57,8 +61,10 @@ define(['jquery', 'util'], function($, util) {
       cwdHistoryList.append(cwdHistoryItem);
     });
 
-    if (cwdHistory.length == 0 || cwdHistory[cwdHistory.length - 1] !== cwd) {
-      cwdHistory.push(cwd);
+    if (cwdHistory.length == 0 || cwdHistory[0] !== cwd) {
+      cwdHistory.unshift(cwd);
+
+      localStorage.setItem('cwdHistory', JSON.stringify(cwdHistory));
     }
   }
 
