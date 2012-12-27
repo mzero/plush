@@ -88,7 +88,8 @@ body {
   overflow: scroll;
 }
 
-#scrollback {
+#scrollback,
+#history {
   overflow: auto;
   position: absolute;
   top: 0.75em;
@@ -97,7 +98,8 @@ body {
   right: 0.5em;
 }
 
-#scrollback > * {
+#scrollback > *,
+#history > * {
   padding-left: 1em;
 }
 
@@ -441,20 +443,30 @@ h1,h2,h3,h4,blockquote,q {
   z-index: 1;
 }
 
-.history-search {
+#history {
   background-color: #ffc;
-}
-
-.history-search .job .view-controls,
-.history-search .job .output-container {
   display: none;
 }
 
-.history-search .job.history-focus {
+#history .item {
+  border-left: 2px solid #fff;
+  margin: 0.5em 0;
+  display: none;
+}
+#history .item.match {
+  display: inherit;
+}
+
+#history .command {
+  white-space: pre-wrap;
+  margin: 0.5em 1.5em 0;
+}
+
+#history .focus {
   background-color: #ffe;
 }
 
-.history-search .job.history-focus .command {
+#history .focus .command {
   font-weight: bold;
   padding-left: 0.5em;
 }

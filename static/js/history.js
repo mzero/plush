@@ -15,6 +15,17 @@
 define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   "use strict";
 
+  var historyPanel = $('#history');
+  var historyItemProto = historyPanel.children('.proto')
+    .detach()
+    .removeClass('proto');
+
+  function addEntry(cmd) {
+    var item = historyItemProto.clone();
+    item.find('.command').text(cmd);
+    historyPanel.append(item);
+  }
+
   var historyJobs = Object.create(null);
   var historyOutputToFetch = [];
   var HISTORY_STARTUP_DELAY = 100;
@@ -30,6 +41,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
         historyOutputToFetch.push(job);
       }
       if ('cmd' in item) {
+        addEntry(item.cmd);
         var j = jobs.newJob(item.cmd, job, true);
         historyJobs[job] = j;
         j.setDeferredOutput(fetchOutput);
@@ -98,55 +110,47 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   var searchFocus = null;
   var searchPriorFocus = null;
   var searchLastDir = -1;
-  var scrollback;
   var commandline;
 
   function startSearch(dir) {
     searchMode = true;
     searchFocus = null;
     searchLastDir = dir;
-    scrollback = $('#scrollback');
-    scrollback.addClass('history-search');
+    historyPanel.show();
     commandline = $('#commandline');
     commandline.focus();
     search();
   }
 
   function cancelSearch() {
-    scrollback.removeClass('history-search');
-    var j = scrollback.find('.job');
-    j.show('fast')
-    j.removeClass('history-match history-focus');
+    historyPanel.hide();
+    if (searchFocus) searchFocus.removeClass('focus');
     searchMode = false;
     searchFocus = null;
     searchPriorFocus = null;
     commandline.focus();
   }
 
-  var ANIM_SPEED = 100;
-
   function search() {
     var s = commandline.val() || '';
-    scrollback.find('.job')
+    historyPanel.children() // NOTE: faster than .find('.item')
       .each(function(idx) {
           var n = $(this);
           if (s.length === 0 || n.find('.command').text().indexOf(s) >= 0) {
-            n.show(ANIM_SPEED);
-            n.addClass('history-match');
+            n.addClass('match');
           } else {
-            n.hide(ANIM_SPEED);
-            n.removeClass('history-match');
+            n.removeClass('match');
           }
         });
-    if (!searchFocus || !(searchFocus.hasClass('history-match'))) {
+    if (!searchFocus || !(searchFocus.hasClass('match'))) {
       nextFocus(searchLastDir);
     }
-    setTimeout(rescrollMatch, ANIM_SPEED);
+    setTimeout(rescrollMatch, 10);
   }
 
   function rescrollMatch() {
     if (searchFocus) {
-      util.scrollIntoView(scrollback, searchFocus);
+      util.scrollIntoView(historyPanel, searchFocus);
     }
   }
 
@@ -167,7 +171,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
   }
 
   function focusEdge(dir) {
-    var js = scrollback.find('.history-match');
+    var js = historyPanel.find('.match');
     switch (dir) {
       case -1: return js.first();
       case  1: return js.last();
@@ -179,15 +183,15 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     if (searchFocus) {
       searchPriorFocus = searchFocus;
       switch (dir) {
-        case -1: next = searchFocus.prevAll('.history-match').first();  break;
-        case  1: next = searchFocus.nextAll('.history-match').first(); break;
+        case -1: next = searchFocus.prevAll('.match').first();  break;
+        case  1: next = searchFocus.nextAll('.match').first(); break;
       }
-      searchFocus.removeClass('history-focus');
+      searchFocus.removeClass('focus');
       if (next === null || next.length === 0) {
         next = focusEdge(dir);
       }
     } else {
-      if (searchPriorFocus && searchPriorFocus.hasClass('history-match')) {
+      if (searchPriorFocus && searchPriorFocus.hasClass('match')) {
         next = searchPriorFocus;
       } else {
         next = focusEdge(-dir);
@@ -196,8 +200,8 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
       }
     }
     if (next && next.length > 0) {
-      next.addClass('history-focus');
-      util.scrollIntoView(scrollback, next);
+      next.addClass('focus');
+      util.scrollIntoView(historyPanel, next);
       searchFocus = next;
     } else {
       searchFocus = null;
@@ -235,6 +239,7 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     HISTORY_STARTUP_DELAY);
 
   return {
+    addEntry: addEntry,
     keydown: keydown,
     commandChange: commandChange
   };

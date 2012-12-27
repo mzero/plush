@@ -15,6 +15,10 @@
 define(['jquery'], function($){
   'use strict';
 
+  function escapeShellArgument(text) {
+    return text.replace(/[ \n\\'"$&|;<>]/g, "\\$&");
+  }
+
   function scrollIntoView(scroller, inner, offset) {
     var sTop = scroller.scrollTop();
     var sBottom = sTop + scroller.height();
@@ -39,12 +43,22 @@ define(['jquery'], function($){
     }
   }
 
-  function escapeShellArgument(text) {
-    return text.replace(/[ \n\\'"$&|;<>]/g, "\\$&");
+  // Use this to debug the timing of any function. Usage:
+  //    function foo(x, y) { ... }
+  //    foo = util.timeFn(foo);
+  function timeFn(f) {
+    return function() {
+      var tStart = new Date();
+      var result = f.apply(this, arguments);
+      var tEnd = new Date();
+      console.log(f.name + ' took ' + (tEnd - tStart) + 'ms');
+      return result;
+    };
   }
-
+  
   return {
+    escapeShellArgument: escapeShellArgument,
     scrollIntoView: scrollIntoView,
-    escapeShellArgument: escapeShellArgument
+    timeFn: timeFn
   };
 });

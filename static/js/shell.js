@@ -96,6 +96,7 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   function runCommand(cmd) {
     var j = jobs.newJob(cmd);
     api.runUser(cmd, jobOutput, j.job)
+    history.addEntry(cmd);
   }
 
   function runCommandline() {
