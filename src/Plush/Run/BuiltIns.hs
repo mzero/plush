@@ -27,6 +27,7 @@ import qualified Data.HashMap.Strict as M
 import Plush.Run.BuiltIns.Evaluation
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
+import Plush.Run.BuiltIns.Plush
 import Plush.Run.BuiltIns.ShellState
 import Plush.Run.BuiltIns.Text
 import Plush.Run.BuiltIns.Trivial
@@ -53,6 +54,7 @@ special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
     , ("shift", shift)
     , (".", dot)
     , ("eval", eval)
+    , ("plush-version", plushVersion)
     ]
     -- eventually will include:
     -- break, continue, exec, exit

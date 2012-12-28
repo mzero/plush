@@ -5,7 +5,7 @@ License-file:    LICENSE
 Author:          Mark Lentczner
 Maintainer:      markl@glyphic.com
 Category:        Utility
-Build-type:      Simple
+Build-type:      Custom
 Cabal-version:   >=1.8
 Synopsis:        the comfy shell
 Description:
@@ -70,6 +70,7 @@ Library
     Plush.Run.BuiltIns.Evaluation
     Plush.Run.BuiltIns.FileSystem
     Plush.Run.BuiltIns.Grep
+    Plush.Run.BuiltIns.Plush
     Plush.Run.BuiltIns.ShellState
     Plush.Run.BuiltIns.Syntax
     Plush.Run.BuiltIns.Text

@@ -50,7 +50,7 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   }
 
   function runInfoGather() {
-    $('#header-info .info').each(function() {
+    $('#header .info').each(function() {
       var elem = $(this);
       api.runStatus(elem.data('cmd'), function (d) {
         if ('stdout' in d) {
