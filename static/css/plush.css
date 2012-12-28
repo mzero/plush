@@ -117,18 +117,21 @@ body {
   z-index: 0;
 }
 
-#input-area #prompt {
+#prompt,
+#prompt-picker {
   position: absolute;
   left: 0;
-  border: none;
-  padding: 0.5em 0 0 0.6em;
+  bottom: 0;
+  width: 3em;
+  padding: 0.5em 0;
+  text-align: center;
 }
 
 input#commandline {
   z-index: 2;
   position: absolute;
-  top: 0.5em;
-  left: 2em;
+  bottom: 0.5em;
+  left: 3em;
   right: 0;
 }
 
@@ -177,10 +180,28 @@ html {
   border-top: 2px solid #dedcbe;
 }
 
-#input-area #prompt {
-  border: none;
+#prompt,
+#prompt-picker {
   color: #045f9e;
 }
+
+#prompt-picker {
+  background: #ffc;
+  padding: 0.5em 0 2em;
+  display: none;
+}
+#prompt-picker li {
+  list-style: none;
+}
+#prompt-picker a {
+  display: block;
+  text-align: center;
+  padding: 0.25em 0;
+}
+#prompt-picker a:hover {
+  background: #cbcba3;
+  text-decoration: none;
+} 
 
 input#commandline {
   font-family: monospace;

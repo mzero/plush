@@ -20,6 +20,23 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   var screen = $('#screen');
   var commandline = $('#commandline');
 
+  var prompt = $('#prompt');
+  var promptPicker = $('#prompt-picker');
+
+  var storedPrompt = localStorage.getItem('prompt');
+  if (storedPrompt) {
+    prompt.text(storedPrompt)
+  }
+  prompt.click(function() {
+    promptPicker.show();
+  });
+  promptPicker.on('click', 'a', function() {
+    var newPrompt = $(this).text();
+    prompt.text(newPrompt);
+    promptPicker.fadeOut(100);
+    localStorage.setItem('prompt', newPrompt);
+    return false;
+  });
 
   function updateContext(ctx) {
     if (ctx.cwd) {
