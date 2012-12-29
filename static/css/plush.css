@@ -38,9 +38,21 @@ body {
   height: 5em;
 }
 
+#header .links {
+  float: left;
+  margin: 0.5em 0;
+  padding: 0.25em 1em;
+  border-right: 1px solid #d5d5d5;
+}
+#header .links a {
+  display: block;
+}
+
+
 #header h1 {
   float: left;
   padding: 0.5em 1em 0 60px;
+  height: 2em;
 }
 #header .version {
   text-align: right;
@@ -136,7 +148,6 @@ input#commandline {
 }
 
 
-
 /* @end */
 
 /* @group Style */
@@ -155,7 +166,11 @@ html {
 
 #header {
  color: #91959c;
- background: #f5f5f5 url(../img/chair-tiny.png) no-repeat 10px 11px;
+ background: #f5f5f5;
+}
+
+#header h1 {
+ background: url(../img/chair-tiny.png) no-repeat 10px 11px;
 }
 
 #header-info .info {
@@ -290,15 +305,13 @@ h1,h2,h3,h4,blockquote,q {
 }
 
 #header h1 {
-  font-size: 27px;
+  font-size: 200%;
   font-weight: 300;
-  line-height: 1.52;
-  text-shadow: 0 1px 1px #fff;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 #header .version {
-  font-size: 10px;
+  font-size: 40%;
   font-weight: normal;
   color: #ccc;
 }
@@ -307,8 +320,16 @@ h1,h2,h3,h4,blockquote,q {
   color: #333;
 }
 
+#header .links a {
+  font-size: 80%;
+  color: #ccc; 
+}
+
+#header .links a:hover {
+  color: #333;
+}
+
 #header a {
-  color: #91959c;
   text-decoration: none
 }
 

@@ -60,6 +60,7 @@ define(['jquery', 'input'], function($, input) {
   }
 
   return {
+    start: startHelp,
     keydown: helpKeydown
   }
 });

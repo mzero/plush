@@ -20,23 +20,51 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   var screen = $('#screen');
   var commandline = $('#commandline');
 
-  var prompt = $('#prompt');
-  var promptPicker = $('#prompt-picker');
+  function setupPromptPicker() {
+    var prompt = $('#prompt');
+    var promptPicker = $('#prompt-picker');
 
-  var storedPrompt = localStorage.getItem('prompt');
-  if (storedPrompt) {
-    prompt.text(storedPrompt)
+    var storedPrompt = localStorage.getItem('prompt');
+    if (storedPrompt) {
+      prompt.text(storedPrompt)
+    }
+    prompt.click(function() {
+      promptPicker.show();
+    });
+    promptPicker.on('click', 'a', function() {
+      var newPrompt = $(this).text();
+      prompt.text(newPrompt);
+      promptPicker.fadeOut(100);
+      localStorage.setItem('prompt', newPrompt);
+      return false;
+    });
   }
-  prompt.click(function() {
-    promptPicker.show();
-  });
-  promptPicker.on('click', 'a', function() {
-    var newPrompt = $(this).text();
-    prompt.text(newPrompt);
-    promptPicker.fadeOut(100);
-    localStorage.setItem('prompt', newPrompt);
-    return false;
-  });
+
+  function setupLinks() {
+    $('#show-help').click(function() {
+      help.start();
+      console.log("show-help clicked");
+      return false;
+    });
+    var reportHrefUpdated = false;
+    $('#report-bug').click(function() {
+       console.log("report-bug clicked");
+     if (!reportHrefUpdated) {
+        var href = $(this).attr('href');
+        var version = $('#header .version').text();
+        if (version) {
+          href += '&labels=Version-' + encodeURIComponent(version);
+        }
+        var description =
+        href += '&comment=' + encodeURIComponent(
+            "Steps to reproduce:\n\n\n"
+            + "Expected result:\n\n\n"
+            + "OS & browser info:\n" + navigator.userAgent + "\n");
+        $(this).attr('href', href);
+        reportHrefUpdated = true;
+      }
+    });
+  }
 
   function updateContext(ctx) {
     if (ctx.cwd) {
@@ -179,6 +207,8 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
 
 
   commandline.focus();
+  setupPromptPicker();
+  setupLinks();
   runInfoGather();
   runContext();
 });
