@@ -21,11 +21,13 @@ module Plush.Utilities (
     readUtf8File,
     getDataResource,
     getStaticResource,
+    displayVersion,
     )
     where
 
 import qualified Data.ByteString as B
 import Data.Maybe (listToMaybe)
+import Data.Version (Version(..), showVersion)
 import System.IO
 
 #ifdef PRODUCTION
@@ -34,8 +36,8 @@ import Data.FileEmbed
 import System.Directory (getCurrentDirectory, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>))
 import System.Posix (getEnv)
-import qualified Paths_plush as CabalPaths
 #endif
+import qualified Paths_plush as CabalPaths
 
 
 -- | The missing read function. The string must parse entirely for this to
@@ -94,3 +96,11 @@ getDataDir = do
                 then return d
                 else getCurrentDirectory
 #endif
+
+
+displayVersion :: String
+displayVersion = headOr (showVersion v) $ reverse $ versionTags v
+  where
+    v = CabalPaths.version
+    headOr def [] = def
+    headOr _ (a:_) = a

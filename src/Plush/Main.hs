@@ -41,6 +41,7 @@ data Options = Options
 optionsDescr :: [OptDescr (Options -> Options)]
 optionsDescr =
     [ Option ['?'] ["help"] (NoArg setHelp)     "help (this message)"
+    , Option [] ["version"] (NoArg setVersion)  "print vesion and exit"
     , Option ['c'] [] (NoArg setReadArgMode)    "read commands from 1st arg"
     , Option ['s'] [] (NoArg setReadStdinMode)  "read commands from stdin"
     , Option ['w'] ["webserver"] (NoArg setWebServerMode) "run web server"
@@ -49,6 +50,7 @@ optionsDescr =
     ]
   where
     setHelp opts = opts { optMode = (\_ _ -> usage) }
+    setVersion opts = opts { optMode = (\_ _ -> version) }
     setReadStdinMode opts = opts { optMode = processStdin }
     setReadArgMode opts = opts { optMode = processArg }
     setWebServerMode opts = opts { optMode = runWebServer }
@@ -84,6 +86,9 @@ usageFailure msg = do
     mapM_ (putStrLn . ("*** " ++)) $ lines msg
     usage
     exitFailure
+
+version :: IO ()
+version = putStrLn $ "Plush, the comfy shell, version " ++ displayVersion
 
 
 foreign export ccall plushMain :: IO ()
