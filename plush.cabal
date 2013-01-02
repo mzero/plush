@@ -58,6 +58,7 @@ Library
     Plush.Job
     Plush.Job.History
     Plush.Job.Output
+    Plush.Job.StdIO
     Plush.Job.Types
     Plush.Parser.Aliases
     Plush.Parser.Base

@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,9 @@ module Plush.Job (
     ) where
 
 
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>))
 import Control.Concurrent
-import qualified Control.Exception as Exception
-import Data.Aeson (Value)
+import qualified Control.Monad.Exception as Exception
 import System.Exit
 import System.IO
 import System.Posix
@@ -39,10 +38,11 @@ import qualified System.Posix.Missing as PM
 
 import Plush.Job.History
 import Plush.Job.Output
+import Plush.Job.StdIO
 import Plush.Job.Types
 import Plush.Run
 import Plush.Run.Execute
-import Plush.Run.Posix (stdJsonOutput, write)
+import Plush.Run.Posix (write)
 import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 
@@ -51,10 +51,7 @@ import Plush.Run.ShellExec
 -- | An opaque type, holding information about a running job.
 -- See 'gatherOutput'
 data RunningState = RS {
-       rsStdIn :: Fd -- | this is the FD to write to inject into FD
-     , rsStdOut :: OutputStream Char
-     , rsStdErr :: OutputStream Char
-     , rsJsonOut :: OutputStream Value
+       rsIO :: RunningIO
      , rsProcessID :: Maybe ProcessID
      , rsCheckDone :: IO ()
      , rsHistory :: HistoryFile
@@ -101,102 +98,78 @@ startShell runner = do
     origStdOut <- fdToHandle origOutFd
     origStdErr <- fdToHandle origErrFd
 
+    foregroundRIO <- makeStdIOParts >>= stdIOLocalPrep
+
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
     historyVar <- initHistory runner >>= newMVar
     let st = ShellThread jobRequestVar scoreBoardVar historyVar
-    _ <- forkIO $ shellThread st devNullFd runner
+    _ <- forkIO $ shellThread st foregroundRIO origStdErr runner
 
     return (st, origStdOut, origStdErr)
   where
     upperFd = Fd 20
 
 
-shellThread :: ShellThread -> Fd -> Runner -> IO ()
-shellThread st devNullFd = go
+shellThread :: ShellThread -> RunningIO -> Handle -> Runner -> IO ()
+shellThread st foregroundRIO origStdErr = go
   where
-    go runner = do
-        request <- takeMVar $ stJobRequest st
-
-        (master1, slave1) <- openPseudoTerminal
-        (master2, slave2) <- openPseudoTerminal
-        _ <- slave1 `dupTo` stdInput
-        slave1 `moveTo` stdOutput
-        slave2 `moveTo` stdError
-
-        readFromJsonOutput <- outPipeFor stdJsonOutput
-
-        frs <- RS master1
-                <$> outputStreamUtf8 master1
-                <*> outputStreamUtf8 master2
-                <*> outputStreamJson readFromJsonOutput
-
-        let closeMasters = mapM_ (\fd -> closeFd fd `Exception.catch` ignore)
-                [ master1, master2, readFromJsonOutput ]
-            -- TODO(elaforge): catch something more specific
-            ignore :: Exception.SomeException -> IO ()
-            ignore = const (return ())
-
-        runner' <- runJob st request frs closeMasters runner
-
-        mapM_ (dupTo devNullFd) [0..9] -- keep 'em reserved
+    go runner =
+        (takeMVar (stJobRequest st) >>= runJob st foregroundRIO runner >>= go)
+        `Exception.catchAll`
+        (\e -> hPutStrLn origStdErr (show e) >> go runner)
 
 
-        go runner'
-
-    outPipeFor destFd = createPipe >>= \(r, w) -> w `moveTo` destFd >> return r
-    srcFd `moveTo` destFd = dupTo srcFd destFd >> closeFd srcFd
-
-
-runJob :: ShellThread -> CommandRequest
-    -> (Maybe ProcessID -> IO () -> HistoryFile -> RunningState) -> IO ()
-    -> Runner -> IO Runner
-runJob st cr@(CommandRequest j _ (CommandItem cmd)) frs closeMs r0 = do
+runJob :: ShellThread -> RunningIO -> Runner -> CommandRequest -> IO Runner
+runJob st foregroundRIO r0 cr@(CommandRequest j _ (CommandItem cmd)) = do
     pr <- runParseCommand cmd r0
     case pr of
         Left errs -> parseError errs >> return r0
-        Right (cl, _rest) -> runJob' cl
+        Right (cl, _rest) -> do
+            (et, r1) <- run (execType cl) r0
+            case et of
+                ExecuteForeground -> foreground cl r1
+                ExecuteMidground  -> background cl r1
+                ExecuteBackground -> foreground cl r1 -- TODO: fix!
   where
-    runJob' cl = do
-        (et, r1) <- run (execType cl) r0
-        case et of
-            ExecuteForeground -> foreground r1
-            ExecuteMidground  -> background r1
-            ExecuteBackground -> foreground r1 -- TODO: fix!
-      where
-        foreground runner = do
-            setUp Nothing (return ())
-            (exitStatus, runner') <- runCommand runner
-            cleanUp exitStatus
-            return runner'
+    foreground cl runner = do
+        setUp Nothing foregroundRIO (return ())
+        (exitStatus, runner') <- runCommand cl runner
+        cleanUp (return ()) exitStatus
+        return runner'
 
-        background runner = do
-            pid <- forkProcess (closeMs >> runCommand runner >>= exitWith . fst)
-            setUp (Just pid) $ checkUp pid
-            return runner
+    background cl runner = do
+        sp <- makeStdIOParts
+        pid <- forkProcess $ do
+                    stdIOChildPrep sp
+                    (exitStatus, _runner') <- runCommand cl runner
+                    exitWith exitStatus
+        rio <- stdIOMasterPrep sp
+        setUp (Just pid) rio $ checkUp (stdIOCloseMasters sp) pid
+        return runner
 
-        runCommand runner = runCommandList cl runner >>= run getLastExitCode
+    runCommand cl runner = runCommandList cl runner >>= run getLastExitCode
 
     parseError errs =
         modifyMVar_ (stScoreBoard st) $ \sb ->
             return $ (j, ParseError errs) : sb
 
-    setUp mpid checker = do
+    setUp mpid rio checker = do
         hFd <- modifyMVar (stHistory st) $ startHistory cr
-        let rs = frs mpid checker hFd
+        let rs = RS rio mpid checker hFd
         writeHistory (rsHistory rs) (HiCommand $ CommandItem cmd)
         modifyMVar_ (stScoreBoard st) $ \sb ->
             return $ (j, Running rs) : sb
 
-    checkUp pid = do
+    checkUp closeMs pid = do
         mStat <- getProcessStatus False False pid
         case mStat of
             Nothing             -> return ()
-            Just (Exited ec)    -> cleanUp ec
-            Just (Terminated _) -> cleanUp $ ExitFailure 129
+            Just (Exited ec)    -> cleanUp closeMs ec
+            Just (Terminated _) -> cleanUp closeMs $ ExitFailure 129
             Just (Stopped _)    -> return ()
 
-    cleanUp exitCode = do
+    cleanUp closeMs exitCode = do
         modifyMVar_ (stScoreBoard st) $ \sb -> do
             let (f,sb') = findJob j sb
             case f of
@@ -252,9 +225,9 @@ pollJobs st = do
 -- | Gather as much output is available from stdout, stderr, and jsonout.
 gatherOutput :: RunningState -> IO [OutputItem]
 gatherOutput rs = do
-    out <- wrap OutputItemStdOut <$> getAvailable (rsStdOut rs)
-    err <- wrap OutputItemStdErr <$> getAvailable (rsStdErr rs)
-    jout <- wrap OutputItemJsonOut <$> getAvailable (rsJsonOut rs)
+    out <- wrap OutputItemStdOut <$> getAvailable (rioStdOut $ rsIO rs)
+    err <- wrap OutputItemStdErr <$> getAvailable (rioStdErr $ rsIO rs)
+    jout <- wrap OutputItemJsonOut <$> getAvailable (rioJsonOut $ rsIO rs)
     let ois = out ++ err ++ jout
     mapM_ (writeOutput (rsHistory rs)) ois
     return ois
@@ -282,8 +255,8 @@ offerInput st job input = modifyMVar_ (stScoreBoard st) $ \sb -> do
         _ -> return ()
     return sb
   where
-    send (InputItemInput s) rs = write (rsStdIn rs) $ toByteString s
-    send (InputItemEof) rs = closeFd (rsStdIn rs)
+    send (InputItemInput s) rs = write (rioStdIn $ rsIO rs) $ toByteString s
+    send (InputItemEof) rs = closeFd (rioStdIn $ rsIO rs)
     send (InputItemSignal sig) rs =
         maybe (return ()) (signalProcess sig) $ rsProcessID rs
 
