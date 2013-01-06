@@ -24,9 +24,12 @@ module Plush.Job.StdIO (
     stdIOMasterPrep,
     stdIOLocalPrep,
     stdIOCloseMasters,
+
+    closeFdSafe,
     ) where
 
 import Control.Applicative ((<$>), (<*>))
+import Control.Monad.Exception (catchIOError)
 import Data.Aeson (Value)
 import System.Posix
 import qualified System.Posix.Missing as PM
@@ -58,6 +61,7 @@ makeStdIOParts = do
     (m1, s1) <- openPseudoTerminal
     (m2, s2) <- openPseudoTerminal
     (mJ, sJ) <- createPipe
+    mapM_ (\fd -> setFdOption fd CloseOnExec True) [m1, m2, mJ]
     return $ StdIOParts m1 m2 mJ s1 s2 sJ
 
 -- | Prepare a child process for standard IO. Note that this will also set up
@@ -112,4 +116,5 @@ stdIOCloseMasters StdIOParts {..} = do
     closeFd master2
     closeFd masterJ
 
-
+closeFdSafe :: Fd -> IO ()
+closeFdSafe fd = closeFd fd `catchIOError` (const $ return ())

@@ -30,6 +30,7 @@ module Plush.Job (
 
 import Control.Applicative ((<$>))
 import Control.Concurrent
+import Control.Monad (forM_, unless, void)
 import qualified Control.Monad.Exception as Exception
 import System.Exit
 import System.IO
@@ -86,42 +87,55 @@ data ShellThread = ShellThread
 -- communicate to the original streams.
 startShell :: Runner -> IO (ShellThread, Handle, Handle)
 startShell runner = do
-    _origInFd <- PM.dupFdCloseOnExec stdInput upperFd
+    origInFd <- PM.dupFdCloseOnExec stdInput upperFd
     origOutFd <- PM.dupFdCloseOnExec stdOutput upperFd
     origErrFd <- PM.dupFdCloseOnExec stdError upperFd
 
-    nfd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
-    devNullFd <- PM.dupFdCloseOnExec nfd upperFd
-    closeFd nfd
-    mapM_ (dupTo devNullFd) [0..9] -- reserve the low FDs, yes, this is insane
+    reserveShellFds
 
     origStdOut <- fdToHandle origOutFd
     origStdErr <- fdToHandle origErrFd
 
-    foregroundRIO <- makeStdIOParts >>= stdIOLocalPrep
+    foregroundStdIOParts <- makeStdIOParts
+    foregroundRIO <- stdIOLocalPrep foregroundStdIOParts
 
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
     historyVar <- initHistory runner >>= newMVar
     let st = ShellThread jobRequestVar scoreBoardVar historyVar
-    _ <- forkIO $ shellThread st foregroundRIO origStdErr runner
+    let childPrep = do
+            mapM_ closeFdSafe [origInFd, origOutFd, origErrFd]
+                -- TODO(mzero): closeFdSafe because origOutFd mysteriously
+                -- is closed by the time we fork a child... why?
+            stdIOCloseMasters foregroundStdIOParts
+    _ <- forkIO $ shellThread st foregroundRIO origStdErr childPrep runner
 
     return (st, origStdOut, origStdErr)
   where
     upperFd = Fd 20
 
+    -- | Reserve FDs 0 - 9 as these can addressed by shell commands.
+    reserveShellFds = do
+        devNullFd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
+        forM_ [0..9] $ \fd -> do
+            unless (devNullFd == fd) $ void $ dupTo devNullFd fd
+            setFdOption fd CloseOnExec True
+        unless (devNullFd <= 0) $ closeFd devNullFd
 
-shellThread :: ShellThread -> RunningIO -> Handle -> Runner -> IO ()
-shellThread st foregroundRIO origStdErr = go
+
+
+shellThread :: ShellThread -> RunningIO -> Handle -> IO () -> Runner -> IO ()
+shellThread st foregroundRIO origStdErr childPrep = go
   where
     go runner =
-        (takeMVar (stJobRequest st) >>= runJob st foregroundRIO runner >>= go)
+        (takeMVar (stJobRequest st) >>= runJob' runner >>= go)
         `Exception.catchAll`
         (\e -> hPutStrLn origStdErr (show e) >> go runner)
+    runJob' = runJob st foregroundRIO childPrep
 
-
-runJob :: ShellThread -> RunningIO -> Runner -> CommandRequest -> IO Runner
-runJob st foregroundRIO r0 cr@(CommandRequest j _ (CommandItem cmd)) = do
+runJob :: ShellThread -> RunningIO -> IO () -> Runner -> CommandRequest -> IO Runner
+runJob st foregroundRIO childPrep r0
+    cr@(CommandRequest j _ (CommandItem cmd)) = do
     pr <- runParseCommand cmd r0
     case pr of
         Left errs -> parseError errs >> return r0
@@ -141,6 +155,7 @@ runJob st foregroundRIO r0 cr@(CommandRequest j _ (CommandItem cmd)) = do
     background cl runner = do
         sp <- makeStdIOParts
         pid <- forkProcess $ do
+                    childPrep
                     stdIOChildPrep sp
                     (exitStatus, _runner') <- runCommand cl runner
                     exitWith exitStatus
