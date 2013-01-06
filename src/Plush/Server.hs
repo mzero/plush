@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 #endif
 import Network.HTTP.Types (Ascii, methodPost, status200)
-import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Middleware.Route as Route
 import qualified Network.Wai as Wai
 import System.IO
@@ -45,6 +44,7 @@ import Plush.Job.Types
 import Plush.Run
 import Plush.Server.API
 import Plush.Server.Utilities
+import qualified Plush.Server.Warp as Warp
 import Plush.Utilities
 
 -- | Run the plush web server. The supplied 'Runner' is used as the shell, and
