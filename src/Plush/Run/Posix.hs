@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Internal as B
+import Data.Foldable (forM_)
 import Foreign.Ptr (castPtr, plusPtr)
 import qualified GHC.IO.Exception as GHC
 import System.Exit
@@ -247,27 +248,24 @@ ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
 ioPipeline :: [IO ExitCode] -> IO ExitCode
 ioPipeline = next Nothing
   where
-    next _ [] = return ExitSuccess
-    next mi [cz] = seg mi cz Nothing >>= wait
+    next pPrev [] = forM_ pPrev closeBoth >> return ExitSuccess
+    next pPrev [cz] = seg pPrev cz Nothing >>= wait
         -- TODO: run cz in foreground once we can stash stdInput reliably
 
-    next mi (c:cs) = do
-        (r, w) <- P.createPipe
-        _ <- seg mi c (Just w)
-        next (Just r) cs
+    next pPrev (c:cs) = do
+        pNext <- Just <$> P.createPipe   -- (readSize, writeSide)
+        _ <- seg pPrev c pNext
+        next pNext cs
 
-    seg mi c mo = do
+    seg pIn c pOut = do
         pid <- P.forkProcess $ do
-            case mi of
-                Nothing -> return ()
-                Just i -> dupTo i stdInput >> closeFd i
-            case mo of
-                Nothing -> return ()
-                Just o -> dupTo o stdOutput >> closeFd o
+            forM_ pIn $ \p@(r,_w) -> dupTo r stdInput >> closeBoth p
+            forM_ pOut $ \p@(_r,w) -> dupTo w stdOutput >> closeBoth p
             c >>= P.exitImmediately
-        maybe (return ()) closeFd mi
-        maybe (return ()) closeFd mo
+        forM_ pIn closeBoth
         return pid
+
+    closeBoth (r,w) = closeFd r >> closeFd w
 
     wait pid = do
         st <- P.getProcessStatus True False pid
