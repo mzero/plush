@@ -132,6 +132,10 @@ debugOptions _ _ = usage >> exitFailure
 
 runRepl :: Runner -> IO ()
 runRepl = runInputT defaultSettings . repl
+    -- TODO(mzero): This opens a FD on /dev/tty which then leaks thru every
+    -- fork and exec. This is a potential resource leak and security risk.
+    -- Haskeline has no way to work around this.
+    -- See http://trac.haskell.org/haskeline/ticket/123
   where
     repl runner = do
         l <- getInputLine "# "
