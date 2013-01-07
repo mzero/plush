@@ -15,7 +15,7 @@ limitations under the License.
 -}
 
 module Plush.Server.Warp (
-    run,
+    runSettings,
     )
     where
 
@@ -30,15 +30,14 @@ import qualified Network.Wai as Wai
 import System.Posix.IO (FdOption(CloseOnExec), setFdOption)
 
 
--- | A reimplementation of 'Warp.run' to gain access to the sockets.
+-- | A reimplementation of 'Warp.runSettings' to gain access to the sockets.
 -- This is to keep them from leaking into exec'd processes.
-run :: Warp.Port -> Wai.Application -> IO ()
-run port app = bracket sBind sClose $ \socket -> do
+runSettings :: Warp.Settings -> Wai.Application -> IO ()
+runSettings settings app = bracket sBind sClose $ \socket -> do
     setSocketCloseOnExec socket
-    Warp.runSettingsConnection set (getter socket) app
+    Warp.runSettingsConnection settings (getter socket) app
   where
-    sBind = bindPort (Warp.settingsPort set) (Warp.settingsHost set)
-    set = Warp.defaultSettings { Warp.settingsPort = port }
+    sBind = bindPort (Warp.settingsPort settings) (Warp.settingsHost settings)
     getter socket = do
         (conn, sa) <- accept socket
         setSocketCloseOnExec conn

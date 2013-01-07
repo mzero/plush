@@ -21,20 +21,24 @@ module Plush.Server (
     )
     where
 
-
+import Control.Applicative ((<$>), (<|>))
 import Control.Concurrent (forkIO)
+import qualified Control.Exception as Ex
 import Control.Monad (replicateM, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy (fromChunks)
+import Data.Conduit.Network (HostPreference(Host))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 #else
 import qualified Data.Text.Encoding as T
 #endif
+import Data.Time (getZonedTime)
 import Network.HTTP.Types (Ascii, methodPost, status200)
-import qualified Network.Wai.Middleware.Route as Route
 import qualified Network.Wai as Wai
+import qualified Network.Wai.Handler.Warp as Warp
+import qualified Network.Wai.Middleware.Route as Route
 import System.IO
 import System.Posix (sleep)
 import System.Random
@@ -44,7 +48,7 @@ import Plush.Job.Types
 import Plush.Run
 import Plush.Server.API
 import Plush.Server.Utilities
-import qualified Plush.Server.Warp as Warp
+import qualified Plush.Server.Warp as Warp'
 import Plush.Utilities
 
 -- | Run the plush web server. The supplied 'Runner' is used as the shell, and
@@ -52,21 +56,41 @@ import Plush.Utilities
 -- shell exits.
 server :: Runner -> Maybe Int -> IO ()
 server runner port = do
-    (shellThread, origOut, _origErr) <- startShell runner
+    (shellThread, origOut, origErr) <- startShell runner
     key <- genKey
     hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
     void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
-    Warp.run port'
+    Warp'.runSettings (settings origErr)
         $ dispatchApp (jsonApis shellThread key)
         $ staticApp
         $ respApp notFound
   where
     port' = fromMaybe 29544 port
+    settings errOut = Warp.defaultSettings
+        { Warp.settingsPort = port'
+        , Warp.settingsHost = Host "127.0.0.1"
+        , Warp.settingsOnException = reportError errOut
+        }
     genKey = replicateM 40 $ randomRIO ('a','z')
     startUrl key =  "http://localhost:" ++ show port' ++ "/index.html#" ++ key
     openCmd url = "xdg-open " ++ url ++ " 2>/dev/null || open " ++ url
     launchOpen st cmd =
         sleep 1 >> submitJob st (CommandRequest "opener" False (CommandItem cmd))
+
+
+reportError :: Handle -> Ex.SomeException -> IO ()
+reportError errOut err = logger $
+    (case e of { Just Ex.ThreadKilled -> Just Nothing; _ -> Nothing })
+    <|> (Just . ("Invalid Request: " ++) . show) <$> (e :: Maybe Warp.InvalidRequest)
+    <|> (Just . Just $ "Exception: " ++ show err)
+  where
+    e :: (Ex.Exception a) => Maybe a
+    e = Ex.fromException err
+
+    logger (Just (Just s)) = do
+        t <- show <$> getZonedTime
+        hPutStrLn errOut $ t ++ ' ' : s
+    logger _ = return ()
 
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 
