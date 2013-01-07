@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Plush.Server.Warp (
     runSettings,
     )
@@ -22,13 +24,17 @@ module Plush.Server.Warp (
 
 import Control.Exception (bracket)
 import Data.Conduit.Network (bindPort)
-import Network.Sendfile (sendfileWithHeader, FileRange(PartOfFile))
 import Network.Socket (accept, fdSocket, sClose, Socket)
-import qualified Network.Socket.ByteString as Sock
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai as Wai
 import System.Posix.IO (FdOption(CloseOnExec), setFdOption)
 
+#if MIN_VERSION_warp(1, 3, 0)
+import Network.Wai.Handler.Warp (socketConnection)
+#else
+import Network.Sendfile (sendfileWithHeader, FileRange(PartOfFile))
+import qualified Network.Socket.ByteString as Sock
+#endif
 
 -- | A reimplementation of 'Warp.runSettings' to gain access to the sockets.
 -- This is to keep them from leaking into exec'd processes.
@@ -43,7 +49,9 @@ runSettings settings app = bracket sBind sClose $ \socket -> do
         setSocketCloseOnExec conn
         return (socketConnection conn, sa)
 
--- | This should be exported by Warp, but isn't.
+#if MIN_VERSION_warp(1, 3, 0)
+#else
+-- | This isn't exported by Warp prior to 1.3
 socketConnection :: Socket -> Warp.Connection
 socketConnection s = Warp.Connection
     { Warp.connSendMany = Sock.sendMany s
@@ -54,6 +62,7 @@ socketConnection s = Warp.Connection
     }
   where
     bytesPerRead = 4096
+#endif
 
 -- | Sockets used by the web server need to be set so that they are not leaked
 -- into processes fork/exec'd by the shell.

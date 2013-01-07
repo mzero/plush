@@ -26,7 +26,8 @@ import Control.Concurrent (forkIO)
 import qualified Control.Exception as Ex
 import Control.Monad (replicateM, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.ByteString.Lazy (fromChunks)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import Data.Conduit.Network (HostPreference(Host))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
@@ -35,7 +36,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 #endif
 import Data.Time (getZonedTime)
-import Network.HTTP.Types (Ascii, methodPost, status200)
+import qualified Network.HTTP.Types as H
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Middleware.Route as Route
@@ -101,9 +102,9 @@ dispatchApp = Route.dispatch True . Route.mkRoutes' . map (uncurry Route.Post)
 
 -- wai-middleware-route (0, 2, 0)
 dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
-dispatchApp = Route.dispatch . map postRule
+dispatchApp = Route.dispatch . map rte
   where
-    postRule (p,a) = (Route.rule methodPost (T.encodeUtf8 $ T.append "^/" p), a)
+    rte (p,a) = (Route.rule H.methodPost (T.encodeUtf8 $ T.append "^/" p), a)
 
 #endif
 
@@ -123,21 +124,21 @@ staticApp app req = do
     mbs <- if ok then liftIO (getStaticResource fp) else return Nothing
     case mbs of
         Nothing -> app req
-        Just bs -> liftIO . return . resp $ fromChunks [bs]
+        Just bs -> liftIO . return . resp $ LBS.fromChunks [bs]
   where
     pi_ = Wai.pathInfo req
     ok = all (not . T.isPrefixOf ".") pi_
     fp = T.unpack $ T.intercalate "/" pi_
-    resp = Wai.responseLBS status200 [("Content-Type", getMimeType fp)]
+    resp = Wai.responseLBS H.status200 [("Content-Type", getMimeType fp)]
 
-getMimeType :: FilePath -> Ascii
+getMimeType :: FilePath -> BS.ByteString
 getMimeType fp = fromMaybe defaultMimeType $ flip lookup defaultMimeTypes
     $ drop 1 $ dropWhile (/= '.') fp
 
-defaultMimeType :: Ascii
+defaultMimeType :: BS.ByteString
 defaultMimeType = "application/octet-stream"
 
-defaultMimeTypes :: [(String, Ascii)]
+defaultMimeTypes :: [(String, BS.ByteString)]
 defaultMimeTypes =
     [ ("css",     "text/css")
     , ("gif",     "image/gif")
