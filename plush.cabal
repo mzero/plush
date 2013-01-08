@@ -66,6 +66,7 @@ Library
     Plush.Parser.Tokens
     Plush.Parser
     Plush.Pretty
+    Plush.Resource
     Plush.Run.Annotate
     Plush.Run.BuiltIns
     Plush.Run.BuiltIns.Evaluation

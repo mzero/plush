@@ -46,11 +46,12 @@ import System.Random
 
 import Plush.Job
 import Plush.Job.Types
+import Plush.Resource
 import Plush.Run
 import Plush.Server.API
 import Plush.Server.Utilities
 import qualified Plush.Server.Warp as Warp'
-import Plush.Utilities
+
 
 -- | Run the plush web server. The supplied 'Runner' is used as the shell, and
 -- an optional port can be supplied. This action does not complete until the

@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,12 +46,12 @@ import qualified Data.Text.Encoding.Error as T
 
 import Plush.Parser
 import Plush.Pretty
+import Plush.Resource
 import Plush.Run.Execute
 import Plush.Run.Posix
 import Plush.Run.ShellExec
 import Plush.Run.TestExec
 import Plush.Types
-import Plush.Utilities
 
 
 -- | Encapsulates the state and 'PosixLike' monad of a running shell.
