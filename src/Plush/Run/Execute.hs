@@ -27,6 +27,7 @@ where
 import Control.Monad
 import Control.Applicative ((<*>))
 import Data.Functor
+import Data.List (intercalate)
 import Data.Monoid
 
 import Plush.Run.Command
@@ -35,12 +36,15 @@ import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.Redirection
 import Plush.Run.ShellExec
+import qualified Plush.Run.ShellFlags as F
 import Plush.Run.Types
 import Plush.Types
 
 
 shellExec :: (PosixLike m) => CommandList -> ShellExec m ()
-shellExec cl = execCommandList cl >> return ()
+shellExec cl = do
+    flags <- getFlags
+    unless (F.noexec flags) $ void $ execCommandList cl
 
 execCommandList :: (PosixLike m) => CommandList -> ShellExec m ExitCode
 execCommandList = foldM (const execCommandItem) ExitSuccess
@@ -93,12 +97,22 @@ execSimpleCommand (SimpleCommand ws as rs) = do
 
 execFields :: (PosixLike m) => Bindings -> [String] -> ShellExec m ExitCode
 execFields bindings (cmd:args) = do
+    flags <- getFlags
+    when (F.xtrace flags) $ xtrace bindings cmd args
     (_, ex, _) <- commandSearch cmd
     case ex of
         UtilityAction ua  -> ua bindings args
         FunctionAction fa -> fa execFunctionBody bindings args
 
 execFields _ [] = exitMsg 122 "Empty command"
+
+xtrace :: (PosixLike m) => Bindings -> String -> [String] -> ShellExec m ()
+xtrace bindings cmd args = do
+    getVarDefault "PS4" "+ " >>= errStr -- TODO(mzero): should expand PS4
+    errStrLn $ intercalate " " line
+  where
+    line = map showBinding bindings ++ cmd : args
+    showBinding (var,val) = var ++ '=' : val
 
 parseAssignment :: (PosixLike m) => Assignment -> ShellExec m (String, String)
 parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
