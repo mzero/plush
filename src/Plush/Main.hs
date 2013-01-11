@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ optionsDescr =
     setReadArgMode opts = opts { optMode = processArg }
     setWebServerMode opts = opts { optMode = runWebServer }
     setDebugMode opts = opts { optMode = debugOptions }
-    setTestExec opts = opts { optRunner = runInTest }
+    setTestExec opts = opts { optRunner = runnerInTest }
 
 parseOptions :: [String] -> IO (Options, [String])
 parseOptions argv =
@@ -64,7 +64,7 @@ parseOptions argv =
       (_,_,errs) -> usageFailure (concat errs)
   where
     defaultOpts =
-        Options { optMode = processFile, optRunner = runInIO }
+        Options { optMode = processFile, optRunner = runnerInIO }
 
 usage :: IO ()
 usage = do
@@ -76,7 +76,6 @@ usage = do
         \ <file>             -- read commands from file\n\
         \ -c <commands>      -- read commands from argument\n\
         \ -w [<port>]        -- run web server\n\
-        \ -d parse           -- interactive parse\n\
         \ -d doctest <file>* -- run doctest over the files\n\
         \ -d shelltest shell <file>* -- run doctest via the given shell\n"
     putStr $ usageInfo ("Options:") optionsDescr
@@ -125,7 +124,6 @@ runWebServer opts args = case args of
     badArgs = usage >> exitFailure
 
 debugOptions :: Options -> [String] -> IO ()
-debugOptions _ ["parse"] = runRepl runInPrettyPrint
 debugOptions _ ("doctest":fps) = runDocTests fps
 debugOptions _ ("shelltest":shell:fps) = shellDocTests shell fps
 debugOptions _ _ = usage >> exitFailure
@@ -152,11 +150,11 @@ runCommands "" _ = return ()
 runCommands cmds runner = runCommand cmds runner >>= uncurry runCommands
 
 runCommand :: String -> Runner -> IO (String, Runner)
-runCommand cmds runner = do
-    pr <- runParseCommand cmds runner
+runCommand cmds r0 = do
+    (pr, r1) <- run (parse cmds) r0
     case pr of
-        Left errs -> putStrLn errs >> return ("", runner)
-        Right (cl, rest) -> runCommandList cl runner
-                                >>= return . (\runner' -> (rest, runner'))
+        Left errs -> putStrLn errs >> return ("", r1)
+        Right (cl, rest) -> run (execute cl) r1
+                                >>= return . (\(_,r2) -> (rest, r2))
 
 

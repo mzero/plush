@@ -136,15 +136,15 @@ shellThread st foregroundRIO origStdErr childPrep = go
 runJob :: ShellThread -> RunningIO -> IO () -> Runner -> CommandRequest -> IO Runner
 runJob st foregroundRIO childPrep r0
     cr@(CommandRequest j _ (CommandItem cmd)) = do
-    pr <- runParseCommand cmd r0
+    (pr, r1) <- run (parse cmd) r0
     case pr of
-        Left errs -> parseError errs >> return r0
+        Left errs -> parseError errs >> return r1
         Right (cl, _rest) -> do
-            (et, r1) <- run (execType cl) r0
+            (et, r2) <- run (execType cl) r1
             case et of
-                ExecuteForeground -> foreground cl r1
-                ExecuteMidground  -> background cl r1
-                ExecuteBackground -> foreground cl r1 -- TODO: fix!
+                ExecuteForeground -> foreground cl r2
+                ExecuteMidground  -> background cl r2
+                ExecuteBackground -> foreground cl r2 -- TODO: fix!
   where
     foreground cl runner = do
         setUp Nothing foregroundRIO (return ())
@@ -163,7 +163,7 @@ runJob st foregroundRIO childPrep r0
         setUp (Just pid) rio $ checkUp (stdIOCloseMasters sp) pid
         return runner
 
-    runCommand cl runner = runCommandList cl runner >>= run getLastExitCode
+    runCommand cl runner = run (execute cl >> getLastExitCode) runner
 
     parseError errs =
         modifyMVar_ (stScoreBoard st) $ \sb ->

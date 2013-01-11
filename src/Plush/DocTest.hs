@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ module Plush.DocTest (
     where
 
 import Control.Applicative ((<$>))
+import Control.Monad (join)
 import Data.List (foldl', intercalate, isPrefixOf, partition)
 import System.FilePath (takeFileName)
 
@@ -176,25 +177,29 @@ reportResults trs = do
 
 
 runTests :: [Test] -> [(Test, Result)]
-runTests tests = fst $ foldl' go ([],testRunInTest) tests
+runTests tests = fst $ foldl' go ([], testRunner) tests
   where
     go (trs, runner) test =
         let (r, runner') = runTest test runner
         in (trs++[(test, r)],runner')
 
 runTest :: Test -> TestRunner -> (Result, TestRunner)
-runTest t runner =
+runTest t r0 =
     if testCondition t "plush"
-        then either badParse exec $ testRunParseCommand (testInput t) runner
-        else (Skipped, runner)
+        then let (p, r1) = testRun (parse $ testInput t) r0
+             in (either badParse exec $ join p) r1
+        else (Skipped, r0)
   where
-    exec (c,"") = let ((out,err), runner') = testRunCommandList c runner
-                      actual = err ++ out in
-        if testExpected t == actual
-            then (Success, runner')
-            else (UnexpectedResult actual, runner')
-    exec (_,r) = (LeftoverParse r, runner)
-    badParse errs = (BadParse errs, runner)
+    exec (c,"") r =
+        let (result, r') = testRun (execute c >> outputs) r
+            actual = case result of
+                Left e -> e
+                Right (out,err) -> err ++ out
+        in if testExpected t == actual
+            then (Success, r')
+            else (UnexpectedResult actual, r')
+    exec (_,extra) r = (LeftoverParse extra, r)
+    badParse errs r = (BadParse errs, r)
 
 
 runDocTests :: [FilePath] -> IO ()
