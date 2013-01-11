@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,10 +41,12 @@ import Plush.Run.Types
 import Plush.Types
 
 
-shellExec :: (PosixLike m) => CommandList -> ShellExec m ()
+shellExec :: (PosixLike m) => CommandList -> ShellExec m ExitCode
 shellExec cl = do
     flags <- getFlags
-    unless (F.noexec flags) $ void $ execCommandList cl
+    if F.noexec flags
+        then success
+        else execCommandList cl
 
 execCommandList :: (PosixLike m) => CommandList -> ShellExec m ExitCode
 execCommandList = foldM (const execCommandItem) ExitSuccess

@@ -149,7 +149,7 @@ parse s = do
     return pcr
 
 -- | Run a parsed command line.
-execute :: (PosixLike m) => CommandList -> ShellExec m ()
+execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode
 execute = shellExec
 
 

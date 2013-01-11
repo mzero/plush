@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ eval = SpecialUtility . const $ Utility evalExec emptyAnnotate
         aliases <- getAliases
         case parseCommand aliases cmdline of
             Left errs -> exitMsg 127 errs
-            Right (cl, _rest) -> shellExec cl >> getLastExitCode
+            Right (cl, _rest) -> shellExec cl
 
 
 dot :: (PosixLike m) => SpecialUtility m

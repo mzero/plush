@@ -42,10 +42,9 @@ import Plush.Job.Output
 import Plush.Job.StdIO
 import Plush.Job.Types
 import Plush.Run
-import Plush.Run.Execute
+import Plush.Run.Execute (execType, ExecuteType(..))
 import Plush.Run.Posix (write)
 import Plush.Run.Posix.Utilities (toByteString)
-import Plush.Run.ShellExec
 
 
 
@@ -163,7 +162,7 @@ runJob st foregroundRIO childPrep r0
         setUp (Just pid) rio $ checkUp (stdIOCloseMasters sp) pid
         return runner
 
-    runCommand cl runner = run (execute cl >> getLastExitCode) runner
+    runCommand cl runner = run (execute cl) runner
 
     parseError errs =
         modifyMVar_ (stScoreBoard st) $ \sb ->
