@@ -35,8 +35,10 @@ module Plush.Run (
     )
 where
 
+import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import qualified Control.Exception as Ex
+import Control.Monad (when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (runStateT)
 import qualified Data.HashMap.Strict as M
@@ -49,7 +51,9 @@ import Plush.Pretty
 import Plush.Resource
 import Plush.Run.Execute
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
+import qualified Plush.Run.ShellFlags as F
 import Plush.Run.TestExec
 import Plush.Types
 
@@ -109,7 +113,7 @@ run act runner = case runner of
 -- | Parse a command, using the state of the 'Runner'
 runParseCommand :: String -> Runner -> IO ParseCommandResult
 runParseCommand s RunInPrettyPrint = return $ parseCommand M.empty s
-runParseCommand s r = (\(a,_) -> parseCommand a s) `fmap` run getAliases r
+runParseCommand s r = fst <$> run (parseInput s) r
 
 -- | Run a 'CommandList' with a 'Runner'
 runCommandList :: CommandList -> Runner -> IO Runner
@@ -149,8 +153,7 @@ testRun act runner = case runner of
 
 -- | Parse a command, using the state of the 'TestRunner'
 testRunParseCommand :: String -> TestRunner -> ParseCommandResult
-testRunParseCommand s r =
-    either Left (\a -> parseCommand a s) . fst $ testRun getAliases r
+testRunParseCommand s r = either Left id . fst $ testRun (parseInput s) r
 
 
 -- | Run a 'CommandList' with a 'TestRunner'. The first part of the return pair
@@ -161,3 +164,17 @@ testRunCommandList cl r = first handleTestError runResult
   where
     runResult = testRun (shellExec cl >> lift testOutput) r
     handleTestError = either (\e -> ("",e)) id
+
+
+-- | Parse a command, in the state of the shell. Extracts the aliases from
+-- the shell state to give to the parser. Also, checks and implements the
+-- verbse (-v) and parseout (-P) shell flags.
+parseInput :: (PosixLike m) => String -> ShellExec m ParseCommandResult
+parseInput s = do
+    flags <- getFlags
+    when (F.verbose flags) $ errStrLn s
+    pcr <- getAliases >>= return . flip parseCommand s
+    when (F.parseout flags) $ case pcr of
+        Right (cl, _) -> errStrLn $ pp cl
+        _ -> return ()
+    return pcr

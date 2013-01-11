@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ data Flags = Flags
     , nolog       :: Bool
     , notify      :: Bool  -- -b
     , nounset     :: Bool  -- -u
+    , parseout    :: Bool  -- -P, non-POSIX
     , verbose     :: Bool  -- -v
     , vi          :: Bool
     , xtrace      :: Bool  -- -x
@@ -74,6 +75,7 @@ defaultFlags = Flags
     , nolog       = False
     , notify      = False
     , nounset     = False
+    , parseout    = False
     , verbose     = False
     , vi          = False
     , xtrace      = False
@@ -153,6 +155,7 @@ flagDescriptions =
     , FlagDesc Nothing    "nolog"       nolog       (\b f->f{ nolog = b })
     , FlagDesc (Just 'b') "notify"      notify      (\b f->f{ notify = b })
     , FlagDesc (Just 'u') "nounset"     nounset     (\b f->f{ nounset = b })
+    , FlagDesc (Just 'P') "parseout"    parseout    (\b f->f{ parseout = b })
     , FlagDesc (Just 'v') "verbose"     verbose     (\b f->f{ verbose = b })
     , FlagDesc Nothing    "vi"          vi          (\b f->f{ vi = b })
     , FlagDesc (Just 'x') "xtrace"      xtrace      (\b f->f{ xtrace = b })
