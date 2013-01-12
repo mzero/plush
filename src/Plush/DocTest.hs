@@ -186,7 +186,7 @@ runTests tests = fst $ foldl' go ([], testRunner) tests
 runTest :: Test -> TestRunner -> (Result, TestRunner)
 runTest t r0 =
     if testCondition t "plush"
-        then let (p, r1) = testRun (parse $ testInput t) r0
+        then let (p, r1) = testRun (parseInput $ testInput t) r0
              in (either badParse exec $ join p) r1
         else (Skipped, r0)
   where

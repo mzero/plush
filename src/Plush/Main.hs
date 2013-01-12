@@ -151,7 +151,7 @@ runCommands cmds runner = runCommand cmds runner >>= uncurry runCommands
 
 runCommand :: String -> Runner -> IO (String, Runner)
 runCommand cmds r0 = do
-    (pr, r1) <- run (parse cmds) r0
+    (pr, r1) <- run (parseInput cmds) r0
     case pr of
         Left errs -> putStrLn errs >> return ("", r1)
         Right (cl, rest) -> run (execute cl) r1

@@ -45,6 +45,8 @@ import Plush.Run
 import Plush.Run.Execute (execType, ExecuteType(..))
 import Plush.Run.Posix (write)
 import Plush.Run.Posix.Utilities (toByteString)
+import Plush.Run.ShellExec (getFlags, setFlags)
+import qualified Plush.Run.ShellFlags as F
 
 
 
@@ -134,8 +136,9 @@ shellThread st foregroundRIO origStdErr childPrep = go
 
 runJob :: ShellThread -> RunningIO -> IO () -> Runner -> CommandRequest -> IO Runner
 runJob st foregroundRIO childPrep r0
-    cr@(CommandRequest j _ (CommandItem cmd)) = do
+        cr@(CommandRequest j record (CommandItem cmd)) = do
     (pr, r1) <- run (parse cmd) r0
+        -- This won't echo even if verbose (-v) or parseout (-P) are set
     case pr of
         Left errs -> parseError errs >> return r1
         Right (cl, _rest) -> do
@@ -162,7 +165,15 @@ runJob st foregroundRIO childPrep r0
         setUp (Just pid) rio $ checkUp (stdIOCloseMasters sp) pid
         return runner
 
-    runCommand cl runner = run (execute cl) runner
+    runCommand cl runner = run (runEnv $ execute cl) runner
+    runEnv act = if record
+        then act
+        else Exception.bracket getFlags setFlags $
+                \f -> setFlags (utilFlags f) >> act
+            -- If the command is not being recorded, it is being run by the
+            -- the front end itself. In this case, don't let the noexec (-n)
+            -- or xtrace (-x) interfere with the execution or output.
+    utilFlags f = f { F.noexec = False, F.xtrace = False }
 
     parseError errs =
         modifyMVar_ (stScoreBoard st) $ \sb ->
@@ -237,12 +248,17 @@ pollJobs st = do
     report' job ois si = return $ map (ReportOne job) $ map SiOutput ois ++ [si]
 
 -- | Gather as much output is available from stdout, stderr, and jsonout.
+-- Note that the order of output to stderr and stdout is lost given the way we
+-- collect these from separate pttys. This infelicity is the trade off for being
+-- able which text came from stderr vs. stdout. stderr is gathered and reported
+-- which tends to work better. It also ensures that xtrace (-x) output preceeds
+-- the command's output.
 gatherOutput :: RunningState -> IO [OutputItem]
 gatherOutput rs = do
-    out <- wrap OutputItemStdOut <$> getAvailable (rioStdOut $ rsIO rs)
     err <- wrap OutputItemStdErr <$> getAvailable (rioStdErr $ rsIO rs)
+    out <- wrap OutputItemStdOut <$> getAvailable (rioStdOut $ rsIO rs)
     jout <- wrap OutputItemJsonOut <$> getAvailable (rioJsonOut $ rsIO rs)
-    let ois = out ++ err ++ jout
+    let ois = err ++ out ++ jout
     mapM_ (writeOutput (rsHistory rs)) ois
     return ois
   where

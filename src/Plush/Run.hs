@@ -30,6 +30,7 @@ module Plush.Run (
 
     -- * Utility Actions
     parse,
+    parseInput,
     execute,
     outputs,
     )
@@ -136,13 +137,20 @@ testRun act runner = case runner of
 -- * Utility Actions
 
 -- | Parse a command, in the state of the shell. Extracts the aliases from
--- the shell state to give to the parser. Also, checks and implements the
--- verbse (-v) and parseout (-P) shell flags.
+-- the shell state to give to the parser. This action should have no side
+-- effects, and the transformed shell state from this action can be safely
+-- ignored.
 parse :: (PosixLike m) => String -> ShellExec m ParseCommandResult
-parse s = do
+parse s = getAliases >>= return . flip parseCommand s
+
+-- | Like 'parse', but the string is considered "shell input", and so is
+-- subject the @verbose (@-v@) and @parseout@ (@-P@) shell flags. Therefore,
+-- this operation can have output other potential side effects.
+parseInput :: (PosixLike m) => String -> ShellExec m ParseCommandResult
+parseInput s = do
     flags <- getFlags
     when (F.verbose flags) $ errStrLn s
-    pcr <- getAliases >>= return . flip parseCommand s
+    pcr <- parse s
     when (F.parseout flags) $ case pcr of
         Right (cl, _) -> errStrLn $ pp cl
         _ -> return ()
