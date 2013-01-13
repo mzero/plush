@@ -53,6 +53,7 @@ Library
   Other-modules:
     Control.Monad.Exception
     Paths_plush
+    Plush.ArgParser
     Plush.DocTest
     Plush.DocTest.Posix
     Plush.Job
