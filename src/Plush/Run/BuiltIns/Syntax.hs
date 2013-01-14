@@ -68,7 +68,7 @@ stdSyntax :: (PosixLike m) =>
     -> Utility m
 stdSyntax options opt0 action summary = Utility exec anno
   where
-    exec cmdLineArgs = case mconcat $ processArgs summary options cmdLineArgs of
+    exec cmdLineArgs = case mconcat $ processArgs options cmdLineArgs of
         OA (Right (optF, args)) -> reportError $ action (optF opt0) args
         OA (Left errs) -> do
             errStr errs
@@ -77,7 +77,7 @@ stdSyntax options opt0 action summary = Utility exec anno
             failure
 
     anno cmdLineArgs = return $
-        map argAnnos $ processArgs summary options cmdLineArgs
+        map (argAnnotations summary) $ processArgs options cmdLineArgs
 
 -- | When a utility simply applies to each of the arguments in turn, this
 -- transforms a function of option state and single arg into the function
@@ -97,12 +97,12 @@ reportError act = act `catchAll`  (exitMsg 1 . show)
 -- last flag from the command line, first. If a flag is repeated, it will
 -- only be included in the state once.
 flag :: Char -> OptionSpec String
-flag f = OptionSpec [f] (NoArg (\fs -> f : (fs \\ [f])))
+flag f = OptionSpec [f] [] (NoArg (\fs -> f : (fs \\ [f])))
 
 -- | Declare a flag option, with possible alternatives. The first flag
 -- listed will be used as the canonical flag added to the option state.
 flagAlt :: String -> OptionSpec String
-flagAlt fa@(f0:_) = OptionSpec fa (NoArg (\fs -> f0 : (fs \\ fa)))
+flagAlt fa@(f0:_) = OptionSpec fa [] (NoArg (\fs -> f0 : (fs \\ fa)))
 flagAlt [] = error "Plush.Run.Builtins.Syntax.flagAlt: no flags supplied"
 
 -- | Declare a flag that is among an exclusive set of flags. Only one of
@@ -112,10 +112,10 @@ flagAlt [] = error "Plush.Run.Builtins.Syntax.flagAlt: no flags supplied"
 toggle :: Char  -- ^ the flag character
     -> String   -- ^ the mutually exclusive set of flags
     -> OptionSpec String
-toggle f excl = OptionSpec [f] (NoArg (\fs -> f : (fs \\ excl)))
+toggle f excl = OptionSpec [f] [] (NoArg (\fs -> f : (fs \\ excl)))
 
 -- | Declare a string option. The option state is the value of this option.
 -- Supply the default as the initial option state to 'stdUtility'.
 argOpt :: Char  -- ^ the flag character
     -> OptionSpec String
-argOpt f = OptionSpec [f] (ReqArg const)
+argOpt f = OptionSpec [f] [] (ReqArg const)

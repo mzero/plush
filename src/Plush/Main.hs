@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, OverloadedStrings #-}
 
 module Plush.Main (plushMain) where
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
-import Data.List (foldl')
-import System.Console.GetOpt
+import Data.Monoid (mconcat)
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hIsTerminalDevice, stdin)
 
+import Plush.ArgParser
 import Plush.DocTest
 import Plush.Run
 import Plush.Server
@@ -38,15 +38,15 @@ data Options = Options
                 , optRunner :: Runner
                 }
 
-optionsDescr :: [OptDescr (Options -> Options)]
+optionsDescr :: [OptionSpec Options]
 optionsDescr =
-    [ Option ['?'] ["help"] (NoArg setHelp)     "help (this message)"
-    , Option [] ["version"] (NoArg setVersion)  "print vesion and exit"
-    , Option ['c'] [] (NoArg setReadArgMode)    "read commands from 1st arg"
-    , Option ['s'] [] (NoArg setReadStdinMode)  "read commands from stdin"
-    , Option ['w'] ["webserver"] (NoArg setWebServerMode) "run web server"
-    , Option ['d'] ["debug"] (NoArg setDebugMode) "debugging commands"
-    , Option ['t'] ["test"] (NoArg setTestExec) "execution in test mode"
+    [ OptionSpec ['?'] ["help"] (NoArg setHelp)
+    , OptionSpec [] ["version"] (NoArg setVersion)
+    , OptionSpec ['c'] [] (NoArg setReadArgMode)
+    , OptionSpec ['s'] [] (NoArg setReadStdinMode)
+    , OptionSpec ['w'] ["webserver"] (NoArg setWebServerMode)
+    , OptionSpec ['d'] ["debug"] (NoArg setDebugMode)
+    , OptionSpec ['t'] ["test"] (NoArg setTestExec)
     ]
   where
     setHelp opts = opts { optMode = (\_ _ -> usage) }
@@ -59,9 +59,9 @@ optionsDescr =
 
 parseOptions :: [String] -> IO (Options, [String])
 parseOptions argv =
-   case getOpt Permute optionsDescr argv of
-      (o,n,[]  ) -> return (foldl' (flip ($)) defaultOpts o,n)
-      (_,_,errs) -> usageFailure (concat errs)
+    case mconcat $ processArgs optionsDescr argv of
+        (OA (Right (f, args))) -> return (f defaultOpts, args)
+        (OA (Left err)) -> usageFailure err
   where
     defaultOpts =
         Options { optMode = processFile, optRunner = runnerInIO }
@@ -78,7 +78,6 @@ usage = do
         \ -w [<port>]        -- run web server\n\
         \ -d doctest <file>* -- run doctest over the files\n\
         \ -d shelltest shell <file>* -- run doctest via the given shell\n"
-    putStr $ usageInfo ("Options:") optionsDescr
 
 usageFailure :: String -> IO a
 usageFailure msg = do
