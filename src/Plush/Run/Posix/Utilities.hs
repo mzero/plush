@@ -34,6 +34,7 @@ module Plush.Run.Posix.Utilities (
     -- $outstr
     PosixOutStr(..),
     outStr, outStrLn, errStr, errStrLn, jsonOut,
+    writeStr, writeStrLn,
 
     -- * File and directory existance
     doesFileExist, doesDirectoryExist,
@@ -84,8 +85,9 @@ readAllFile fp = bracket open closeFd (fmap fromByteString . readAll)
 
 
 -- $outstr
--- Use these in place of 'putStr' and 'putStrLn'. Note that these are
--- unbuffered.
+-- Use these in place of 'putStr' and 'putStrLn', (as well as
+-- 'hPutStr' and 'hPutStrLn').
+-- Note that these are unbuffered.
 
 -- | String like classes that can be used with 'outStr' and friends.
 class PosixOutStr s where
@@ -110,11 +112,15 @@ instance PosixOutStr T.Text where
     toByteStringLn = L.fromChunks . (:[B.singleton nl]) . T.encodeUtf8
       where nl = toEnum $ fromEnum '\n'
 
+writeStr, writeStrLn :: (PosixOutStr s, PosixLike m) => Fd -> s -> m ()
+writeStr fd = write fd . toByteString
+writeStrLn fd = write fd . toByteStringLn
+
 outStr, outStrLn, errStr, errStrLn :: (PosixOutStr s, PosixLike m) => s -> m ()
-outStr = write stdOutput . toByteString
-errStr = write stdError . toByteString
-outStrLn = write stdOutput . toByteStringLn
-errStrLn = write stdError . toByteStringLn
+outStr = writeStr stdOutput
+errStr = writeStr stdError
+outStrLn = writeStrLn stdOutput
+errStrLn = writeStrLn stdError
 
 jsonOut :: (A.ToJSON a, PosixLike m) => a -> m ()
 jsonOut = write stdJsonOutput . A.encode

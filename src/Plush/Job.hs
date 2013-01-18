@@ -33,7 +33,6 @@ import Control.Concurrent
 import Control.Monad (forM_, unless, void)
 import qualified Control.Monad.Exception as Exception
 import System.Exit
-import System.IO
 import System.Posix
 import qualified System.Posix.Missing as PM
 
@@ -43,8 +42,7 @@ import Plush.Job.StdIO
 import Plush.Job.Types
 import Plush.Run
 import Plush.Run.Execute
-import Plush.Run.Posix (write)
-import Plush.Run.Posix.Utilities (toByteString)
+import Plush.Run.Posix.Utilities (writeStr)
 import Plush.Run.ShellExec
 
 
@@ -85,16 +83,13 @@ data ShellThread = ShellThread
 -- the shell is stated, they must not be used for communicating. The returned
 -- handles are tied to the original 'stdout' and 'stderr' and can be used to
 -- communicate to the original streams.
-startShell :: Runner -> IO (ShellThread, Handle, Handle)
+startShell :: Runner -> IO (ShellThread, Fd, Fd)
 startShell runner = do
     origInFd <- PM.dupFdCloseOnExec stdInput upperFd
     origOutFd <- PM.dupFdCloseOnExec stdOutput upperFd
     origErrFd <- PM.dupFdCloseOnExec stdError upperFd
 
     reserveShellFds
-
-    origStdOut <- fdToHandle origOutFd
-    origStdErr <- fdToHandle origErrFd
 
     foregroundStdIOParts <- makeStdIOParts
     foregroundRIO <- stdIOLocalPrep foregroundStdIOParts
@@ -104,13 +99,11 @@ startShell runner = do
     historyVar <- initHistory runner >>= newMVar
     let st = ShellThread jobRequestVar scoreBoardVar historyVar
     let childPrep = do
-            mapM_ closeFdSafe [origInFd, origOutFd, origErrFd]
-                -- TODO(mzero): closeFdSafe because origOutFd mysteriously
-                -- is closed by the time we fork a child... why?
+            mapM_ closeFd [origInFd, origOutFd, origErrFd]
             stdIOCloseMasters foregroundStdIOParts
-    _ <- forkIO $ shellThread st foregroundRIO origStdErr childPrep runner
+    _ <- forkIO $ shellThread st foregroundRIO origErrFd childPrep runner
 
-    return (st, origStdOut, origStdErr)
+    return (st, origOutFd, origErrFd)
   where
     upperFd = Fd 20
 
@@ -124,13 +117,13 @@ startShell runner = do
 
 
 
-shellThread :: ShellThread -> RunningIO -> Handle -> IO () -> Runner -> IO ()
-shellThread st foregroundRIO origStdErr childPrep = go
+shellThread :: ShellThread -> RunningIO -> Fd -> IO () -> Runner -> IO ()
+shellThread st foregroundRIO origErrFd childPrep = go
   where
     go runner =
         (takeMVar (stJobRequest st) >>= runJob' runner >>= go)
         `Exception.catchAll`
-        (\e -> hPutStrLn origStdErr (show e) >> go runner)
+        (\e -> writeStr origErrFd (show e) >> go runner)
     runJob' = runJob st foregroundRIO childPrep
 
 runJob :: ShellThread -> RunningIO -> IO () -> Runner -> CommandRequest -> IO Runner
@@ -270,7 +263,7 @@ offerInput st job input = modifyMVar_ (stScoreBoard st) $ \sb -> do
         _ -> return ()
     return sb
   where
-    send (InputItemInput s) rs = write (rioStdIn $ rsIO rs) $ toByteString s
+    send (InputItemInput s) rs = writeStr (rioStdIn $ rsIO rs) s
     send (InputItemEof) rs = closeFd (rioStdIn $ rsIO rs)
     send (InputItemSignal sig) rs =
         maybe (return ()) (signalProcess sig) $ rsProcessID rs

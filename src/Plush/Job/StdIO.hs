@@ -24,12 +24,9 @@ module Plush.Job.StdIO (
     stdIOMasterPrep,
     stdIOLocalPrep,
     stdIOCloseMasters,
-
-    closeFdSafe,
     ) where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad.Exception (catchIOError)
 import Data.Aeson (Value)
 import System.Posix
 import qualified System.Posix.Missing as PM
@@ -115,6 +112,3 @@ stdIOCloseMasters StdIOParts {..} = do
     closeFd master1
     closeFd master2
     closeFd masterJ
-
-closeFdSafe :: Fd -> IO ()
-closeFdSafe fd = closeFd fd `catchIOError` (const $ return ())

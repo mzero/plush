@@ -40,13 +40,13 @@ import qualified Network.HTTP.Types as H
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Middleware.Route as Route
-import System.IO
-import System.Posix (sleep)
+import System.Posix (Fd, sleep)
 import System.Random
 
 import Plush.Job
 import Plush.Job.Types
 import Plush.Run
+import Plush.Run.Posix.Utilities (writeStr)
 import Plush.Server.API
 import Plush.Server.Utilities
 import qualified Plush.Server.Warp as Warp'
@@ -57,11 +57,11 @@ import Plush.Utilities
 -- shell exits.
 server :: Runner -> Maybe Int -> IO ()
 server runner port = do
-    (shellThread, origOut, origErr) <- startShell runner
+    (shellThread, origOutFd, origErrFd) <- startShell runner
     key <- genKey
-    hPutStrLn origOut $ "Starting server, connect to: " ++ startUrl key
+    writeStr origOutFd $ "Starting server, connect to: " ++ startUrl key
     void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
-    Warp'.runSettings (settings origErr)
+    Warp'.runSettings (settings origErrFd)
         $ dispatchApp (jsonApis shellThread key)
         $ staticApp
         $ respApp notFound
@@ -79,7 +79,7 @@ server runner port = do
         sleep 1 >> submitJob st (CommandRequest "opener" False (CommandItem cmd))
 
 
-reportError :: Handle -> Ex.SomeException -> IO ()
+reportError :: Fd -> Ex.SomeException -> IO ()
 reportError errOut err = logger $
     (case e of { Just Ex.ThreadKilled -> Just Nothing; _ -> Nothing })
     <|> (Just . ("Invalid Request: " ++) . show) <$> (e :: Maybe Warp.InvalidRequest)
@@ -90,7 +90,7 @@ reportError errOut err = logger $
 
     logger (Just (Just s)) = do
         t <- show <$> getZonedTime
-        hPutStrLn errOut $ t ++ ' ' : s
+        writeStr errOut $ t ++ ' ' : s
     logger _ = return ()
 
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
