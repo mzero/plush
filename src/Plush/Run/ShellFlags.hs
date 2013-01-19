@@ -99,7 +99,9 @@ flagParameter flags = mapMaybe fdShortName setFlags
 processFlagArgs :: [String] -> (Flags -> Flags, [String])
 processFlagArgs = go
   where
+    go as@("-":_) = (id,as)
     go as@("--":_) = (id,as)
+    go (a@('-':'-':_):as) = (id,[a]) `andThen` go as
     go ("-o":n:as) = long n True `andThen` go as
     go ("+o":n:as) = long n False `andThen` go as
     go (('-':cs):as) = short cs True `andThen` go as

@@ -1,4 +1,4 @@
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2012-2013 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./dist/build/plush/plush -d doctest tests/*.doctest
-./dist/build/plush/plush -d shelltest sh tests/*.doctest
-./dist/build/plush/plush -d shelltest dash tests/*.doctest
-./dist/build/plush/plush -d shelltest bash tests/*.doctest
+./dist/build/plush/plush --doctest tests/*.doctest
+./dist/build/plush/plush --shelltest sh tests/*.doctest
+./dist/build/plush/plush --shelltest dash tests/*.doctest
+./dist/build/plush/plush --shelltest bash tests/*.doctest
 plush_datadir=`pwd` \
-  ./dist/build/plush/plush -d shelltest ./dist/build/plush/plush tests/*.doctest
+  ./dist/build/plush/plush --shelltest ./dist/build/plush/plush tests/*.doctest
