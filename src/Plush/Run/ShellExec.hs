@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ module Plush.Run.ShellExec (
     VarScope(..), VarMode(..), VarEntry,
     ShellState(), initialShellState,
     ShellExec,
+    getName, setName,
     getArgs, setArgs,
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
@@ -87,6 +88,12 @@ initialShellState = ShellState
 
 type ShellExec m = StateT ShellState m
 
+getName :: (Monad m) => ShellExec m String
+getName = gets ssName
+
+setName :: (Monad m) => String -> ShellExec m ()
+setName name = modify $ (\s -> s { ssName = name })
+
 getArgs :: (Monad m) => ShellExec m [String]
 getArgs = gets ssArgs
 
@@ -112,6 +119,7 @@ getVar name = get >>= return . varOptions
         "#" -> Just . show . length . ssArgs $ s
         "?" -> Just . show . exitStatus . ssLastExitCode $ s
         "-" -> Just . flagParameter . ssFlags $ s
+        "0" -> Just . ssName $ s
         _ -> Nothing
     positionalVar s = case readMaybe name of
         Just n | n > 0 -> listToMaybe . drop (n - 1) $ ssArgs s

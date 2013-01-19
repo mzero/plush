@@ -42,16 +42,21 @@ foreign export ccall plushMain :: IO ()
 plushMain :: IO ()
 plushMain = do
     fullArgs <- getArgs
+    progName <- getProgName
+        -- TODO(mzero): this should be argv[0], but getProgName applies basename
     let (flagF, nonFlagArgs) = F.processFlagArgs fullArgs
     case mconcat $ processArgs commandLineOptions nonFlagArgs of
         (OA (Right (optF, args))) -> do
-            let opts = optF $ defaultOpts { optSetFlags = flagF}
+            let opts = optF $ Options
+                        { optMode = processFile
+                        , optRunner = runnerInIO
+                        , optShellName = progName
+                        , optSetFlags = flagF
+                        , optShellArgs = []
+                        }
             optMode opts opts args
             exitSuccess
         (OA (Left err)) -> usageFailure err
-  where
-    defaultOpts = Options processFile runnerInIO "plush" id []
-
 
 data Options = Options
                 { optMode :: Options -> [String] -> IO ()
@@ -101,7 +106,11 @@ initialRunner :: Options -> IO Runner
 initialRunner opts = fmap snd $ run setup (optRunner opts)
   where
     setup :: (PosixLike m) => Shell.ShellExec m ()
-    setup = Shell.setFlags flags >> Shell.setArgs (optShellArgs opts)
+    setup = do
+        Shell.setName $ optShellName opts
+        Shell.setFlags flags
+        Shell.setArgs $ optShellArgs opts
+
     iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
     flags = if iIsSet
                 then F.defaultInteractiveFlags
