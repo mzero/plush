@@ -20,11 +20,11 @@ and grep cabaility. For now, these tests are hand coded to match plush.
 
 variable output
     # v1=amy v2="doesn't" v3=""
-    # set | fgrep v1=           # SKIP sh bash
+    # set | fgrep v1=           # SKIP bash
     v1='amy'
-    # set | fgrep v2=           # SKIP sh bash
+    # set | fgrep v2=           # SKIP bash
     v2='doesn'"'"'t'
-    # set | fgrep v3=           # SKIP sh bash
+    # set | fgrep v3=           # SKIP bash
     v3=''
 
 flag output, user form

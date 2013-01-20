@@ -25,7 +25,34 @@ test_shell_if_exists() {
 }
 
 $plush --doctest $extra $tests
-test_shell_if_exists sh
+test_shell_if_exists $plush
 test_shell_if_exists dash
 test_shell_if_exists bash
-# test_shell_if_exists ksh
+
+# sh is often some other shell, detect that here, and act accordingly
+if shpath=`which sh`
+then
+    if shlink=`readlink $shpath`
+    then
+        realshbase=`basename $shlink`
+        case "$realshbase" in
+            dash|bash)
+                echo sh is $realshbase, not retesting
+                ;;
+
+            *)
+                echo sh is $realshbase, testing as sh
+                test_shell_if_exists sh
+                ;;
+        esac
+    else
+        if strings $shpath | grep -q BASH_VERSION
+        then
+            echo sh appears to be bash, not retesting
+        else
+            test_shell_if_exists sh
+        fi
+    fi
+else
+    echo no sh found on path
+fi

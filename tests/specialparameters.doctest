@@ -37,7 +37,7 @@ first character of IFS, if any (and defaulted to space, if unset)
     argv[1] = <alpha:beta:gamma>
 
     # IFS=""
-    # recho $*                                          # SKIP sh bash
+    # recho $*                                          # SKIP bash
     argv[1] = <alphabetagamma>
 
     # recho "$*"

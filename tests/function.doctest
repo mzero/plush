@@ -1,4 +1,4 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -60,5 +60,5 @@ Unset functions. Note that we skip this test for other shells because
 the error messages are different.
     # foo() { echo ok; }
     # unset -f foo
-    # foo                               # SKIP sh dash bash
+    # foo                               # ONLY plush
     Unknown command: foo
