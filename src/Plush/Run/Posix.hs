@@ -49,8 +49,8 @@ module Plush.Run.Posix (
     stdJsonInput, stdJsonOutput,
 ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad (when)
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad (foldM, when)
 import Control.Monad.Exception (MonadException, catchIf, catchIOError)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
@@ -246,16 +246,15 @@ ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
 -- series of pipes. The first action gets the original stdInput, the last
 -- command gets the original stdOutput.
 ioPipeline :: [IO ExitCode] -> IO ExitCode
-ioPipeline = next Nothing
+ioPipeline actions = next Nothing actions >>= waitAll
   where
-    next pPrev [] = forM_ pPrev closeBoth >> return ExitSuccess
-    next pPrev [cz] = seg pPrev cz Nothing >>= wait
+    next pPrev [] = forM_ pPrev closeBoth >> return []
+    next pPrev [cz] = (:[]) <$> seg pPrev cz Nothing
         -- TODO: run cz in foreground once we can stash stdInput reliably
 
     next pPrev (c:cs) = do
-        pNext <- Just <$> P.createPipe   -- (readSize, writeSide)
-        _ <- seg pPrev c pNext
-        next pNext cs
+        pNext <- Just <$> P.createPipe   -- (readSide, writeSide)
+        (:) <$> seg pPrev c pNext <*> next pNext cs
 
     seg pIn c pOut = do
         pid <- P.forkProcess $ do
@@ -266,6 +265,8 @@ ioPipeline = next Nothing
         return pid
 
     closeBoth (r,w) = closeFd r >> closeFd w
+
+    waitAll = foldM (const wait) ExitSuccess
 
     wait pid = do
         st <- P.getProcessStatus True False pid

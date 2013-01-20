@@ -131,7 +131,7 @@ Library
     wai-middleware-route >= 0.2.0 && < 0.8,
     warp >= 1.0.0 && < 1.4
 
-  ghc-options: -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
+  ghc-options: -Wall -fno-warn-missing-signatures -fwarn-tabs
 
   if flag(Production)
     cpp-options: -DPRODUCTION
@@ -148,7 +148,7 @@ Executable plush
   C-sources:
     src-main/main.c
 
-  ghc-options: -no-hs-main -Wall -threaded -fno-warn-missing-signatures -fwarn-tabs
+  ghc-options: -no-hs-main -Wall -fno-warn-missing-signatures -fwarn-tabs
 
 
 Executable recho
