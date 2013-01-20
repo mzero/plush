@@ -197,12 +197,20 @@ runWebServer opts args = case args of
 --
 
 doctest :: Options -> [String] -> IO ()
-doctest _ fps = runDocTests fps
+doctest opts fps = runDocTests (isVerbose opts) fps
 
 shelltest :: Options -> [String] -> IO ()
-shelltest _ (shell:fps) = shellDocTests shell fps
+shelltest opts (shell:fps) = shellDocTests (isVerbose opts) shell fps
 shelltest _ _ = usageFailure "requires a shell arg"
 
+-- | Repurpose the @-v@ shell flag (@verbose@) as the verbose flag for tests.
+isVerbose :: Options -> Bool
+isVerbose opts = F.verbose $ optSetFlags opts F.defaultFlags
+
+
+--
+-- Running Commands
+--
 
 runRepl :: Runner -> IO ()
 runRepl = runInputT defaultSettings . repl

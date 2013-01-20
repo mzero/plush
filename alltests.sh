@@ -12,9 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./dist/build/plush/plush --doctest tests/*.doctest
-./dist/build/plush/plush --shelltest sh tests/*.doctest
-./dist/build/plush/plush --shelltest dash tests/*.doctest
-./dist/build/plush/plush --shelltest bash tests/*.doctest
-plush_datadir=`pwd` \
-  ./dist/build/plush/plush --shelltest ./dist/build/plush/plush tests/*.doctest
+extra="$@"
+tests="tests/*.doctest"
+plush="./dist/build/plush/plush"
+
+test_shell_if_exists() {
+    shell=$1
+    if which $shell >/dev/null
+    then
+        $plush --shelltest $extra "$shell" $tests
+    fi
+}
+
+$plush --doctest $extra $tests
+test_shell_if_exists sh
+test_shell_if_exists dash
+test_shell_if_exists bash
+# test_shell_if_exists ksh

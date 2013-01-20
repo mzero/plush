@@ -21,9 +21,10 @@ module Plush.DocTest (
     where
 
 import Control.Applicative ((<$>))
-import Control.Monad (join)
+import Control.Monad (join, when)
 import Data.List (foldl', intercalate, isPrefixOf, partition)
 import System.FilePath (takeFileName)
+import System.IO (hFlush, hSetBuffering, BufferMode(NoBuffering), stdout)
 
 import Plush.DocTest.Posix
 import Plush.Run
@@ -120,6 +121,14 @@ docTestFile fp =
 divider :: IO ()
 divider = putStrLn $ replicate 72 '-'
 
+leftAlign :: Int -> String -> String
+leftAlign n s | n <= 0 = s
+leftAlign n []         = replicate n ' '
+leftAlign n (c:cs)     = c : leftAlign (n - 1) cs
+
+rightAlign :: Int -> String -> String
+rightAlign n = reverse . leftAlign n . reverse
+
 data Result = BadParse String
             | LeftoverParse String
             | UnexpectedResult String
@@ -160,19 +169,39 @@ reportResult test result = case result of
 
     putStrIndented = putStr . unlines . map ("    "++) . lines
 
-reportResults :: [(Test, Result)] -> IO ()
-reportResults trs = do
-    mapM_ (uncurry reportResult) trs'
-    divider
-    putStrLn $ show sAll ++ " successes, "
-        ++ show fAll ++ " failures"
-        ++ if kAll > 0 then ", " ++ show kAll ++ " skipped" else ""
+reportResults :: Bool -> [(Test, Result)] -> IO ()
+reportResults verbose trs = if verbose then reportVerbose else reportLight
   where
+    reportVerbose = do
+        mapM_ (uncurry reportResult) trs'
+        divider
+        putStrLn $ show sAll ++ " successes, "
+            ++ show fAll ++ " failures"
+            ++ if kAll > 0 then ", " ++ show kAll ++ " skipped" else ""
+    reportLight = do
+        putStrLn $ rightAlign 4 (show sAll) ++ " pass "
+            ++ rightAlign 4 (show fAll) ++ " fail "
+            ++ rightAlign 4 (show kAll) ++ " skip"
+
     trs' = uncurry (++) $ partition ((/= Skipped).snd) trs
     (sAll,kAll,fAll) = foldl' q (0::Int,0::Int,0::Int) $ map snd trs
     q (s,k,f) Success = (s+1,k,f)
     q (s,k,f) Skipped = (s,k+1,f)
     q (s,k,f) _ = (s,k,f+1)
+
+
+type RunTests = [Test] -> IO [(Test, Result)]
+
+runAndReport :: String -> Bool -> RunTests -> [FilePath] -> IO ()
+runAndReport name verbose testF fps = do
+    hSetBuffering stdout NoBuffering
+    putStr $ if verbose
+        then "=== Running " ++ name ++ " ===\n"
+        else leftAlign 48 $ "Running " ++ name ++ "... "
+    hFlush stdout
+    results <- mapM (\fp -> docTestFile fp >>= testF) fps
+    reportResults verbose $ concat results
+    when verbose $ putStrLn ""
 
 
 
@@ -202,11 +231,9 @@ runTest t r0 =
     badParse errs r = (BadParse errs, r)
 
 
-runDocTests :: [FilePath] -> IO ()
-runDocTests fps = do
-    putStrLn $ "=== Running tests under test mode with -- plush ==="
-    mapM (\fp -> runTests `fmap` docTestFile fp) fps >>= reportResults . concat
-    putStrLn ""
+runDocTests :: Bool -> [FilePath] -> IO ()
+runDocTests verbose =
+    runAndReport "doctest (plush test mode)" verbose $ return . runTests
 
 
 
@@ -237,11 +264,7 @@ shellTests shcmd tests = do
     breakLn = breaker ++ "\n"
     breaker = "~~~ ~~~ ~~~ ~~~ ~~~ ~~~"
 
-shellDocTests :: String -> [FilePath] -> IO ()
-shellDocTests shcmd fps = do
-    putStrLn $ "=== Running tests with shell command -- " ++ shcmd ++ " ==="
-    mapM shellFile fps >>= reportResults . concat
-    putStrLn ""
-  where
-    shellFile fp = docTestFile fp >>= shellTests shcmd
+shellDocTests :: Bool -> String -> [FilePath] -> IO ()
+shellDocTests verbose shcmd =
+    runAndReport ("shelltest " ++ shcmd) verbose $ shellTests shcmd
 
