@@ -53,6 +53,7 @@ Library
   Other-modules:
     Control.Monad.Exception
     Paths_plush
+    Plush.ArgParser
     Plush.DocTest
     Plush.DocTest.Posix
     Plush.Job
@@ -66,6 +67,7 @@ Library
     Plush.Parser.Tokens
     Plush.Parser
     Plush.Pretty
+    Plush.Resource
     Plush.Run.Annotate
     Plush.Run.BuiltIns
     Plush.Run.BuiltIns.Evaluation

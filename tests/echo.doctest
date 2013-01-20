@@ -1,4 +1,4 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -44,6 +44,6 @@ the standard argument syntax -- should be treated as a normal argument
     -- onetwo
 
 Plush chooses to not implement the XSI style escape sequences
-    # echo '\a \b \c \f \n \r \t \v \\ \041'    # SKIP dash sh
+    # echo '\a \b \c \f \n \r \t \v \\ \041'    # SKIP dash
     \a \b \c \f \n \r \t \v \\ \041
 

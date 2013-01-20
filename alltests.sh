@@ -1,4 +1,4 @@
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2012-2013 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./dist/build/plush/plush -d doctest tests/*.doctest
-./dist/build/plush/plush -d shelltest sh tests/*.doctest
-./dist/build/plush/plush -d shelltest dash tests/*.doctest
-./dist/build/plush/plush -d shelltest bash tests/*.doctest
-plush_datadir=`pwd` \
-  ./dist/build/plush/plush -d shelltest ./dist/build/plush/plush tests/*.doctest
+extra="$@"
+tests="tests/*.doctest"
+plush="./dist/build/plush/plush"
+
+test_shell_if_exists() {
+    shell=$1
+    if which $shell >/dev/null
+    then
+        $plush --shelltest $extra "$shell" $tests
+    fi
+}
+
+$plush --doctest $extra $tests
+test_shell_if_exists $plush
+test_shell_if_exists dash
+test_shell_if_exists bash
+
+# sh is often some other shell, detect that here, and act accordingly
+if shpath=`which sh`
+then
+    if shlink=`readlink $shpath`
+    then
+        realshbase=`basename $shlink`
+        case "$realshbase" in
+            dash|bash)
+                echo sh is $realshbase, not retesting
+                ;;
+
+            *)
+                echo sh is $realshbase, testing as sh
+                test_shell_if_exists sh
+                ;;
+        esac
+    else
+        if strings $shpath | grep -q BASH_VERSION
+        then
+            echo sh appears to be bash, not retesting
+        else
+            test_shell_if_exists sh
+        fi
+    fi
+else
+    echo no sh found on path
+fi

@@ -1,11 +1,11 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
--- 
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
+--
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
 -- You may obtain a copy of the License at
--- 
+--
 --     http://www.apache.org/licenses/LICENSE-2.0
--- 
+--
 -- Unless required by applicable law or agreed to in writing, software
 -- distributed under the License is distributed on an "AS IS" BASIS,
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,16 +25,16 @@ Initial set up
 
 Basic path globs
     # touch .ant aardvark bat.hs beetle.hs cat.hs rat whale
-    
+
     # echo *.hs
     bat.hs beetle.hs cat.hs
-    
+
     # echo b*
     bat.hs beetle.hs
-    
+
     # echo ???.hs
     bat.hs cat.hs
-    
+
     # echo ?at*
     bat.hs cat.hs rat
 
@@ -49,7 +49,7 @@ Character classes
 
     # echo [].hs
     [].hs
-    
+
     # echo \[\].hs
     [].hs
 
@@ -74,20 +74,20 @@ Character classes
 Don't match leading periods, except with explicit periods
     # echo ?a*
     aardvark bat.hs cat.hs rat
-    
+
     # echo *t*
     bat.hs beetle.hs cat.hs rat
-    
+
     # echo .a*
     ..ant
-    
+
     # echo .*
     .. .. .ant
-    
+
 Non matching patterns return themselves
     # echo *.cpp
     *.cpp
-    
+
     # echo z*
     z*
 
@@ -98,29 +98,29 @@ What is and isn't expanded
     bat.hs beetle.hs
     # echo $t$v
     beetle.hs
-    
+
     # echo "$t"
     b*
     # echo 'b*'
     b*
     # echo b\*
     b*
-    
+
 Subdirectories can be matched
     # mkdir america
     # mkdir antarctic
     # touch america/lynx america/porcupine america/Index
     # touch antarctic/penguine antarctic/sealion antarctic/Index
-    
+
     # echo america/*
     america/Index america/lynx america/porcupine
-    
+
     # echo */Index
     america/Index antarctic/Index
-    
+
     # echo */p*
     america/porcupine antarctic/penguine
-    
+
     # echo Europe/*
     Europe/*
 
@@ -133,11 +133,11 @@ Trailing slashes
     r*/
     # echo rat/
     rat/
-    
+
 Weird internal slashes
-    # echo a*//l*           # SKIP sh bash
+    # echo a*//l*           # SKIP bash
     america//lynx
-    
+
 Leading slashes
     # echo /tmp/${testdir}/w*
     /tmp/doctest/whale
@@ -145,4 +145,4 @@ Leading slashes
 Clean-up
     # cd /tmp
     # rm -rf ${testdir}
-    
+

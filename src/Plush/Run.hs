@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,39 +19,42 @@ limitations under the License.
 module Plush.Run (
     -- * Runner
     Runner,
+    runnerInIO,
+    runnerInTest,
     run,
-    runParseCommand,
-    runCommandList,
-    runInIO,
-    runInTest,
-    runInPrettyPrint,
 
     -- * TestRunner
     TestRunner,
+    testRunner,
     testRun,
-    testRunParseCommand,
-    testRunCommandList,
-    testRunInTest,
+
+    -- * Utility Actions
+    parse,
+    parseInput,
+    execute,
+    outputs,
     )
 where
 
 import Control.Arrow (first)
 import qualified Control.Exception as Ex
+import Control.Monad (when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (runStateT)
-import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
 
 import Plush.Parser
 import Plush.Pretty
+import Plush.Resource
 import Plush.Run.Execute
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
+import qualified Plush.Run.ShellFlags as F
 import Plush.Run.TestExec
 import Plush.Types
-import Plush.Utilities
 
 
 -- | Encapsulates the state and 'PosixLike' monad of a running shell.
@@ -68,22 +71,14 @@ import Plush.Utilities
 data Runner = RunPrimed Runner
             | RunInIO ShellState
             | RunInTest ShellState TestState
-            | RunInPrettyPrint
 
 -- | Run actions in the @'ShellExec' 'IO'@ monad.
-runInIO :: Runner
-runInIO = RunPrimed $ RunInIO initialShellState
+runnerInIO :: Runner
+runnerInIO = RunPrimed $ RunInIO initialShellState
 
 -- | Run actions in the @'ShellExec' 'TestExec'@ monad.
-runInTest :: Runner
-runInTest = RunPrimed $ RunInTest initialShellState initialTestState
-
--- | Run actions under pretty print. This only works with 'runCommandList',
--- which will output the pretty-printed version of the command to @stdout@.
--- It will simply throw an error with arbitrary 'ShellExec' actions. Admittedly,
--- this is a bit of a hack.
-runInPrettyPrint :: Runner
-runInPrettyPrint = RunInPrettyPrint
+runnerInTest :: Runner
+runnerInTest = RunPrimed $ RunInTest initialShellState initialTestState
 
 -- | Using the encapsulated state and monad in a 'Runner', run a 'ShellExec'
 -- action. The result is a pair of the result of the action, and a new 'Runner'
@@ -104,18 +99,6 @@ run act runner = case runner of
         putStr $ either show (uncurry (++)) oe
         return (a, RunInTest s' t'')
 
-    RunInPrettyPrint -> fail "run: can't execute actions in PrettyPrint"
-
--- | Parse a command, using the state of the 'Runner'
-runParseCommand :: String -> Runner -> IO ParseCommandResult
-runParseCommand s RunInPrettyPrint = return $ parseCommand M.empty s
-runParseCommand s r = (\(a,_) -> parseCommand a s) `fmap` run getAliases r
-
--- | Run a 'CommandList' with a 'Runner'
-runCommandList :: CommandList -> Runner -> IO Runner
-runCommandList cl RunInPrettyPrint = putStrLn (pp cl) >> return RunInPrettyPrint
-runCommandList cl r = snd `fmap` run (shellExec cl) r
-
 -- | Initialize the state of the shell for a runner. This requires reading
 -- auxillary data from plush's data dir, which is used to set up the internal
 -- state of the shell. Therefore, this priming takes place in IO, even if the
@@ -126,14 +109,16 @@ prime r = do
                     `fmap` getDataResource "summaries.txt"
     snd `fmap` run (primeShellState >> loadSummaries summaries) r
 
+
+
 -- | A similar encapsulation as 'Runner', but always with the 'TestExec' monad.
 -- As a consequence, actions are not run in the 'IO' monad.
 data TestRunner = TestRunPrimed TestRunner
                 | TestRunInTest ShellState TestState
 
 -- | Run actions in the @'ShellExec' 'TestExec'@ monad.
-testRunInTest :: TestRunner
-testRunInTest = TestRunPrimed $ TestRunInTest initialShellState initialTestState
+testRunner :: TestRunner
+testRunner = TestRunPrimed $ TestRunInTest initialShellState initialTestState
 
 -- | Using the encapsulated state in a 'TestRunner', run a 'ShellExec' action.
 -- The result is a pair of the result of the action, and a new 'TestRunner'
@@ -147,17 +132,36 @@ testRun act runner = case runner of
             (r', s') = either (\e -> (Left $ show e, s)) (first Right) r
         in  (r', TestRunInTest s' t')
 
--- | Parse a command, using the state of the 'TestRunner'
-testRunParseCommand :: String -> TestRunner -> ParseCommandResult
-testRunParseCommand s r =
-    either Left (\a -> parseCommand a s) . fst $ testRun getAliases r
 
 
--- | Run a 'CommandList' with a 'TestRunner'. The first part of the return pair
--- is a combination of the @stdout@ and @stderr@ outputs.
-testRunCommandList ::
-    CommandList -> TestRunner -> ((String, String), TestRunner)
-testRunCommandList cl r = first handleTestError runResult
-  where
-    runResult = testRun (shellExec cl >> lift testOutput) r
-    handleTestError = either (\e -> ("",e)) id
+-- * Utility Actions
+
+-- | Parse a command, in the state of the shell. Extracts the aliases from
+-- the shell state to give to the parser. This action should have no side
+-- effects, and the transformed shell state from this action can be safely
+-- ignored.
+parse :: (PosixLike m) => String -> ShellExec m ParseCommandResult
+parse s = getAliases >>= return . flip parseCommand s
+
+-- | Like 'parse', but the string is considered "shell input", and so is
+-- subject the @verbose (@-v@) and @parseout@ (@-P@) shell flags. Therefore,
+-- this operation can have output other potential side effects.
+parseInput :: (PosixLike m) => String -> ShellExec m ParseCommandResult
+parseInput s = do
+    flags <- getFlags
+    when (F.verbose flags) $ errStrLn s
+    pcr <- parse s
+    when (F.parseout flags) $ case pcr of
+        Right (cl, _) -> errStrLn $ pp cl
+        _ -> return ()
+    return pcr
+
+-- | Run a parsed command line.
+execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode
+execute = shellExec
+
+
+-- | Drain and return the output streams for a TestExec
+outputs :: ShellExec TestExec (String, String)
+outputs = lift testOutput
+

@@ -1,11 +1,11 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
--- 
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
+--
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
 -- You may obtain a copy of the License at
--- 
+--
 --     http://www.apache.org/licenses/LICENSE-2.0
--- 
+--
 -- Unless required by applicable law or agreed to in writing, software
 -- distributed under the License is distributed on an "AS IS" BASIS,
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,11 +20,11 @@ and grep cabaility. For now, these tests are hand coded to match plush.
 
 variable output
     # v1=amy v2="doesn't" v3=""
-    # set | fgrep v1=           # SKIP sh bash
+    # set | fgrep v1=           # SKIP bash
     v1='amy'
-    # set | fgrep v2=           # SKIP sh bash
+    # set | fgrep v2=           # SKIP bash
     v2='doesn'"'"'t'
-    # set | fgrep v3=           # SKIP sh bash
+    # set | fgrep v3=           # SKIP bash
     v3=''
 
 flag output, user form
@@ -42,6 +42,7 @@ flag output, user form
     nolog            off
     notify           off
     nounset          off
+    parseout         off
     verbose          off
     vi               off
     xtrace           off
@@ -60,6 +61,7 @@ flag output, script form
     set +o nolog
     set +o notify
     set +o nounset
+    set +o parseout
     set +o verbose
     set +o vi
     set +o xtrace
