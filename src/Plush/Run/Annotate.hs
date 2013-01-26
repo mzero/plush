@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import Control.Monad (filterM)
 import Control.Monad.Exception (catchIOError)
 import Data.List ((\\), isPrefixOf)
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import System.FilePath
 
 
@@ -88,7 +88,12 @@ annotate cl cursor = coallesce <$> annoCommandList cl
             return $ Just (location w, [Completions comps])
         _ -> return Nothing
       where
-        compFiles (pre, post) = map (++post) <$> (pathnameGlob $ pre ++ "*")
+        compFiles (preCursor, postCursor) = map (++postCursor) <$> do
+            (tildePart, pathPart) <- tildeSplit preCursor
+            paths <- pathnameGlob (fromMaybe "" $ tildeDir tildePart)
+                        $ pathPart ++ "*"
+            return $ (maybe id (map . (</>)) $ tildePrefix tildePart) paths
+
 
     noteCmdCompletion w
         | '/' `elem` wordText w = noteCompletion w
