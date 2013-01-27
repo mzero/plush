@@ -28,6 +28,7 @@ import System.IO (hFlush, hSetBuffering, BufferMode(NoBuffering), stdout)
 
 import Plush.DocTest.Posix
 import Plush.Run
+import Plush.Run.Script
 import Plush.Utilities
 
 

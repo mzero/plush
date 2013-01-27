@@ -29,8 +29,6 @@ module Plush.Run (
     testRun,
 
     -- * Utility Actions
-    parse,
-    parseInput,
     execute,
     outputs,
     )
@@ -38,21 +36,16 @@ where
 
 import Control.Arrow (first)
 import qualified Control.Exception as Ex
-import Control.Monad (when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (runStateT)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
 
-import Plush.Parser
-import Plush.Pretty
 import Plush.Resource
 import Plush.Run.Execute
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
-import qualified Plush.Run.ShellFlags as F
 import Plush.Run.TestExec
 import Plush.Types
 
@@ -136,25 +129,6 @@ testRun act runner = case runner of
 
 -- * Utility Actions
 
--- | Parse a command, in the state of the shell. Extracts the aliases from
--- the shell state to give to the parser. This action should have no side
--- effects, and the transformed shell state from this action can be safely
--- ignored.
-parse :: (PosixLike m) => String -> ShellExec m ParseCommandResult
-parse s = getAliases >>= return . flip parseCommand s
-
--- | Like 'parse', but the string is considered "shell input", and so is
--- subject the @verbose (@-v@) and @parseout@ (@-P@) shell flags. Therefore,
--- this operation can have output other potential side effects.
-parseInput :: (PosixLike m) => String -> ShellExec m ParseCommandResult
-parseInput s = do
-    flags <- getFlags
-    when (F.verbose flags) $ errStrLn s
-    pcr <- parse s
-    when (F.parseout flags) $ case pcr of
-        Right (cl, _) -> errStrLn $ pp cl
-        _ -> return ()
-    return pcr
 
 -- | Run a parsed command line.
 execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode

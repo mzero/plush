@@ -86,6 +86,7 @@ Library
     Plush.Run.Posix
     Plush.Run.Posix.Utilities
     Plush.Run.Redirection
+    Plush.Run.Script
     Plush.Run.ShellExec
     Plush.Run.ShellFlags
     Plush.Run.TestExec

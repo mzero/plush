@@ -18,12 +18,11 @@ limitations under the License.
 
 module Plush.Main (plushMain) where
 
-import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (exitFailure, exitSuccess, exitWith)
 import System.IO (Handle, hIsTerminalDevice, hPutStr, hPutStrLn,
     stderr, stdin, stdout)
 
@@ -31,6 +30,7 @@ import Plush.ArgParser
 import Plush.DocTest
 import Plush.Run
 import Plush.Run.Posix
+import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
 import Plush.Server
@@ -147,7 +147,12 @@ version _ _ = putStrLn $ "Plush, the comfy shell, version " ++ displayVersion
 --
 processFile :: Options -> [String] -> IO ()
 processFile opts [] = processStdin opts []
-processFile opts (fp:args) = readUtf8File fp >>= processArg opts . (:(fp:args))
+processFile opts (fp:args) = do
+    script <- readUtf8File fp
+    processScriptNameArgs opts script (fp:args)
+    -- NOTE: This doesn't use runFile, as the file needs to come from the
+    -- invoking world, not within the PosixLike environment, which might be
+    -- a test environment.
 
 -- | Mode to run command specified on command line. Handles invocations like:
 --
@@ -155,11 +160,8 @@ processFile opts (fp:args) = readUtf8File fp >>= processArg opts . (:(fp:args))
 --
 processArg :: Options -> [String] -> IO ()
 processArg _ [] = usageFailure "no command given"
-processArg opts (cmds:nameAndArgs) = initialRunner opts' >>= runCommands cmds
-  where
-    opts' = case nameAndArgs of
-        [] -> opts
-        (name:args) -> opts { optShellName = name, optShellArgs = args }
+processArg opts (cmds:nameAndArgs) =
+    processScriptNameArgs opts cmds nameAndArgs
 
 -- | Mode to run commands from @stdin@. Handles invocations like:
 --
@@ -172,12 +174,22 @@ processStdin opts args = do
     isErrTerm <- hIsTerminalDevice stderr
     if isInTerm && isErrTerm
         then initialInteractiveRunner opts' >>= runRepl
-        else do
-            cmds <- getContents
-            initialRunner opts' >>= runCommands cmds
+        else getContents >>= processScript opts'
   where
     opts' = opts { optShellArgs = args }
 
+
+processScriptNameArgs :: Options -> String -> [String] -> IO ()
+processScriptNameArgs opts script []            = processScript opts script
+processScriptNameArgs opts script (name:args)   = processScript opts' script
+  where
+    opts' = opts { optShellName = name, optShellArgs = args }
+
+processScript :: Options -> String -> IO ()
+processScript opts script = do
+    r <- initialRunner opts
+    (ec, _) <- run (runScript script) r
+    exitWith ec
 
 --
 -- Web & Server Modes
@@ -224,21 +236,9 @@ runRepl = runInputT defaultSettings . repl
         case l of
             Nothing -> return ()
             Just input -> do
-                (leftOver, runner') <- liftIO (runCommand input runner)
-                when (not $ null leftOver) $
-                    outputStrLn ("Didn't use whole input: " ++ leftOver)
+                (s, runner') <- liftIO (run (runCommand input) runner)
+                case s of
+                    (_, Just leftOver) | not $ null leftOver ->
+                        outputStrLn ("Didn't use whole input: " ++ leftOver)
+                    _ -> return ()
                 repl runner'
-
-runCommands :: String -> Runner -> IO ()
-runCommands "" _ = return ()
-runCommands cmds runner = runCommand cmds runner >>= uncurry runCommands
-
-runCommand :: String -> Runner -> IO (String, Runner)
-runCommand cmds r0 = do
-    (pr, r1) <- run (parseInput cmds) r0
-    case pr of
-        Left errs -> putStrLn errs >> return ("", r1)
-        Right (cl, rest) -> run (execute cl) r1
-                                >>= return . (\(_,r2) -> (rest, r2))
-
-
