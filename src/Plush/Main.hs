@@ -108,13 +108,13 @@ initialRunner opts = fmap snd $ run setup (optRunner opts)
     setup :: (PosixLike m) => Shell.ShellExec m ()
     setup = do
         Shell.setName $ optShellName opts
-        Shell.setFlags flags
+        Shell.setFlags $ optSetFlags opts $ baseFlags
         Shell.setArgs $ optShellArgs opts
 
     iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
-    flags = if iIsSet
-                then F.defaultInteractiveFlags
-                else F.defaultFlags
+    baseFlags = if iIsSet
+                    then F.defaultInteractiveFlags
+                    else F.defaultFlags
         -- N.B.: Interactive as determined at the command line chooses a base
         -- set of flags, rather than setting just the interactive flag.
 
