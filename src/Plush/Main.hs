@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE ForeignFunctionInterface, OverloadedStrings #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Plush.Main (plushMain) where
 
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
@@ -25,11 +26,13 @@ import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess, exitWith)
 import System.IO (Handle, hIsTerminalDevice, hPutStr, hPutStrLn,
     stderr, stdin, stdout)
+import System.Posix.Missing (getArg0)
 
 import Plush.ArgParser
 import Plush.DocTest
 import Plush.Run
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
@@ -41,15 +44,15 @@ foreign export ccall plushMain :: IO ()
 
 plushMain :: IO ()
 plushMain = do
+    progName <- getArg0
     fullArgs <- getArgs
-    progName <- getProgName
-        -- TODO(mzero): this should be argv[0], but getProgName applies basename
     let (flagF, nonFlagArgs) = F.processFlagArgs fullArgs
     case mconcat $ processArgs commandLineOptions nonFlagArgs of
         (OA (Right (optF, args))) -> do
             let opts = optF $ Options
                         { optMode = processFile
                         , optRunner = runnerInIO
+                        , optLogin = take 1 progName == "-"
                         , optShellName = progName
                         , optSetFlags = flagF
                         , optShellArgs = []
@@ -61,6 +64,7 @@ plushMain = do
 data Options = Options
                 { optMode :: Options -> [String] -> IO ()
                 , optRunner :: Runner
+                , optLogin :: Bool
                 , optShellName :: String
                 , optSetFlags :: F.Flags -> F.Flags
                 , optShellArgs :: [String]
@@ -75,11 +79,13 @@ commandLineOptions =
     , OptionSpec ['w'] ["webserver"]  (NoArg $ setMode runWebServer)
     , OptionSpec []    ["doctest"]    (NoArg $ setMode doctest)
     , OptionSpec []    ["shelltest"]  (NoArg $ setMode shelltest)
+    , OptionSpec []    ["login"]      (NoArg $ setLogin True)
     , OptionSpec ['t'] ["test"]       (NoArg $ setRunner runnerInTest)
     ]
   where
     setMode m opts = opts { optMode = m }
     setRunner r opts = opts { optRunner = r }
+    setLogin b opts = opts { optLogin = b }
 
 
 usage :: Handle -> IO ()
@@ -110,6 +116,8 @@ initialRunner opts = fmap snd $ run setup (optRunner opts)
         Shell.setName $ optShellName opts
         Shell.setFlags $ optSetFlags opts $ baseFlags
         Shell.setArgs $ optShellArgs opts
+        when (optLogin opts) $ do
+            outStrLn "--imagine login processing occurring here--"
 
     iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
     baseFlags = if iIsSet

@@ -100,5 +100,9 @@ The - special parameter expands to the state of the flags
     a
 
 The 0 special parameter exapnds to the name of the shell
-    # echo $0               # ONLY plush
-    plush
+    # echo $0 | fgrep -q plush ; echo $?            # ONLY plush
+    0
+
+Can't have pipe in last test (no idea why)
+    # echo bye
+    bye

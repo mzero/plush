@@ -19,13 +19,19 @@ limitations under the License.
 
 module System.Posix.Missing (
     dupFd, dupFdCloseOnExec,
+
     loginTerminal,
     setControllingTerminal,
+
+    getArg0,
     ) where
 
 import Control.Monad (when)
 import Foreign.C
 import Foreign.Ptr (nullPtr, Ptr)
+import Foreign.Safe (alloca, peek, peekElemOff)
+import qualified GHC.Foreign as GHC
+import GHC.IO.Encoding (getFileSystemEncoding)
 import System.Posix
 import System.Posix.Internals
 
@@ -103,3 +109,17 @@ setControllingTerminal tty = do
     openFd ttyName ReadWrite Nothing defaultFileFlags >>= closeFd
 #endif
 
+-- | Return @argv[0]@ as passed to the program on invocation. Unlike
+-- 'getProgName', this is the raw value passed to the process. It may, or may
+-- not, have anything to do with the name of the running executable!
+getArg0 :: IO String
+getArg0 =
+    alloca $ \ p_argc ->
+    alloca $ \ p_argv -> do
+        getProgArgv p_argc p_argv
+        argv <- peek p_argv
+        enc <- getFileSystemEncoding
+        peekElemOff argv 0 >>= GHC.peekCString enc
+
+foreign import ccall unsafe "getProgArgv"
+  getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
