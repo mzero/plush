@@ -61,7 +61,7 @@ runCommand cmds = do
     pcr <- parseInput cmds
     case pcr of
         Left errs -> errStrLn errs >> return (ExitFailure 125, Nothing)
-        Right (cl, rest) -> shellExec cl >>= return . (\ec -> (ec, Just rest))
+        Right (cl, rest) -> execute cl >>= return . (\ec -> (ec, Just rest))
 
 -- | Run all the commands, parsed from a string
 runScript :: (PosixLike m) => String -> ShellExec m ExitCode

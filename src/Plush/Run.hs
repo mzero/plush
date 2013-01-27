@@ -27,27 +27,20 @@ module Plush.Run (
     TestRunner,
     testRunner,
     testRun,
-
-    -- * Utility Actions
-    execute,
-    outputs,
     )
 where
 
 import Control.Arrow (first)
 import qualified Control.Exception as Ex
-import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (runStateT)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
 
 import Plush.Resource
-import Plush.Run.Execute
 import Plush.Run.Posix
 import Plush.Run.ShellExec
 import Plush.Run.TestExec
-import Plush.Types
 
 
 -- | Encapsulates the state and 'PosixLike' monad of a running shell.
@@ -124,18 +117,3 @@ testRun act runner = case runner of
         let (r, t') = runTest (runStateT act s) t
             (r', s') = either (\e -> (Left $ show e, s)) (first Right) r
         in  (r', TestRunInTest s' t')
-
-
-
--- * Utility Actions
-
-
--- | Run a parsed command line.
-execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode
-execute = shellExec
-
-
--- | Drain and return the output streams for a TestExec
-outputs :: ShellExec TestExec (String, String)
-outputs = lift testOutput
-
