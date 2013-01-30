@@ -1,0 +1,30 @@
+# ~/.plush/env
+#
+# This file is sourced by plush when it interactive.
+# It is an interactive shell if any of these are true:
+#   * stdin and stderr are terminals
+#   * invoked with -i option
+#   * started in web server mode (-w)
+# In addition, real and effictive uids & gids must be the same.
+#
+# If you don't want any of this processing, remove the commands from this file
+# but don't delete the file: It is automatically re-created to the default
+# script if it is found missing.
+
+echo ~/.plush/env ...
+
+#
+# Shell Variables
+#
+PS1='⾙ '    # U+2F99 KANGXI RADICAL SHELL
+
+#
+# Common Aliases
+#
+alias ls='ls -F'
+alias ll='ls -lF'
+alias more=less
+alias mv='mv -i'
+alias rm='rm -i'
+alias du='du -h'
+

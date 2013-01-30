@@ -18,8 +18,10 @@ limitations under the License.
 
 module Plush.Main (plushMain) where
 
-import Control.Monad (void, when)
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString as B
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
@@ -27,12 +29,15 @@ import System.Exit (exitFailure, exitSuccess, exitWith)
 import System.IO (Handle, hIsTerminalDevice, hPutStr, hPutStrLn,
     stderr, stdin, stdout)
 import System.FilePath ((</>))
+import System.Posix.Files (ownerModes)
 import System.Posix.Missing (getArg0)
 
 import Plush.ArgParser
 import Plush.DocTest
+import Plush.Resource
 import Plush.Run
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
@@ -109,7 +114,13 @@ usageFailure msg = do
 
 
 initialRunner :: Options -> IO Runner
-initialRunner opts = fmap snd $ run (setupShell opts) (optRunner opts)
+initialRunner opts = do
+    scriptDefaults <- makeScriptDefaults
+    fmap snd $ run (setupShell opts scriptDefaults) (optRunner opts)
+  where
+    makeScriptDefaults = if (optLogin opts)
+        then (,) <$> getDataResource "profile" <*> getDataResource "env"
+        else return (Nothing, Nothing)
 
 initialInteractiveRunner :: Options -> IO Runner
 initialInteractiveRunner opts =
@@ -117,15 +128,23 @@ initialInteractiveRunner opts =
   where
     setInteractive flags = flags { F.interactive = True }
 
-setupShell :: (PosixLike m) => Options -> Shell.ShellExec m ()
-setupShell opts = do
+
+type ScriptDefaults = (Maybe B.ByteString, Maybe B.ByteString)
+
+setupShell :: (PosixLike m) => Options -> ScriptDefaults -> Shell.ShellExec m ()
+setupShell opts (defProfile, defEnv) = do
     Shell.setName $ optShellName opts
     Shell.setFlags $ optSetFlags opts $ baseFlags
     Shell.setArgs $ optShellArgs opts
     when (optLogin opts) $ do
-        -- TODO(mzero): create ~/.plush/profile and ~/.plush/env if missing
-        maybeRunFile $ Just "/etc/profile"
-        Shell.getVar "HOME" >>= maybeRunFile . fmap (</> ".plush/Profile")
+        home <- Shell.getVarDefault "HOME" ""
+        when (not $ null home) $ do
+            let dotPlush = home </> ".plush"
+            createDirIfMissing dotPlush
+            createScriptIfMissing defProfile $ dotPlush </> "profile"
+            createScriptIfMissing defEnv $ dotPlush </> "env"
+            maybeRunFile $ Just "/etc/profile"
+            maybeRunFile $ Just $ dotPlush </> "profile"
     when iIsSet $ do
         match <- realAndEffectiveIDsMatch
         when match $ do
@@ -140,6 +159,15 @@ setupShell opts = do
         -- set of flags, rather than setting just the interactive flag.
 
     maybeRunFile = maybe (return ()) (void . runFile)
+
+    createDirIfMissing fp = do
+        exists <- doesDirectoryExist fp
+        unless exists $ createDirectory fp ownerModes
+
+    createScriptIfMissing Nothing _ = return ()
+    createScriptIfMissing (Just content) fp = do
+        exists <- doesFileExist fp
+        unless exists $ writeAllFile fp content
 
 --
 -- Information Modes
@@ -249,13 +277,14 @@ runRepl = runInputT defaultSettings . repl
     -- See http://trac.haskell.org/haskeline/ticket/123
   where
     repl runner = do
-        l <- getInputLine "$ "
+        (ps1, runner') <- liftIO (run (Shell.getVarDefault "PS1" "$ ") runner)
+        l <- getInputLine ps1
         case l of
             Nothing -> return ()
             Just input -> do
-                (s, runner') <- liftIO (run (runCommand input) runner)
+                (s, runner'') <- liftIO (run (runCommand input) runner')
                 case s of
                     (_, Just leftOver) | not $ null leftOver ->
                         outputStrLn ("Didn't use whole input: " ++ leftOver)
                     _ -> return ()
-                repl runner'
+                repl runner''

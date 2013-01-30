@@ -1,0 +1,28 @@
+# ~/.plush/profile
+#
+# This file is sourced by plush when it is run as a login shell.
+# It is a a login shell if any of these are true:
+#   * argv[0] starts with a '-' (login does this)
+#   * invoked with --login option
+#   * started in web server mode (-w)
+#
+# If you don't want any login processing, remove the commands from this file
+# but don't delete the file: It is automatically re-created to the default
+# script if it is found missing.
+
+echo ~/.plush/profile ...
+
+#
+# Clean up history
+#
+find ~/.plush/history -depth -mtime +45 -delete
+    # removes things older than 45 days
+
+#
+# Set ENV - which is the name of a script to load in interactive shells
+#
+ENV=~/.plush/env
+export ENV
+    # N.B.: This script will automatically be sourced by plush next if
+    # it is an interactive shell.
+

@@ -29,6 +29,7 @@ module Plush.Run.Posix.Utilities (
     -- * Input convenience functions
     PosixInStr(..),
     readAllFile,
+    writeAllFile,
 
     -- * Output convenience functions
     -- $outstr
@@ -56,6 +57,7 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import System.Exit
 import System.FilePath
+import qualified System.Posix.Files as P
 
 import Plush.Run.Posix
 
@@ -63,6 +65,9 @@ import Plush.Run.Posix
 -- Instances for strings use lenient UTF-8 decoding.
 class PosixInStr s where
     fromByteString :: L.ByteString -> s
+
+instance PosixInStr B.ByteString where
+    fromByteString = B.concat . L.toChunks
 
 instance PosixInStr L.ByteString where
     fromByteString = id
@@ -83,6 +88,13 @@ readAllFile fp = fmap fromByteString $ bracket open closeFd readAll
   where
     open = openFd fp ReadOnly Nothing defaultFileFlags
 
+-- | Write all of a file.
+writeAllFile :: (PosixLike m, PosixOutStr s) => FilePath -> s -> m ()
+writeAllFile fp s = bracket open closeFd (flip write $ toByteString s)
+  where
+    open = openFd fp WriteOnly (Just ownerRWMode) fileFlags
+    ownerRWMode = P.ownerReadMode `P.unionFileModes` P.ownerWriteMode
+    fileFlags = defaultFileFlags { trunc = True }
 
 -- $outstr
 -- Use these in place of 'putStr' and 'putStrLn', (as well as
@@ -95,6 +107,9 @@ class PosixOutStr s where
     toByteStringLn :: s -> L.ByteString
     toByteStringLn = flip L.snoc nl . toByteString
       where nl = toEnum $ fromEnum '\n'
+
+instance PosixOutStr B.ByteString where
+    toByteString = L.fromChunks . (:[])
 
 instance PosixOutStr L.ByteString where
     toByteString = id

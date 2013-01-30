@@ -13,6 +13,8 @@ Description:
 
 Data-files:
   data/summaries.txt
+  data/profile
+  data/env
   static/audio/*.ogg
   static/css/*.css
   static/css/*.gif
