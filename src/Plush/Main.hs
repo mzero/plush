@@ -18,7 +18,7 @@ limitations under the License.
 
 module Plush.Main (plushMain) where
 
-import Control.Monad (when)
+import Control.Monad (void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
@@ -26,13 +26,13 @@ import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess, exitWith)
 import System.IO (Handle, hIsTerminalDevice, hPutStr, hPutStrLn,
     stderr, stdin, stdout)
+import System.FilePath ((</>))
 import System.Posix.Missing (getArg0)
 
 import Plush.ArgParser
 import Plush.DocTest
 import Plush.Run
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
@@ -109,22 +109,7 @@ usageFailure msg = do
 
 
 initialRunner :: Options -> IO Runner
-initialRunner opts = fmap snd $ run setup (optRunner opts)
-  where
-    setup :: (PosixLike m) => Shell.ShellExec m ()
-    setup = do
-        Shell.setName $ optShellName opts
-        Shell.setFlags $ optSetFlags opts $ baseFlags
-        Shell.setArgs $ optShellArgs opts
-        when (optLogin opts) $ do
-            outStrLn "--imagine login processing occurring here--"
-
-    iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
-    baseFlags = if iIsSet
-                    then F.defaultInteractiveFlags
-                    else F.defaultFlags
-        -- N.B.: Interactive as determined at the command line chooses a base
-        -- set of flags, rather than setting just the interactive flag.
+initialRunner opts = fmap snd $ run (setupShell opts) (optRunner opts)
 
 initialInteractiveRunner :: Options -> IO Runner
 initialInteractiveRunner opts =
@@ -132,6 +117,28 @@ initialInteractiveRunner opts =
   where
     setInteractive flags = flags { F.interactive = True }
 
+setupShell :: (PosixLike m) => Options -> Shell.ShellExec m ()
+setupShell opts = do
+    Shell.setName $ optShellName opts
+    Shell.setFlags $ optSetFlags opts $ baseFlags
+    Shell.setArgs $ optShellArgs opts
+    when (optLogin opts) $ do
+        -- TODO(mzero): create ~/.plush/profile and ~/.plush/env if missing
+        maybeRunFile $ Just "/etc/profile"
+        Shell.getVar "HOME" >>= maybeRunFile . fmap (</> ".plush/Profile")
+    when iIsSet $ do
+        -- TODO(mzero): check that real and effective ids & gids are same
+        Shell.getVar "ENV" >>= maybeRunFile
+        -- TODO(mzero): env should be subject to parameter expansion
+  where
+    iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
+    baseFlags = if iIsSet
+                    then F.defaultInteractiveFlags
+                    else F.defaultFlags
+        -- N.B.: Interactive as determined at the command line chooses a base
+        -- set of flags, rather than setting just the interactive flag.
+
+    maybeRunFile = maybe (return ()) (void . runFile)
 
 --
 -- Information Modes
@@ -209,8 +216,9 @@ runWebServer opts args = case args of
     [port] -> maybe badPort (serve . Just) $ readMaybe port
     _ -> usageFailure "too many arguments"
   where
-    serve mp = initialInteractiveRunner opts >>= flip server mp
+    serve mp = initialInteractiveRunner opts' >>= flip server mp
     badPort = usageFailure "not a port number"
+    opts' = opts { optLogin = True }
 
 --
 -- Testing Modes

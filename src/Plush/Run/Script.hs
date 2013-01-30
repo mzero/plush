@@ -24,7 +24,9 @@ module Plush.Run.Script (
 )
 where
 
+import Control.Applicative ((<$>))
 import Control.Monad (when)
+import Control.Monad.Exception (catchIOError)
 
 import Plush.Parser
 import Plush.Pretty
@@ -72,5 +74,9 @@ runScript cmds0 = rc (ExitSuccess, Just cmds0)
 
 -- | Run all commands from a file.
 runFile :: (PosixLike m) => FilePath -> ShellExec m ExitCode
-runFile fp = readAllFile fp >>= runScript
-    -- TODO(mzero): should this handle errors?
+runFile fp = do
+    mscript <- (Just <$> readAllFile fp) `catchIOError` (\_ -> return Nothing)
+    case mscript of
+        Nothing -> return $ ExitFailure 127
+        Just script -> runScript script
+

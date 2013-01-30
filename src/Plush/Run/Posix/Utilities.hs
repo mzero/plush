@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ instance PosixInStr T.Text where
 
 -- | Read all of a file.
 readAllFile :: (PosixLike m, PosixInStr s) => FilePath -> m s
-readAllFile fp = bracket open closeFd (fmap fromByteString . readAll)
+readAllFile fp = fmap fromByteString $ bracket open closeFd readAll
   where
     open = openFd fp ReadOnly Nothing defaultFileFlags
 
