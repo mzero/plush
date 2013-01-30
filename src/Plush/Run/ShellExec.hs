@@ -283,6 +283,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     setCloseOnExec = liftT1 setCloseOnExec
 
     getUserHomeDirectoryForName = liftT1 getUserHomeDirectoryForName
+    realAndEffectiveIDsMatch = lift realAndEffectiveIDsMatch
 
     execProcess = liftT3 execProcess
     pipeline cs = do

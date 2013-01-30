@@ -139,6 +139,11 @@ class (Functor m, Monad m, MonadException m,
     -- | A safe lookup of home directory info. See `getUserEntryForName`.
     getUserHomeDirectoryForName :: String -> m (Maybe FilePath)
 
+    -- | A check for possibly elivated privledges. Checks that for both the
+    -- user IDs and group IDs, the real and effective versions match.
+    -- See §2.5.3
+    realAndEffectiveIDsMatch :: m Bool
+
     -- From System.Process
 
     execProcess :: Bindings     -- ^ Environment variable bindings
@@ -198,6 +203,11 @@ instance PosixLike IO where
     getUserHomeDirectoryForName s =
         (Just . P.homeDirectory <$> P.getUserEntryForName s)
             `catchIOError` (\_ -> return Nothing)
+
+    realAndEffectiveIDsMatch = do
+        usersMatch <- (==) <$> P.getRealUserID <*> P.getEffectiveUserID
+        groupsMatch <- (==) <$> P.getRealGroupID <*> P.getEffectiveGroupID
+        return $ usersMatch && groupsMatch
 
     execProcess env cmd args = do
         (_, _, _, h) <- IO.createProcess $

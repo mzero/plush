@@ -127,9 +127,10 @@ setupShell opts = do
         maybeRunFile $ Just "/etc/profile"
         Shell.getVar "HOME" >>= maybeRunFile . fmap (</> ".plush/Profile")
     when iIsSet $ do
-        -- TODO(mzero): check that real and effective ids & gids are same
-        Shell.getVar "ENV" >>= maybeRunFile
-        -- TODO(mzero): env should be subject to parameter expansion
+        match <- realAndEffectiveIDsMatch
+        when match $ do
+            Shell.getVar "ENV" >>= maybeRunFile
+            -- TODO(mzero): env should be subject to parameter expansion
   where
     iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
     baseFlags = if iIsSet
