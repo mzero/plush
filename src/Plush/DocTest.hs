@@ -22,12 +22,16 @@ module Plush.DocTest (
 
 import Control.Applicative ((<$>))
 import Control.Monad (join, when)
+import Control.Monad.Trans.Class (lift)
 import Data.List (foldl', intercalate, isPrefixOf, partition)
 import System.FilePath (takeFileName)
 import System.IO (hFlush, hSetBuffering, BufferMode(NoBuffering), stdout)
 
 import Plush.DocTest.Posix
 import Plush.Run
+import Plush.Run.Execute
+import Plush.Run.Script
+import Plush.Run.TestExec (testOutput)
 import Plush.Utilities
 
 
@@ -220,7 +224,7 @@ runTest t r0 =
         else (Skipped, r0)
   where
     exec (c,"") r =
-        let (result, r') = testRun (execute c >> outputs) r
+        let (result, r') = testRun (execute c >> lift testOutput) r
             actual = case result of
                 Left e -> e
                 Right (out,err) -> err ++ out

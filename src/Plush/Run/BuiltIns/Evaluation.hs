@@ -26,11 +26,10 @@ import Control.Monad.Exception (bracket_)
 import Data.List (intercalate)
 import System.FilePath
 
-import Plush.Parser
 import Plush.Run.BuiltIns.Utilities
-import Plush.Run.Execute
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
+import Plush.Run.Script
 import Plush.Run.ShellExec
 import Plush.Run.Types
 
@@ -41,13 +40,7 @@ eval = SpecialUtility . const $ Utility evalExec emptyAnnotate
     evalExec args = let cmdline = dropWhile (== ' ') $ intercalate " " args in
         if null cmdline
             then success
-            else run cmdline
-
-    run cmdline = do
-        aliases <- getAliases
-        case parseCommand aliases cmdline of
-            Left errs -> exitMsg 127 errs
-            Right (cl, _rest) -> shellExec cl
+            else fst <$> runCommand cmdline
 
 
 dot :: (PosixLike m) => SpecialUtility m
@@ -65,24 +58,13 @@ dot = SpecialUtility . const $ Utility dotExec emptyAnnotate
             -- NOTE: dot doesn't require that the script be exectuable
         if b
             then do
-                setLastExitCode ExitSuccess
-                script <- readAllFile fp
                 oldArgs <- getArgs
                 bracket_
                     (unless (null args) $ setArgs args)
                     (unless (null args) $ setArgs oldArgs)
-                    (runScript script)
+                    (runFile fp)
             else
                 runFirstFound args fps
 
     runFirstFound _ [] = exitMsg 127 "script file not found"
         -- TODO: should be a shell error, exiting non-interactive shells
-
-    runScript "" = getLastExitCode;
-    runScript cmds = do
-        aliases <- getAliases
-        case parseCommand aliases cmds of
-            Left errs -> exitMsg 127 errs
-            Right (cl, rest) -> shellExec cl >> runScript rest
-
-

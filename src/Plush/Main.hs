@@ -14,23 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE ForeignFunctionInterface, OverloadedStrings #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Plush.Main (plushMain) where
 
-import Control.Monad (when)
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString as B
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (exitFailure, exitSuccess, exitWith)
 import System.IO (Handle, hIsTerminalDevice, hPutStr, hPutStrLn,
     stderr, stdin, stdout)
+import System.FilePath ((</>))
+import System.Posix.Files (ownerModes)
+import System.Posix.Missing (getArg0)
 
 import Plush.ArgParser
 import Plush.DocTest
+import Plush.Resource
 import Plush.Run
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities
+import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
 import Plush.Server
@@ -41,15 +49,15 @@ foreign export ccall plushMain :: IO ()
 
 plushMain :: IO ()
 plushMain = do
+    progName <- getArg0
     fullArgs <- getArgs
-    progName <- getProgName
-        -- TODO(mzero): this should be argv[0], but getProgName applies basename
     let (flagF, nonFlagArgs) = F.processFlagArgs fullArgs
     case mconcat $ processArgs commandLineOptions nonFlagArgs of
         (OA (Right (optF, args))) -> do
             let opts = optF $ Options
                         { optMode = processFile
                         , optRunner = runnerInIO
+                        , optLogin = take 1 progName == "-"
                         , optShellName = progName
                         , optSetFlags = flagF
                         , optShellArgs = []
@@ -61,6 +69,7 @@ plushMain = do
 data Options = Options
                 { optMode :: Options -> [String] -> IO ()
                 , optRunner :: Runner
+                , optLogin :: Bool
                 , optShellName :: String
                 , optSetFlags :: F.Flags -> F.Flags
                 , optShellArgs :: [String]
@@ -75,11 +84,13 @@ commandLineOptions =
     , OptionSpec ['w'] ["webserver"]  (NoArg $ setMode runWebServer)
     , OptionSpec []    ["doctest"]    (NoArg $ setMode doctest)
     , OptionSpec []    ["shelltest"]  (NoArg $ setMode shelltest)
+    , OptionSpec []    ["login"]      (NoArg $ setLogin True)
     , OptionSpec ['t'] ["test"]       (NoArg $ setRunner runnerInTest)
     ]
   where
     setMode m opts = opts { optMode = m }
     setRunner r opts = opts { optRunner = r }
+    setLogin b opts = opts { optLogin = b }
 
 
 usage :: Handle -> IO ()
@@ -103,20 +114,13 @@ usageFailure msg = do
 
 
 initialRunner :: Options -> IO Runner
-initialRunner opts = fmap snd $ run setup (optRunner opts)
+initialRunner opts = do
+    scriptDefaults <- makeScriptDefaults
+    fmap snd $ run (setupShell opts scriptDefaults) (optRunner opts)
   where
-    setup :: (PosixLike m) => Shell.ShellExec m ()
-    setup = do
-        Shell.setName $ optShellName opts
-        Shell.setFlags flags
-        Shell.setArgs $ optShellArgs opts
-
-    iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
-    flags = if iIsSet
-                then F.defaultInteractiveFlags
-                else F.defaultFlags
-        -- N.B.: Interactive as determined at the command line chooses a base
-        -- set of flags, rather than setting just the interactive flag.
+    makeScriptDefaults = if (optLogin opts)
+        then (,) <$> getDataResource "profile" <*> getDataResource "env"
+        else return (Nothing, Nothing)
 
 initialInteractiveRunner :: Options -> IO Runner
 initialInteractiveRunner opts =
@@ -124,6 +128,46 @@ initialInteractiveRunner opts =
   where
     setInteractive flags = flags { F.interactive = True }
 
+
+type ScriptDefaults = (Maybe B.ByteString, Maybe B.ByteString)
+
+setupShell :: (PosixLike m) => Options -> ScriptDefaults -> Shell.ShellExec m ()
+setupShell opts (defProfile, defEnv) = do
+    Shell.setName $ optShellName opts
+    Shell.setFlags $ optSetFlags opts $ baseFlags
+    Shell.setArgs $ optShellArgs opts
+    when (optLogin opts) $ do
+        home <- Shell.getVarDefault "HOME" ""
+        when (not $ null home) $ do
+            let dotPlush = home </> ".plush"
+            createDirIfMissing dotPlush
+            createScriptIfMissing defProfile $ dotPlush </> "profile"
+            createScriptIfMissing defEnv $ dotPlush </> "env"
+            maybeRunFile $ Just "/etc/profile"
+            maybeRunFile $ Just $ dotPlush </> "profile"
+    when iIsSet $ do
+        match <- realAndEffectiveIDsMatch
+        when match $ do
+            Shell.getVar "ENV" >>= maybeRunFile
+            -- TODO(mzero): env should be subject to parameter expansion
+  where
+    iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
+    baseFlags = if iIsSet
+                    then F.defaultInteractiveFlags
+                    else F.defaultFlags
+        -- N.B.: Interactive as determined at the command line chooses a base
+        -- set of flags, rather than setting just the interactive flag.
+
+    maybeRunFile = maybe (return ()) (void . runFile)
+
+    createDirIfMissing fp = do
+        exists <- doesDirectoryExist fp
+        unless exists $ createDirectory fp ownerModes
+
+    createScriptIfMissing Nothing _ = return ()
+    createScriptIfMissing (Just content) fp = do
+        exists <- doesFileExist fp
+        unless exists $ writeAllFile fp content
 
 --
 -- Information Modes
@@ -147,7 +191,12 @@ version _ _ = putStrLn $ "Plush, the comfy shell, version " ++ displayVersion
 --
 processFile :: Options -> [String] -> IO ()
 processFile opts [] = processStdin opts []
-processFile opts (fp:args) = readUtf8File fp >>= processArg opts . (:(fp:args))
+processFile opts (fp:args) = do
+    script <- readUtf8File fp
+    processScriptNameArgs opts script (fp:args)
+    -- NOTE: This doesn't use runFile, as the file needs to come from the
+    -- invoking world, not within the PosixLike environment, which might be
+    -- a test environment.
 
 -- | Mode to run command specified on command line. Handles invocations like:
 --
@@ -155,11 +204,8 @@ processFile opts (fp:args) = readUtf8File fp >>= processArg opts . (:(fp:args))
 --
 processArg :: Options -> [String] -> IO ()
 processArg _ [] = usageFailure "no command given"
-processArg opts (cmds:nameAndArgs) = initialRunner opts' >>= runCommands cmds
-  where
-    opts' = case nameAndArgs of
-        [] -> opts
-        (name:args) -> opts { optShellName = name, optShellArgs = args }
+processArg opts (cmds:nameAndArgs) =
+    processScriptNameArgs opts cmds nameAndArgs
 
 -- | Mode to run commands from @stdin@. Handles invocations like:
 --
@@ -172,12 +218,22 @@ processStdin opts args = do
     isErrTerm <- hIsTerminalDevice stderr
     if isInTerm && isErrTerm
         then initialInteractiveRunner opts' >>= runRepl
-        else do
-            cmds <- getContents
-            initialRunner opts' >>= runCommands cmds
+        else getContents >>= processScript opts'
   where
     opts' = opts { optShellArgs = args }
 
+
+processScriptNameArgs :: Options -> String -> [String] -> IO ()
+processScriptNameArgs opts script []            = processScript opts script
+processScriptNameArgs opts script (name:args)   = processScript opts' script
+  where
+    opts' = opts { optShellName = name, optShellArgs = args }
+
+processScript :: Options -> String -> IO ()
+processScript opts script = do
+    r <- initialRunner opts
+    (ec, _) <- run (runScript script) r
+    exitWith ec
 
 --
 -- Web & Server Modes
@@ -189,8 +245,9 @@ runWebServer opts args = case args of
     [port] -> maybe badPort (serve . Just) $ readMaybe port
     _ -> usageFailure "too many arguments"
   where
-    serve mp = initialInteractiveRunner opts >>= flip server mp
+    serve mp = initialInteractiveRunner opts' >>= flip server mp
     badPort = usageFailure "not a port number"
+    opts' = opts { optLogin = True }
 
 --
 -- Testing Modes
@@ -220,25 +277,14 @@ runRepl = runInputT defaultSettings . repl
     -- See http://trac.haskell.org/haskeline/ticket/123
   where
     repl runner = do
-        l <- getInputLine "$ "
+        (ps1, runner') <- liftIO (run (Shell.getVarDefault "PS1" "$ ") runner)
+        l <- getInputLine ps1
         case l of
             Nothing -> return ()
             Just input -> do
-                (leftOver, runner') <- liftIO (runCommand input runner)
-                when (not $ null leftOver) $
-                    outputStrLn ("Didn't use whole input: " ++ leftOver)
-                repl runner'
-
-runCommands :: String -> Runner -> IO ()
-runCommands "" _ = return ()
-runCommands cmds runner = runCommand cmds runner >>= uncurry runCommands
-
-runCommand :: String -> Runner -> IO (String, Runner)
-runCommand cmds r0 = do
-    (pr, r1) <- run (parseInput cmds) r0
-    case pr of
-        Left errs -> putStrLn errs >> return ("", r1)
-        Right (cl, rest) -> run (execute cl) r1
-                                >>= return . (\(_,r2) -> (rest, r2))
-
-
+                (s, runner'') <- liftIO (run (runCommand input) runner')
+                case s of
+                    (_, Just leftOver) | not $ null leftOver ->
+                        outputStrLn ("Didn't use whole input: " ++ leftOver)
+                    _ -> return ()
+                repl runner''

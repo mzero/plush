@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -320,6 +320,7 @@ instance PosixLike TestExec where
     getUserHomeDirectoryForName s = return $ lookup s homeDirs
       where
         homeDirs = [("tester","/home"), ("root","/"), ("nobody","/tmp")]
+    realAndEffectiveIDsMatch = return True
 
     execProcess _env fp args = runFilePrim fp $ \_s fs _fpc dpc n -> do
         case fsExecutable fs dpc n of

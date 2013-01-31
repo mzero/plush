@@ -13,6 +13,8 @@ Description:
 
 Data-files:
   data/summaries.txt
+  data/profile
+  data/env
   static/audio/*.ogg
   static/css/*.css
   static/css/*.gif
@@ -86,6 +88,7 @@ Library
     Plush.Run.Posix
     Plush.Run.Posix.Utilities
     Plush.Run.Redirection
+    Plush.Run.Script
     Plush.Run.ShellExec
     Plush.Run.ShellFlags
     Plush.Run.TestExec

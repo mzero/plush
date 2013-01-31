@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ module Plush.Run.Expansion (
     expandPassive,
     expandAndSplit,
     wordExpansionActive,
+    TildePart, tildeDir, tildePrefix,
+    tildeSplit,
     pathnameGlob,
     quoteRemoval,
     byPathParts,
@@ -30,7 +32,7 @@ import Control.Monad (foldM)
 import Control.Monad.Exception (catchIOError)
 import Data.Char (isSpace)
 import Data.List (foldl', intercalate, partition, sort, tails)
-import System.FilePath (combine)
+import System.FilePath (combine, (</>))
 import Text.Parsec
 
 import Plush.Run.Posix
@@ -82,23 +84,41 @@ wordExpansion _live w = tildeExpansion w >>= modifyPartsM (mapM we)
 
 
 tildeExpansion :: (PosixLike m) => Word -> ShellExec m Word
-tildeExpansion w0 = case w0 of
-    Word l (Bare ('~':cs):wz) -> maybe w0 (Word l) <$> te "" ((Bare cs):wz)
-    _ -> return w0
+tildeExpansion = modifyPartsM $ go . compress
   where
-    te n ((Bare s):ws) = case break (== '/') s of
-        (r,[]) -> te (n++r) ws
-        (r,q)  -> ex (n++r) >>= onto (Bare q:ws)
-    te n [] = ex n >>= onto []
-    te _ _ = return Nothing
+    go [Bare s] = (:[]) . Bare . te <$> tildeSplit s
+    go ps = return ps
 
-    ex "" = getVar "HOME"
-    ex n = getUserHomeDirectoryForName n
-
-    onto ws = return . fmap (\e -> Bare e : ws)
+    te (tildePart, pathPart) = (maybe id (</>) $ tildeDir tildePart) pathPart
         -- Bare, not Singlequoted nor Expanded because the results of tilde
         -- expansion are not subject to field splitting, but are subject to
         -- pathname expansion.
+
+type TildePart = Maybe (String, FilePath)
+
+tildeDir :: TildePart -> Maybe FilePath
+tildeDir = fmap snd
+
+tildePrefix :: TildePart -> Maybe String
+tildePrefix = fmap fst
+
+-- | Break a string into the tilde prefix, if any, and the remainder.
+-- The prefix is returned along with its expansion. If the string starts with a
+-- tilde, but the named user doesn't exist, then it isn't treated as a tilde
+-- prefix, and 'Nothing' is returned for the prefix.
+tildeSplit :: (PosixLike m) => String
+    -> ShellExec m (TildePart, String)
+tildeSplit s@('~':t) = do
+    let (name,rest) = break (== '/') t
+    dir <- if null name
+                then getVar "HOME"
+                else getUserHomeDirectoryForName name
+    case dir of
+        Nothing -> return (Nothing, s)
+        Just d -> return (Just ('~':name, d), drop 1 rest)
+            -- Note: because of break, rest is either empty or starts with '/'
+tildeSplit s = return (Nothing, s)
+
 
 
 data SeparatorType = Whitespace | Explicit
@@ -108,10 +128,6 @@ fieldSplitting :: String -> Word -> [Word]
 fieldSplitting ifs = expandParts $
     split [] . ignoreFirst . concatMap breakup . compress
   where
-    compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s++t)) : ps
-    compress (p:ps) = p : compress ps
-    compress [] = []
-
     breakup (Expanded s) = either err id $ parse fieldP "" s
     breakup p = [FieldPart p]
 
@@ -141,13 +157,8 @@ pathnameExpansion :: (PosixLike m) => Word -> m [Word]
 pathnameExpansion =  origIfNull $ (expandPartsM $ glob . compress)
     -- TODO: should skip pathnameExpansion of shell flag -f is set
   where
-    compress :: Parts -> Parts
-    compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
-    compress (p:ps) = p : compress ps
-    compress [] = []
-
     glob :: (PosixLike m) => Parts -> m [Parts]
-    glob [(Bare s)] = pathnameGlob s >>= return . map ((:[]).Bare)
+    glob [(Bare s)] = pathnameGlob "" s >>= return . map ((:[]).Bare)
     glob _ = return []
 
     origIfNull f a = (\bs -> if null bs then [a] else bs) <$> f a
@@ -158,8 +169,8 @@ type Pattern = [PatternPart]
 data PatternAction = AddSlash | MatchContents Pattern
 type PathPattern = [PatternAction]
 
-pathnameGlob :: (PosixLike m) => String -> m [String]
-pathnameGlob = either (\_err -> return []) match . parse patP ""
+pathnameGlob :: (PosixLike m) => FilePath -> String -> m [String]
+pathnameGlob base = either (\_err -> return []) match . parse patP ""
   where
     match :: (PosixLike m) => PathPattern -> m [String]
     match = foldM steps [""]
@@ -167,12 +178,14 @@ pathnameGlob = either (\_err -> return []) match . parse patP ""
         steps fs p = concat `fmap` mapM (step p) fs
 
         step (MatchContents p) dir = do
-            entries <- getDirectoryContents (if null dir then "." else dir)
+            entries <- getDirectoryContents (ifNull "." $ base </> dir)
                 `catchIOError` (\_ -> return [])
             return $ map (combine dir) $ sort $ filter (patMatch p) entries
         step (AddSlash) path = do
-            isDir <- doesDirectoryExist (if null path then "/" else path)
+            isDir <- doesDirectoryExist (ifNull "/" $ base </> path)
             return $ if isDir then [path ++ "/"] else []
+
+    ifNull d s = if null s then d else s
 
     patP =  many1 (slashP <|> matchP)
     slashP = char '/' >> return AddSlash
@@ -233,5 +246,11 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
 
     unparts = Word (location w) . intercalate [Bare ":"] . map parts
 
+
+compress :: Parts -> Parts
+compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
+compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
+compress (p:ps) = p : compress ps
+compress [] = []
 
 

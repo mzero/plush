@@ -41,8 +41,9 @@ import Plush.Job.Output
 import Plush.Job.StdIO
 import Plush.Job.Types
 import Plush.Run
-import Plush.Run.Execute (execType, ExecuteType(..))
+import Plush.Run.Execute (execType, ExecuteType(..), execute)
 import Plush.Run.Posix.Utilities (writeStr)
+import Plush.Run.Script (parse)
 import Plush.Run.ShellExec (getFlags, setFlags)
 import qualified Plush.Run.ShellFlags as F
 

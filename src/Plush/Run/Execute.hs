@@ -17,7 +17,7 @@ limitations under the License.
 {-# Language TupleSections #-}
 
 module Plush.Run.Execute (
-    shellExec,
+    execute,
 
     ExecuteType(..),
     execType,
@@ -41,8 +41,8 @@ import Plush.Run.Types
 import Plush.Types
 
 
-shellExec :: (PosixLike m) => CommandList -> ShellExec m ExitCode
-shellExec cl = do
+execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode
+execute cl = do
     flags <- getFlags
     if F.noexec flags
         then success
@@ -148,7 +148,7 @@ execFor (Name _ name) (Just words_) cmds = do
     forLoop (w:ws) = do
         ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just w)
         case ok of
-            ExitSuccess -> shellExec cmds >> forLoop ws
+            ExitSuccess -> execute cmds >> forLoop ws
             e@(ExitFailure {}) -> return e
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
