@@ -53,28 +53,32 @@ pp = render . ppCommandList
     ppCompoundCommand cmd = case cmd of
         BraceGroup cmds -> hsep [char '{', ppCommandList cmds, char '}']
         Subshell cmds -> hsep [char '(', ppCommandList cmds, char ')']
-        ForLoop name words_ cmds -> hsep $
-            text "for" : ppName name
-            : (maybe [] ((text "in" :) . map ppWord) words_)
-            ++ [text "do", ppCommandList cmds, text "done"]
-        IfConditional conds mElse -> hsep $
+        ForLoop name words_ cmds -> vcat
+            [ text "for" <+> ppName name
+                <+> (maybe empty ((text "in" <+>) . hsep . map ppWord) words_)
+            , text "do"
+            , nest 4 $ ppCommandList cmds
+            , text "done"
+            ]
+        IfConditional conds mElse -> vcat $
             concat (zipWith ppIfCondition ("if" : repeat "elif") conds)
-            ++ maybe [] (\e -> [text "else", ppCommandList e])  mElse
+            ++ maybe [] (\e -> [text "else", nest 4 $ ppCommandList e])  mElse
             ++ [text "fi"]
-        WhileLoop condition cmds -> hsep
-            [ text "while", ppCommandList condition
-            , text "do", ppCommandList cmds, text "done"
-            ]
-        UntilLoop condition cmds -> hsep
-            [text "until", ppCommandList cmds
-            , text "do", ppCommandList condition, text "done"
-            ]
+        WhileLoop condition cmds -> ppLoop "while" condition cmds
+        UntilLoop condition cmds -> ppLoop "until" condition cmds
 
     ppIfCondition token (condition, consequent) =
-            [ text token, ppCommandList condition
-            , text "then", ppCommandList consequent
+            [ text token <+> ppCommandList condition
+            , text "then"
+            , nest 4 $ ppCommandList consequent
             ]
 
+    ppLoop s condition cmds = vcat
+            [ text s <+> ppCommandList condition
+            , text "do"
+            , nest 4 $ ppCommandList cmds
+            , text "done"
+            ]
     ppSimpleCommand (SimpleCommand ws as rs) = hsep $
         map ppAssignment as ++ map ppWord ws ++ map ppRedirect rs
 
