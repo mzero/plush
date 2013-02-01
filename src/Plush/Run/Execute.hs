@@ -132,10 +132,10 @@ execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
-    ForClause name words_ cmds -> execFor name words_ cmds
-    IfClause _condition _consequent _alts -> notSupported "IfClause"
-    WhileClause _condition _cmds -> notSupported "WhileClause"
-    UntilClause _condition _cmds -> notSupported "UntilClause"
+    ForLoop name words_ cmds -> execFor name words_ cmds
+    IfConditional _conds _mElse -> notSupported "if"
+    WhileLoop _condition _cmds -> notSupported "while"
+    UntilLoop _condition _cmds -> notSupported "until"
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ExitCode
@@ -183,12 +183,13 @@ execType = typeCommandList
         BraceGroup cmdlist -> typeCommandList cmdlist
         -- Things in the subshell can't change the state of this shell.
         Subshell {} -> return ExecuteMidground
-        ForClause _ _ cmdlist -> typeCommandList cmdlist
-        IfClause condition consequent alternatives -> minimum <$>
-            mapM typeCommandList (condition : consequent : alternatives)
-        WhileClause condition body ->
+        ForLoop _ _ cmdlist -> typeCommandList cmdlist
+        IfConditional conds mElse -> minimum <$>
+            mapM typeCommandList
+                (maybe id (:) mElse $ concatMap (\(c,d)->[c,d]) conds)
+        WhileLoop condition body ->
             min <$> typeCommandList condition <*> typeCommandList body
-        UntilClause condition body ->
+        UntilLoop condition body ->
             min <$> typeCommandList condition <*> typeCommandList body
     typeCommand (Function {}) = return ExecuteForeground
 

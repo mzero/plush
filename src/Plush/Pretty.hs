@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,21 +53,26 @@ pp = render . ppCommandList
     ppCompoundCommand cmd = case cmd of
         BraceGroup cmds -> hsep [char '{', ppCommandList cmds, char '}']
         Subshell cmds -> hsep [char '(', ppCommandList cmds, char ')']
-        ForClause name words_ cmds -> hsep $
+        ForLoop name words_ cmds -> hsep $
             text "for" : ppName name
             : (maybe [] ((text "in" :) . map ppWord) words_)
             ++ [text "do", ppCommandList cmds, text "done"]
-        IfClause condition consequent alts -> hsep $
-            text "if" : ppCommandList condition : text "then"
-            : ppCommandList consequent : text "else"
-            : map ppCommandList alts
-        WhileClause condition cmds -> hsep
+        IfConditional conds mElse -> hsep $
+            concat (zipWith ppIfCondition ("if" : repeat "elif") conds)
+            ++ maybe [] (\e -> [text "else", ppCommandList e])  mElse
+            ++ [text "fi"]
+        WhileLoop condition cmds -> hsep
             [ text "while", ppCommandList condition
             , text "do", ppCommandList cmds, text "done"
             ]
-        UntilClause condition cmds -> hsep
+        UntilLoop condition cmds -> hsep
             [text "until", ppCommandList cmds
             , text "do", ppCommandList condition, text "done"
+            ]
+
+    ppIfCondition token (condition, consequent) =
+            [ text token, ppCommandList condition
+            , text "then", ppCommandList consequent
             ]
 
     ppSimpleCommand (SimpleCommand ws as rs) = hsep $

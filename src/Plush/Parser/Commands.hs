@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ for_clause = do
     name <- tok_for *> tok_name <* linebreak
     words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
     doGroup <- tok_do *> compound_list <* tok_done
-    return $ ForClause name words_ doGroup
+    return $ ForLoop name words_ doGroup
 
 case_clause :: ShellParser CompoundCommand
 case_clause = tok_case *> unexpected "case_clause not supported"

@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,16 +49,19 @@ instance Monoid SimpleCommand where
 data CompoundCommand =
     BraceGroup CommandList
     | Subshell CommandList
-    -- | for Name in [Word] do CommandList done
-    --
-    -- If words is Nothing, then there was no 'in' keyword, which triggers
-    -- special behaviour.
-    | ForClause Name (Maybe [Word]) CommandList
-    -- | condition consequent [elif, elif, ...]
-    | IfClause CommandList CommandList [CommandList]
-    -- | condition cmds
-    | WhileClause CommandList CommandList
-    | UntilClause CommandList CommandList
+
+    | ForLoop Name (Maybe [Word]) CommandList
+    -- ^ There is a difference between the word list being absent (when there
+    -- is no @in@ keyword) and the word list being empty (when @in@ is present).
+    -- Hence the the 'Maybe'.
+
+    | IfConditional [(CommandList, CommandList)] (Maybe CommandList)
+    -- ^ The initial @if@ clause and any @elif@ clauses are all compiled into
+    -- the list of (conditional, consequent) command lists. The final optional
+    -- 'CommandList' is the @else@ part.
+
+    | WhileLoop CommandList CommandList
+    | UntilLoop CommandList CommandList
     deriving (Eq, Show)
 
 commandWord :: Word -> SimpleCommand
