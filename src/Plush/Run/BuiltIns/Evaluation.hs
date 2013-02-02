@@ -32,12 +32,13 @@ import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import Plush.Run.ShellExec
 import Plush.Run.Types
+import Plush.Utilities
 
 
 eval :: (PosixLike m) => SpecialUtility m
 eval = SpecialUtility . const $ Utility evalExec emptyAnnotate
   where
-    evalExec args = let cmdline = dropWhile (== ' ') $ intercalate " " args in
+    evalExec args = let cmdline = dropWhile isBlank $ intercalate " " args in
         if null cmdline
             then success
             else fst <$> runCommand cmdline

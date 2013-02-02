@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@ import Control.Monad
 import Data.Char (isAlpha, isDigit)
 import qualified Data.HashMap.Strict as M
 import Text.Parsec
+
+import Plush.Utilities
 
 
 type Aliases = M.HashMap String String
@@ -116,17 +118,17 @@ aliasesInProgress (DAS _ _ stk) = map (\(_, an, _) -> an) stk
 
 endsInBlank :: String -> Bool
 endsInBlank [] = False
-endsInBlank [c] = c == ' '
+endsInBlank [c] = isBlank c
 endsInBlank (_:cs) = endsInBlank cs
-
 
 -- | Workhorse of the stream: Return the next character if any.
 dasUncons :: DealiasingStream -> Maybe (Char, DealiasingStream)
 dasUncons d@(DAS aliases _ _) = nextChar d >>= go
   where
     go (False, c, d') = Just (c, d')     -- not doing alias substitution (AS)
-    go (True, ' ', d') = dasUncons d'    -- drop leading blanks, when doing AS
-    go (True, c, d') =                   -- doing AS, so look at next name
+    go (True, c, d')
+        | isBlank c   = dasUncons d'     -- drop leading blanks, when doing AS
+        | otherwise   =                  -- doing AS, so look at next name
         let (w, dw') = nextNameSpan d
             mr = if null w || w `elem` aliasesInProgress d
                 then Nothing             -- already in progress
