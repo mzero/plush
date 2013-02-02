@@ -133,9 +133,9 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
     ForLoop name words_ cmds -> execFor name words_ cmds
-    IfConditional _conds _mElse -> notSupported "if"
-    WhileLoop _condition _cmds -> notSupported "while"
-    UntilLoop _condition _cmds -> notSupported "until"
+    IfConditional conds mElse -> execIf conds mElse
+    WhileLoop test body -> execLoop True test body
+    UntilLoop test body -> execLoop False test body
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ExitCode
@@ -150,6 +150,28 @@ execFor (Name _ name) (Just words_) cmds = do
         case ok of
             ExitSuccess -> execute cmds >> forLoop ws
             e@(ExitFailure {}) -> return e
+
+execIf :: (PosixLike m) =>
+    [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ExitCode
+execIf [] Nothing = success
+execIf [] (Just e) = execute e
+execIf ((c,s):css) mElse = do
+    ec <- execute c
+    case ec of
+        ExitFailure n | n /= 0 -> execIf css mElse
+        _ -> execute s
+
+execLoop :: (PosixLike m) =>
+    Bool -> CommandList -> CommandList -> ShellExec m ExitCode
+execLoop loopWhen test body = go ExitSuccess
+  where
+    go lastEc = do
+        ec <- execute test
+        if loopWhen == isSuccess ec
+            then execute body >>= go
+            else return lastEc
+    isSuccess (ExitFailure n) | n /= 0 = False
+    isSuccess _ = True
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
 execFunctionBody (FunctionBody body redirects) =

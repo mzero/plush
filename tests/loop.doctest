@@ -1,0 +1,37 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+tests of parsing - none of these produce output!
+    # while false; do echo hi; done
+    # until true; do echo hi; done
+    # while false; do
+    +    echo hi
+    + done
+    # while false
+    + do
+    +    echo hi
+    + done
+
+test looping behavior
+N.B.: Don't use the [ ] form of test: It is broken on Mac OS X & OpenBSD (!)
+    # set true uno true dos true tres false cuatro true cinco
+    # while $1; do echo $2; shift 2; done
+    uno
+    dos
+    tres
+    # set false moja false mbili false tatu true nne false tano
+    # until $1; do echo $2; shift 2; done
+    moja
+    mbili
+    tatu
