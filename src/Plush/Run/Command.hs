@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ commandSearch cmd
                           emptyAnnotate)
     externalExec fp = withEnvVars $ \args -> do
         env <- getEnv
-        execProcess env fp args
+        execProcess fp env cmd args
 
     functionExec fb ef = setShellVars (\args -> withFunContext args $ ef fb)
         -- §2.9.5 states that when executed, functions have the assignment

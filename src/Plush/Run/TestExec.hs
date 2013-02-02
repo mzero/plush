@@ -322,7 +322,7 @@ instance PosixLike TestExec where
         homeDirs = [("tester","/home"), ("root","/"), ("nobody","/tmp")]
     realAndEffectiveIDsMatch = return True
 
-    execProcess _env fp args = runFilePrim fp $ \_s fs _fpc dpc n -> do
+    execProcess fp _env _cmd args = runFilePrim fp $ \_s fs _fpc dpc n -> do
         case fsExecutable fs dpc n of
             Just util -> utilExecute util args
                 -- TODO(mzero): doesn't handle environment correctly, but
