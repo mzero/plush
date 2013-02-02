@@ -251,9 +251,9 @@ ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
 
 
 -- | 'execProcess' for 'IO'
-ioExecProcess fp env _cmd args = do
+ioExecProcess fp env cmd args = do
         pid <- P.forkProcess $
-            P.executeFile fp False args (Just env) `catchIOError` handler
+            PM.executeFile0 fp cmd args env `catchIOError` handler
         mStat <- P.getProcessStatus True False pid
         case mStat of
             Just (P.Exited ec)  -> return ec

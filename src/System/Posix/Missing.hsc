@@ -24,16 +24,20 @@ module System.Posix.Missing (
     setControllingTerminal,
 
     getArg0,
+    executeFile0,
     ) where
 
 import Control.Monad (when)
-import Foreign.C
+import Foreign (withArray0, withMany)
+import Foreign.C (CInt(..), CString, CULong(..),
+    throwErrnoIfMinus1, throwErrnoIfMinus1_, throwErrnoPathIfMinus1_)
 import Foreign.Ptr (nullPtr, Ptr)
 import Foreign.Safe (alloca, peek, peekElemOff)
 import qualified GHC.Foreign as GHC
 import GHC.IO.Encoding (getFileSystemEncoding)
 import System.Posix
-import System.Posix.Internals
+import System.Posix.Internals (c_fcntl_write, FD, withFilePath)
+import System.Posix.Process.Internals (pPrPr_disableITimers)
 
 #include "HsUnix.h"
 
@@ -123,3 +127,24 @@ getArg0 =
 
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
+
+
+-- | Like 'executeFile', but allow for expressly setting @argv[0]@
+-- For simplicity, this version has no path search option, and always takes an
+-- environment.  If incorporating into System.Posix.Process, the signature
+-- should better match 'executeFile'.
+executeFile0 :: FilePath -> String -> [String] -> [(String, String)] -> IO a
+executeFile0 path cmd args env = do
+  withFilePath path $ \s ->
+    withMany withFilePath (cmd:args) $ \cstrs ->
+      withArray0 nullPtr cstrs $ \arg_arr ->
+    let env' = map (\ (name, val) -> name ++ ('=' : val)) env in
+    withMany withFilePath env' $ \cenv ->
+      withArray0 nullPtr cenv $ \env_arr -> do
+    pPrPr_disableITimers
+    throwErrnoPathIfMinus1_ "executeFile" path
+        (c_execve s arg_arr env_arr)
+    return undefined -- never reached
+
+foreign import ccall unsafe "execve"
+  c_execve :: CString -> Ptr CString -> Ptr CString -> IO CInt
