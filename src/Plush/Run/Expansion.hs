@@ -32,6 +32,7 @@ import Control.Monad (foldM)
 import Control.Monad.Exception (catchIOError)
 import Data.Char (isSpace)
 import Data.List (foldl', intercalate, partition, sort, tails)
+import Data.Maybe (fromMaybe)
 import System.FilePath (combine, (</>))
 import Text.Parsec
 
@@ -72,15 +73,46 @@ wordExpansionActive :: (PosixLike m) => Word -> ShellExec m Word
 wordExpansionActive = wordExpansion True
 
 wordExpansion :: (PosixLike m) => Bool -> Word -> ShellExec m Word
-wordExpansion _live w = tildeExpansion w >>= modifyPartsM (mapM we)
+wordExpansion live w = tildeExpansion w >>= modifyPartsM (mapM we)
     -- TODO: honor the live parameter
   where
-    we (Parameter name Nothing) = Expanded `fmap` getVarDefault name ""
-    -- TODO: parameters with modifiers
+    we (Parameter name pmod) = parameterExpansion live name pmod
     -- we (Subcommand cl) = return $ Expanded (testExecute cl)
     -- TODO: arthmetic
     we (Doublequoted dw) = mapM we dw >>= return . Doublequoted
     we p = return p
+
+parameterExpansion :: (PosixLike m) =>
+    Bool -> String -> ParameterModifier -> ShellExec m WordPart
+parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
+  where
+    pmodf PModNone                 = return . fromMaybe ""
+    pmodf (PModUseDefault t wd)    = pAct (ptest t) wd return
+    pmodf (PModAssignDefault t wd) = pAct (ptest t) wd setVar
+    pmodf (PModIndicateError t wd) = pAct (ptest t) wd (indicateError t)
+    pmodf (PModUseAlternate t wd)  = pAct (not . ptest t) wd return
+    pmodf PModLength               = return . show . length . fromMaybe ""
+    pmodf _ = \s ->
+        errStrLn "unsupported parameter mod" >> return (fromMaybe "" s)
+
+    pAct f wd act v =
+        if f v
+            then return $ fromMaybe "" v
+            else wordExpansion live wd >>= act . wordText
+
+    ptest _     Nothing  = False
+    ptest False (Just _) = True         -- plain mods use any assigned value
+    ptest True  (Just s) = not $ null s -- ':' mods only use non null values
+
+    setVar s = setVarEntry name (VarShellOnly, VarReadWrite, Just s) >> return s
+
+    indicateError True ""  = shouldError " is unset or null"
+    indicateError False "" = shouldError " is unset"
+    indicateError _ msg    = shouldError $ ": " ++ msg
+
+    shouldError msg = errStrLn (name ++ msg) >> return ""
+        -- TODO(mzero): should shell error at this point
+
 
 
 tildeExpansion :: (PosixLike m) => Word -> ShellExec m Word
