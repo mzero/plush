@@ -15,6 +15,7 @@ limitations under the License.
 -}
 
 module Plush.Utilities (
+    isBlank,
     readMaybe,
     readUtf8File,
     displayVersion,
@@ -27,6 +28,13 @@ import System.IO
 
 import qualified Paths_plush as CabalPaths
 
+-- | In the spec, <blank> is defined by the class current locale (§3.74).
+-- In plush, which is always UTF-8 based, it is simply <space> or <tab>. On many
+-- UTF-8 locales have <blank> include a few other (but not all) space chars.
+isBlank :: Char -> Bool
+isBlank ' ' = True
+isBlank '\t' = True
+isBlank _ = False
 
 -- | The missing read function. The string must parse entirely for this to
 -- return a value.

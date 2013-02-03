@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import Text.Parsec
 import Plush.Parser.Aliases (originalSourceColumn)
 import Plush.Parser.Base
 import Plush.Types
+import Plush.Utilities
 
 
 -- This is a complete refactoring of §2.3 & §2.10.1. Those sections are written
@@ -55,7 +56,7 @@ import Plush.Types
 
 whitespace :: ShellParser ()
 whitespace = do
-    skipMany (char ' ')
+    skipMany (satisfy isBlank)
     optional $ char '#' >> skipMany (satisfy (/= '\n'))
 
 tokenize :: ShellParser a -> ShellParser a
@@ -142,7 +143,7 @@ wordContent endP = bits
 bare :: ShellParser WordPart
 bare = Bare <$> many1 (noneOf nonWordChars)
   where
-    nonWordChars = " \n\\\'\"$" ++ operatorStarts
+    nonWordChars = " \t\n\\\'\"$" ++ operatorStarts
     operatorStarts = concatMap (take 1) operators
 
 

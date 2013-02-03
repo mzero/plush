@@ -285,7 +285,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     getUserHomeDirectoryForName = liftT1 getUserHomeDirectoryForName
     realAndEffectiveIDsMatch = lift realAndEffectiveIDsMatch
 
-    execProcess = liftT3 execProcess
+    execProcess = liftT4 execProcess
     pipeline cs = do
         s <- get
         lift $ pipeline [ evalStateT c s | c <- cs ]

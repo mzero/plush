@@ -67,7 +67,6 @@ import System.Posix.Types
 import qualified System.IO as IO
 import qualified System.IO.Error as IO
 import qualified System.Posix as P
-import qualified System.Process as IO
 import qualified System.Posix.Missing as PM
 
 
@@ -146,8 +145,9 @@ class (Functor m, Monad m, MonadException m,
 
     -- From System.Process
 
-    execProcess :: Bindings     -- ^ Environment variable bindings
-                -> FilePath     -- ^ Path to exec
+    execProcess :: FilePath     -- ^ Path to exec
+                -> Bindings     -- ^ Environment variable bindings
+                -> String       -- ^ Command name
                 -> [String]     -- ^ Arguments
                 -> m ExitCode
 
@@ -209,10 +209,7 @@ instance PosixLike IO where
         groupsMatch <- (==) <$> P.getRealGroupID <*> P.getEffectiveGroupID
         return $ usersMatch && groupsMatch
 
-    execProcess env cmd args = do
-        (_, _, _, h) <- IO.createProcess $
-                        (IO.proc cmd args) { IO.env = Just env }
-        IO.waitForProcess h
+    execProcess = ioExecProcess
 
     pipeline = ioPipeline
 
@@ -251,6 +248,20 @@ ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
         m <- fromIntegral `fmap` P.fdWriteBuf fd (castPtr p) (fromIntegral n)
         when (0 <= m && m <= n) $ writeBuf (p `plusPtr` m, n - m)
     writeBuf _ = return ()
+
+
+-- | 'execProcess' for 'IO'
+ioExecProcess fp env cmd args = do
+        pid <- P.forkProcess $
+            PM.executeFile0 fp cmd args env `catchIOError` handler
+        mStat <- P.getProcessStatus True False pid
+        case mStat of
+            Just (P.Exited ec)  -> return ec
+            _                   -> return $ ExitFailure 129
+  where
+    handler _ = P.exitImmediately $ ExitFailure 127
+        -- NOTE(mzero): §2.9.1 seems to imply 126 in this case, but all other
+        -- shells return 127
 
 -- | 'pipeline' for 'IO': fork each action, connected by a daisy chained
 -- series of pipes. The first action gets the original stdInput, the last
