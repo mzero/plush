@@ -95,11 +95,11 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     pmodf (PModRemoveSuffix False wd) = remove shortestSuffix wd
     pmodf (PModRemoveSuffix True  wd) = remove longestSuffix wd
 
-    getWord wd = wordText <$> wordExpansion live wd
+    getWord wd = wordExpansion live wd
 
     pAct f wd act v = if f v
         then return $ fromMaybe "" v
-        else getWord wd >>= act
+        else getWord wd >>= act . wordText
 
     ptest _     Nothing  = False
     ptest False (Just _) = True         -- plain mods use any assigned value
@@ -221,12 +221,3 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
     byparts acc (x:ws) = byparts (x:acc) ws
 
     unparts = Word (location w) . intercalate [Bare ":"] . map parts
-
-
-compress :: Parts -> Parts
-compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
-compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
-compress (p:ps) = p : compress ps
-compress [] = []
-
-

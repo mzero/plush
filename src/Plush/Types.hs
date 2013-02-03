@@ -153,6 +153,14 @@ partText (Arithmetic wd) = "$((" ++ wordText wd ++ "))"
 
 partText (Expanded s) = s
 
+compress :: Parts -> Parts
+compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
+compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
+compress (p:ps) = p : compress ps
+compress [] = []
+
+
+
 
 -- | Source location of a parsed construct. References all the way back to the
 -- original source text. Character positions are enumerated characters from 1.

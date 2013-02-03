@@ -109,15 +109,30 @@ Pattern matches, pattern features
     =noodle=
     # echo =${str##*}=
     ==
+
     # echo ${str#[a-m]} ${str#[!a-m]} ${str#[n-z]} ${str#[!n-z]}
     noodle oodle oodle noodle
     # echo ${str#*[aeiou]} ${str#*[!aeiou]}
     odle oodle
-    # str='.a*b?c\d'
+    # str='.noodle'
     # echo ${str#?}     # leading dot matched by wildcard (not true for globs!)
-    a*b?c\d
-    # echo ${str#*\*} ${str#*\?} ${str#*\\}     # SKIP plush
+    noodle
+
+Patterns with quoted pattern characters
+    # str='a*b?c\d'
+    # echo ${str#*\*} ${str#*\?} ${str#*\\}
     b?c\d c\d d
+    # echo ${str#*'*'} ${str#*'?'} ${str#*'\'}
+    b?c\d c\d d
+    # echo ${str#*"*"} ${str#*"?"} ${str#*"\\"}
+    b?c\d c\d d
+
+    # star='*' question='?' backslashes='\\'
+    # echo ${str#*$star} ${str#*$question} ${str#*$backslashes}
+    a*b?c\d *b?c\d d
+    # backslash='\'
+    # echo ${str#*$backslash}   # SKIP dash - spec is mute on trailing backslash
+    a*b?c\d
 
 Pattern matches, longest & shortest
     # str='ababxyxy'
@@ -136,3 +151,36 @@ Patterns on unset vars don't expand the pattern
     ==
     no
 
+Pattern matching examples from spec
+    # unset X
+    # echo ${X:=abc}
+    abc
+
+    # unset posix
+    # set a b c
+    # echo ${3:+posix}
+    posix
+
+    # HOME=/usr/posix
+    # echo ${#HOME}
+    10
+
+    # x=file.c
+    # echo ${x%.c}.o
+    file.o
+
+    # x=posix/src/std
+    # echo ${x%%/*}
+    posix
+
+    # x=$HOME/src/cmd
+    # echo ${x#$HOME}
+    /src/cmd
+
+    # x=/one/two/three
+    # echo ${x##*/}
+    three
+
+    # x='*hi'
+    # echo "${x#*}" ${x#"*"}
+    *hi hi

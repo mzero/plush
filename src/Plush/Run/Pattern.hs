@@ -35,6 +35,7 @@ import Text.Parsec.String
 
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
+import Plush.Types
 
 
 data PatternPart = Literal Char | CharTest (Char -> Bool) | Star | NoMatch
@@ -66,8 +67,15 @@ pattern exclude = many1 partP
 
 -- | Compile a string into a 'Pattern'. If the string is an invalid pattern,
 -- then the resutling pattern will match no strings.
-makePattern :: String -> Pattern
-makePattern = either (\_ -> [NoMatch]) id . parse (pattern "") ""
+makePattern :: Word -> Pattern
+makePattern = concatMap asPattern . compress . parts
+  where
+    asPattern (Bare s)      = strPattern s
+    asPattern (Expanded s)  = strPattern s
+    asPattern p             = litPattern $ partText p
+
+    strPattern = either (\_ -> [NoMatch]) id . parse (pattern "") ""
+    litPattern = map Literal
 
 -- | Match a pattern against a string (anchored at the start), and return a
 -- list of all possible remainders (after the matched part). If the @initialDot@

@@ -28,7 +28,7 @@ Simple command usage
     aaa='apple'
     bbb='banana'
     ccc='casava'
-    # alias -p | tr \" \'           # SKIP dash - a bashism plush supports
+    # alias -p | tr \" \'           # SKIP dash - a supported bashism
     alias aaa='apple'
     alias bbb='banana'
     alias ccc='casava'
