@@ -32,6 +32,7 @@ import System.FilePath
 
 import Plush.Run.Command
 import Plush.Run.Expansion
+import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.ShellExec
 import Plush.Run.Types

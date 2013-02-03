@@ -85,6 +85,7 @@ Library
     Plush.Run.Command
     Plush.Run.Execute
     Plush.Run.Expansion
+    Plush.Run.Pattern
     Plush.Run.Posix
     Plush.Run.Posix.Utilities
     Plush.Run.Redirection
