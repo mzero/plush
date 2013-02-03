@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,13 +45,19 @@ complete_command = do
     return $ cl ++ [(ao,s)]
 
 list :: ShellParser (CommandList, AndOrList) -- leading list & last and_or
-list = do
-    ao <- and_or
-    try (more_list ao) <|> return ([], ao)
+list = sequenceOfAndOr separator_op
+
+-- | Utility that implements the structure of both list and term, which
+-- differ only on the separator term used between the parts.
+sequenceOfAndOr :: ShellParser Execution -> ShellParser (CommandList, AndOrList)
+sequenceOfAndOr separatorTerm = first_list
   where
+    first_list = do
+        ao <- and_or
+        try (more_list ao) <|> return ([], ao)
     more_list ao = do
-        s <- separator_op
-        (cl, ao') <- list
+        s <- separatorTerm
+        (cl, ao') <- first_list
         return ((ao,s):cl, ao')
 
 and_or :: ShellParser AndOrList
@@ -94,40 +100,57 @@ for_clause = do
     -- character set).
     name <- tok_for *> tok_name <* linebreak
     words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
-    doGroup <- tok_do *> compound_list <* tok_done
-    return $ ForClause name words_ doGroup
+    doGroup <- do_group
+    return $ ForLoop name words_ doGroup
 
 case_clause :: ShellParser CompoundCommand
 case_clause = tok_case *> unexpected "case_clause not supported"
 
 if_clause :: ShellParser CompoundCommand
-if_clause = tok_if *> unexpected "if_clause not supported"
+if_clause = do
+    c0 <- tok_if *> compound_list
+    s0 <- tok_then *> compound_list
+    (css, mElse) <- option ([], Nothing) else_part <* tok_fi
+    return $ IfConditional ((c0,s0):css) mElse
+
+-- | N.B.: The grammar for if_clause in §2.10.2 is known to be wrong. It will
+-- be fixed in the upcoming corregenda (TC1), which is expected to define it
+-- as:
+--
+-- @@
+--      else_part : Elif compound_list Then compound_list
+--                | Elif compound_list Then compound_list else_part
+--                | Else compound_list
+--                ;
+-- @@
+else_part :: ShellParser ([(CommandList, CommandList)], Maybe CommandList)
+else_part = try elifOption <|> elseOption
+  where
+    elseOption = tok_else *> compound_list >>= return . (\e -> ([], Just e))
+    elifOption = do
+        c <- tok_elif *> compound_list
+        s <- tok_then *> compound_list
+        (css, mElse) <- option ([], Nothing) else_part
+        return ((c,s):css, mElse)
 
 while_clause :: ShellParser CompoundCommand
-while_clause = tok_while *> unexpected "while_clause not supported"
+while_clause = tok_while *> (WhileLoop <$> compound_list <*> do_group)
 
 until_clause :: ShellParser CompoundCommand
-until_clause = tok_until *> unexpected "until_clause not supported"
+until_clause = tok_until *> (UntilLoop <$> compound_list <*> do_group)
 
--- | This is the same as 'list', except that the cmds are separated with
--- 'separator' instead of 'separator_op'.  Normally I'd factor them into one
--- function, but we're trying to maintain exactly the structure and names of
--- the POSIX grammar so copy paste.
+do_group :: ShellParser CommandList
+do_group = tok_do *> compound_list <* tok_done
+
 compound_list :: ShellParser CommandList
 compound_list = do
+    optional newline_list
     (cl, ao) <- term
     s <- option Sequential separator
     return $ cl ++ [(ao, s)]
 
 term :: ShellParser (CommandList, AndOrList)
-term = do
-    ao <- and_or
-    try (more_list ao) <|> return ([], ao)
-  where
-    more_list ao = do
-        s <- separator
-        (cl, ao') <- list
-        return ((ao,s):cl, ao')
+term = sequenceOfAndOr separator
 
 -- * function definition
 

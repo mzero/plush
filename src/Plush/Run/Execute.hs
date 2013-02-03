@@ -132,10 +132,10 @@ execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
-    ForClause name words_ cmds -> execFor name words_ cmds
-    IfClause _condition _consequent _alts -> notSupported "IfClause"
-    WhileClause _condition _cmds -> notSupported "WhileClause"
-    UntilClause _condition _cmds -> notSupported "UntilClause"
+    ForLoop name words_ cmds -> execFor name words_ cmds
+    IfConditional conds mElse -> execIf conds mElse
+    WhileLoop test body -> execLoop True test body
+    UntilLoop test body -> execLoop False test body
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ExitCode
@@ -150,6 +150,28 @@ execFor (Name _ name) (Just words_) cmds = do
         case ok of
             ExitSuccess -> execute cmds >> forLoop ws
             e@(ExitFailure {}) -> return e
+
+execIf :: (PosixLike m) =>
+    [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ExitCode
+execIf [] Nothing = success
+execIf [] (Just e) = execute e
+execIf ((c,s):css) mElse = do
+    ec <- execute c
+    case ec of
+        ExitFailure n | n /= 0 -> execIf css mElse
+        _ -> execute s
+
+execLoop :: (PosixLike m) =>
+    Bool -> CommandList -> CommandList -> ShellExec m ExitCode
+execLoop loopWhen test body = go ExitSuccess
+  where
+    go lastEc = do
+        ec <- execute test
+        if loopWhen == isSuccess ec
+            then execute body >>= go
+            else return lastEc
+    isSuccess (ExitFailure n) | n /= 0 = False
+    isSuccess _ = True
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
 execFunctionBody (FunctionBody body redirects) =
@@ -183,12 +205,13 @@ execType = typeCommandList
         BraceGroup cmdlist -> typeCommandList cmdlist
         -- Things in the subshell can't change the state of this shell.
         Subshell {} -> return ExecuteMidground
-        ForClause _ _ cmdlist -> typeCommandList cmdlist
-        IfClause condition consequent alternatives -> minimum <$>
-            mapM typeCommandList (condition : consequent : alternatives)
-        WhileClause condition body ->
+        ForLoop _ _ cmdlist -> typeCommandList cmdlist
+        IfConditional conds mElse -> minimum <$>
+            mapM typeCommandList
+                (maybe id (:) mElse $ concatMap (\(c,d)->[c,d]) conds)
+        WhileLoop condition body ->
             min <$> typeCommandList condition <*> typeCommandList body
-        UntilClause condition body ->
+        UntilLoop condition body ->
             min <$> typeCommandList condition <*> typeCommandList body
     typeCommand (Function {}) = return ExecuteForeground
 
