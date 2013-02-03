@@ -32,6 +32,7 @@ import System.FilePath
 
 import Plush.Run.Command
 import Plush.Run.Expansion
+import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.ShellExec
 import Plush.Run.Types
@@ -91,7 +92,7 @@ annotate cl cursor = coallesce <$> annoCommandList cl
         compFiles (preCursor, postCursor) = map (++postCursor) <$> do
             (tildePart, pathPart) <- tildeSplit preCursor
             paths <- pathnameGlob (fromMaybe "" $ tildeDir tildePart)
-                        $ pathPart ++ "*"
+                        $ [Singlequoted pathPart, Bare "*"]
             return $ (maybe id (map . (</>)) $ tildePrefix tildePart) paths
 
 

@@ -106,6 +106,9 @@ What is and isn't expanded
     # echo b\*
     b*
 
+    # echo 'b'*
+    bat.hs beetle.hs
+
 Subdirectories can be matched
     # mkdir america
     # mkdir antarctic

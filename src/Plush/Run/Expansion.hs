@@ -21,20 +21,19 @@ module Plush.Run.Expansion (
     wordExpansionActive,
     TildePart, tildeDir, tildePrefix,
     tildeSplit,
-    pathnameGlob,
     quoteRemoval,
     byPathParts,
     )
 where
 
 import Control.Applicative ((<$>))
-import Control.Monad (foldM)
-import Control.Monad.Exception (catchIOError)
 import Data.Char (isSpace)
-import Data.List (foldl', intercalate, partition, sort, tails)
-import System.FilePath (combine, (</>))
+import Data.List (intercalate, partition)
+import Data.Maybe (fromMaybe)
+import System.FilePath ((</>))
 import Text.Parsec
 
+import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
@@ -72,15 +71,52 @@ wordExpansionActive :: (PosixLike m) => Word -> ShellExec m Word
 wordExpansionActive = wordExpansion True
 
 wordExpansion :: (PosixLike m) => Bool -> Word -> ShellExec m Word
-wordExpansion _live w = tildeExpansion w >>= modifyPartsM (mapM we)
+wordExpansion live w = tildeExpansion w >>= modifyPartsM (mapM we)
     -- TODO: honor the live parameter
   where
-    we (Parameter name Nothing) = Expanded `fmap` getVarDefault name ""
-    -- TODO: parameters with modifiers
+    we (Parameter name pmod) = parameterExpansion live name pmod
     -- we (Subcommand cl) = return $ Expanded (testExecute cl)
     -- TODO: arthmetic
     we (Doublequoted dw) = mapM we dw >>= return . Doublequoted
     we p = return p
+
+parameterExpansion :: (PosixLike m) =>
+    Bool -> String -> ParameterModifier -> ShellExec m WordPart
+parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
+  where
+    pmodf PModNone                 = return . fromMaybe ""
+    pmodf (PModUseDefault t wd)    = pAct (ptest t) wd return
+    pmodf (PModAssignDefault t wd) = pAct (ptest t) wd setVar
+    pmodf (PModIndicateError t wd) = pAct (ptest t) wd (indicateError t)
+    pmodf (PModUseAlternate t wd)  = pAct (not . ptest t) wd return
+    pmodf PModLength               = return . show . length . fromMaybe ""
+    pmodf (PModRemovePrefix False wd) = remove shortestPrefix wd
+    pmodf (PModRemovePrefix True  wd) = remove longestPrefix wd
+    pmodf (PModRemoveSuffix False wd) = remove shortestSuffix wd
+    pmodf (PModRemoveSuffix True  wd) = remove longestSuffix wd
+
+    getWord wd = wordExpansion live wd
+
+    pAct f wd act v = if f v
+        then return $ fromMaybe "" v
+        else getWord wd >>= act . wordText
+
+    ptest _     Nothing  = False
+    ptest False (Just _) = True         -- plain mods use any assigned value
+    ptest True  (Just s) = not $ null s -- ':' mods only use non null values
+
+    setVar s = setVarEntry name (VarShellOnly, VarReadWrite, Just s) >> return s
+
+    remove f wd = maybe (return "") $ \s ->
+        getWord wd >>= return . fromMaybe s . flip f s . makePattern
+
+    indicateError True ""  = shouldError " is unset or null"
+    indicateError False "" = shouldError " is unset"
+    indicateError _ msg    = shouldError $ ": " ++ msg
+
+    shouldError msg = errStrLn (name ++ msg) >> return ""
+        -- TODO(mzero): should shell error at this point
+
 
 
 tildeExpansion :: (PosixLike m) => Word -> ShellExec m Word
@@ -152,75 +188,12 @@ fieldSplitting ifs = expandParts $
 
 
 
-
 pathnameExpansion :: (PosixLike m) => Word -> m [Word]
-pathnameExpansion =  origIfNull $ (expandPartsM $ glob . compress)
+pathnameExpansion w = results <$> pathnameGlob "" (parts w)
     -- TODO: should skip pathnameExpansion of shell flag -f is set
   where
-    glob :: (PosixLike m) => Parts -> m [Parts]
-    glob [(Bare s)] = pathnameGlob "" s >>= return . map ((:[]).Bare)
-    glob _ = return []
-
-    origIfNull f a = (\bs -> if null bs then [a] else bs) <$> f a
-
-
-data PatternPart = Literal Char | CharTest (Char -> Bool) | Star
-type Pattern = [PatternPart]
-data PatternAction = AddSlash | MatchContents Pattern
-type PathPattern = [PatternAction]
-
-pathnameGlob :: (PosixLike m) => FilePath -> String -> m [String]
-pathnameGlob base = either (\_err -> return []) match . parse patP ""
-  where
-    match :: (PosixLike m) => PathPattern -> m [String]
-    match = foldM steps [""]
-      where
-        steps fs p = concat `fmap` mapM (step p) fs
-
-        step (MatchContents p) dir = do
-            entries <- getDirectoryContents (ifNull "." $ base </> dir)
-                `catchIOError` (\_ -> return [])
-            return $ map (combine dir) $ sort $ filter (patMatch p) entries
-        step (AddSlash) path = do
-            isDir <- doesDirectoryExist (ifNull "/" $ base </> path)
-            return $ if isDir then [path ++ "/"] else []
-
-    ifNull d s = if null s then d else s
-
-    patP =  many1 (slashP <|> matchP)
-    slashP = char '/' >> return AddSlash
-    matchP = many1 partP >>= return . MatchContents
-    partP = (char '*' >> return Star)
-        <|> (char '?' >> return (CharTest (const True)))
-        <|> (char '\\' >> anyChar >>= return . Literal)
-        <|> (try $ do _ <- char '['
-                      c <- noneOf "/"
-                      first <- if c == '!'
-                               then noneOf "/"
-                               else return c
-                      rest <- many $ noneOf "]/"
-                      _ <- char ']'
-                      let f = if c == '!'
-                              then flip notElem
-                              else flip elem
-                      return $ CharTest (f $ makeCharClass (first:rest)))
-        <|> (noneOf "/" >>= return . Literal)
-
-    makeCharClass :: [Char] -> [Char]
-    makeCharClass []                   = []
-    makeCharClass (begin:'-':end:rest) = [begin .. end] ++ makeCharClass rest
-    makeCharClass (c:cs)               = c : makeCharClass cs
-
-    patMatch :: Pattern -> String -> Bool
-    patMatch pattern s = any null $ foldl' (flip concatMap) [s] matchers
-      where
-        matchers = zipWith g (True:repeat False) pattern
-        g _    (Literal l)  (c:cs)  = if l == c then [cs] else []
-        g True _            ('.':_) = []
-        g _    (CharTest p) (c:cs)  = if p c then [cs] else []
-        g _    Star            cs   = tails cs
-        g _    _               []   = []
-
+    results [] = [w]
+    results es = expandParts (const [[Bare e] | e <- es]) w
 
 
 quoteRemoval :: Word -> String
@@ -245,12 +218,3 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
     byparts acc (x:ws) = byparts (x:acc) ws
 
     unparts = Word (location w) . intercalate [Bare ":"] . map parts
-
-
-compress :: Parts -> Parts
-compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
-compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
-compress (p:ps) = p : compress ps
-compress [] = []
-
-

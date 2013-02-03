@@ -36,7 +36,7 @@ module Plush.Parser.Tokens (
     )
 where
 
-import Control.Applicative ((<*), (*>))
+import Control.Applicative ((<*), (<*>), (*>))
 import Control.Monad
 import qualified Data.Char as Char
 import Data.Functor
@@ -66,12 +66,8 @@ operators :: [String]
 operators = words "&& || ;; << >> <& >& <> <<- >|"
 
 tok_word :: ShellParser Word
-tok_word = tokenize $ do
-    start <- originalSourceColumn
-    ps <- many1 (backslash <|> singlequote <|> doublequote <|> dollar <|> bare)
-    end <- originalSourceColumn
-    return $ Word (Span start end) ps
-        -- TODO: should handle case where start and end are on differnt lines
+tok_word = tokenize . locatedWord $
+    many1 (backslash <|> singlequote <|> doublequote <|> dollar <|> bare)
 
 -- In the shell command language, a word consisting solely of underscores,
 -- digits, and alphabetics from the portable character set. The first character
@@ -109,7 +105,9 @@ dollar :: ShellParser WordPart
 dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
   where
     parameter = between (char '{') (char '}') $
-        liftM2 Parameter variableName (optionMaybe modification)
+        (char '#' >> (flip Parameter PModLength) <$> variableName)
+        <|>
+        (Parameter <$> variableName <*> option PModNone modification)
 
     arithmetic = between (try $ string "((") (string "))") $
         Arithmetic <$> wordContent (string "))")
@@ -117,7 +115,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
     subcommand = between (char '(') (char ')') $
         Subcommand <$> unexpected "subcommands not yet supported" -- complete_command
 
-    variable = variableName >>= \v -> return $ Parameter v Nothing
+    variable = variableName >>= \v -> return $ Parameter v PModNone
 
     variableName = positionalName <|> specialName <|> shellVariableName
     positionalName = many1 digit
@@ -127,13 +125,26 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
     shellVariableName =
         liftM2 (:) (char '_' <|> letter) $ many (char '_' <|> alphaNum)
 
-    modification = choice modifiers <&> wordContent (char '}')
-    modifiers = map (try . string) $ words ":- - := = :? ? :+ + % %% # ##"
+    modification = modifiers <*> wordContent (char '}')
+    modifiers = choice $ map try
+        [ string ":-" >> return (PModUseDefault True)
+        , string "-"  >> return (PModUseDefault False)
+        , string ":=" >> return (PModAssignDefault True)
+        , string "="  >> return (PModAssignDefault False)
+        , string ":?" >> return (PModIndicateError True)
+        , string "?"  >> return (PModIndicateError False)
+        , string ":+" >> return (PModUseAlternate True)
+        , string "+"  >> return (PModUseAlternate False)
+        , string "%%" >> return (PModRemoveSuffix True)
+        , string "%"  >> return (PModRemoveSuffix False)
+        , string "##" >> return (PModRemovePrefix True)
+        , string "#"  >> return (PModRemovePrefix False)
+        ]
         -- TODO rather inefficient way to do this!
 
 -- like tok_word, but a) spaces are allowed, and b) terminates on end
-wordContent :: ShellParser a -> ShellParser [WordPart]
-wordContent endP = bits
+wordContent :: ShellParser a -> ShellParser Word
+wordContent endP = locatedWord bits
   where
     bits = (lookAhead (try endP) >> return []) <|> liftM2 (:) bit bits
     bit = (backslash <|> singlequote <|> doublequote <|> dollar <|> bChar)
@@ -145,6 +156,15 @@ bare = Bare <$> many1 (noneOf nonWordChars)
   where
     nonWordChars = " \t\n\\\'\"$" ++ operatorStarts
     operatorStarts = concatMap (take 1) operators
+
+
+locatedWord :: ShellParser Parts -> ShellParser Word
+locatedWord partsParser = do
+    start <- originalSourceColumn
+    ps <- partsParser
+    end <- originalSourceColumn
+    return $ Word (Span start end) ps
+        -- TODO: should handle case where start and end are on differnt lines
 
 
 tok_assignment_word :: ShellParser Assignment

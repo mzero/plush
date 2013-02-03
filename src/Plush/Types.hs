@@ -90,6 +90,17 @@ data RedirectType
     | RedirInputOutput -- <> (def. 0)
     deriving (Eq, Show)
 
+data ParameterModifier
+    = PModNone
+    | PModUseDefault Bool Word      -- - and :-
+    | PModAssignDefault Bool Word   -- = and :=
+    | PModIndicateError Bool Word   -- ? and :?
+    | PModUseAlternate Bool Word    -- + and :+
+    | PModLength                    -- #
+    | PModRemoveSuffix Bool Word    -- % and %%
+    | PModRemovePrefix Bool Word    -- # and ##
+    deriving (Eq, Show)
+
 data Word = Word { location :: Location, parts :: Parts }
     deriving (Eq, Show)
 
@@ -102,9 +113,9 @@ data WordPart = Bare String
               | Backslashed Char
               | Singlequoted String
               | Doublequoted Parts
-              | Parameter String (Maybe (String,Parts)) -- TODO: Modifier type?
+              | Parameter String ParameterModifier
               | Subcommand CommandList
-              | Arithmetic Parts
+              | Arithmetic Word
               | Expanded String
     deriving (Eq, Show)
 
@@ -117,15 +128,38 @@ partText (Backslashed c) | c == '\n' = ""
                          | otherwise = [c]
 partText (Singlequoted s) = s
 partText (Doublequoted ps) = concatMap partText ps
-partText (Parameter n mm) = "${" ++ n ++ modText mm ++ "}"
+partText (Parameter n mm) = "${" ++ modPre mm ++ n ++ modPost mm ++ "}"
   where
-    modText Nothing = ""
-    modText (Just (m,ps)) = m ++ concatMap partText ps
+    modPre PModLength = "#"
+    modPre _ = ""
+
+    modPost PModNone = ""
+    modPost (PModUseDefault    True  wd) = ':' : '-' : wordText wd
+    modPost (PModUseDefault    False wd) =       '-' : wordText wd
+    modPost (PModAssignDefault True  wd) = ':' : '=' : wordText wd
+    modPost (PModAssignDefault False wd) =       '=' : wordText wd
+    modPost (PModIndicateError True  wd) = ':' : '?' : wordText wd
+    modPost (PModIndicateError False wd) =       '?' : wordText wd
+    modPost (PModUseAlternate  True  wd) = ':' : '+' : wordText wd
+    modPost (PModUseAlternate  False wd) =       '+' : wordText wd
+    modPost PModLength = ""
+    modPost (PModRemoveSuffix  True  wd) = '%' : '%' : wordText wd
+    modPost (PModRemoveSuffix  False wd) =       '%' : wordText wd
+    modPost (PModRemovePrefix  True  wd) = '#' : '#' : wordText wd
+    modPost (PModRemovePrefix  False wd) =       '#' : wordText wd
 
 partText (Subcommand _cl) = "$(...command...)" -- TODO
-partText (Arithmetic ps) = "$((" ++ concatMap partText ps ++ "))"
+partText (Arithmetic wd) = "$((" ++ wordText wd ++ "))"
 
 partText (Expanded s) = s
+
+compress :: Parts -> Parts
+compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps
+compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
+compress (p:ps) = p : compress ps
+compress [] = []
+
+
 
 
 -- | Source location of a parsed construct. References all the way back to the
