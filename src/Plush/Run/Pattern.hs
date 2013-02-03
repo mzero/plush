@@ -21,6 +21,7 @@ module Plush.Run.Pattern (
     shortestPrefix, longestPrefix,
     shortestSuffix, longestSuffix,
     patternMatch,
+
     pathnameGlob,
     )
 where
@@ -41,8 +42,8 @@ import Plush.Types
 data PatternPart = Literal Char | CharTest (Char -> Bool) | Star | NoMatch
 type Pattern = [PatternPart]
 
-pattern :: String -> Parser Pattern
-pattern exclude = many1 partP
+pattern :: Parser Pattern
+pattern = many1 partP
   where
     partP = (char '*' >> return Star)
         <|> (char '?' >> return (CharTest (const True)))
@@ -58,7 +59,7 @@ pattern exclude = many1 partP
                               then flip notElem
                               else flip elem
                       return $ CharTest (f $ makeCharClass (first:rest)))
-        <|> (noneOf exclude >>= return . Literal)
+        <|> (anyChar >>= return . Literal)
 
     makeCharClass :: [Char] -> [Char]
     makeCharClass []                   = []
@@ -74,7 +75,7 @@ makePattern = concatMap asPattern . compress . parts
     asPattern (Expanded s)  = strPattern s
     asPattern p             = litPattern $ partText p
 
-    strPattern = either (\_ -> [NoMatch]) id . parse (pattern "") ""
+    strPattern = either (\_ -> [NoMatch]) id . parse pattern ""
     litPattern = map Literal
 
 -- | Match a pattern against a string (anchored at the start), and return a
@@ -125,15 +126,28 @@ longestSuffix p s = reverse <$> longestPrefix (reverse p) (reverse s)
 data PatternAction = AddSlash | MatchContents Pattern
 type PathPattern = [PatternAction]
 
-pathnamePattern :: Parser PathPattern
-pathnamePattern = many1 (slashP <|> matchP)
+makePathPattern :: Parts -> PathPattern
+makePathPattern = mergeMatches . concatMap asPattern . compress
   where
-    slashP = char '/' >> return AddSlash
-    matchP = pattern "/" >>= return . MatchContents
+    asPattern (Bare s)      = bySlashes strPattern s
+    asPattern (Expanded s)  = bySlashes strPattern s
+    asPattern p             = bySlashes litPattern $ partText p
 
+    bySlashes _ [] = []
+    bySlashes f ('/':s) = AddSlash : bySlashes f s
+    bySlashes f s = let (pre,post) = break (== '/') s
+                    in MatchContents (f pre) : bySlashes f post
 
-pathnameGlob :: (PosixLike m) => FilePath -> String -> m [String]
-pathnameGlob base = either (\_err -> return []) match . parse pathnamePattern ""
+    strPattern = either (\_ -> [NoMatch]) id . parse pattern ""
+    litPattern = map Literal
+
+    mergeMatches [] = []
+    mergeMatches (MatchContents pa : MatchContents pb : ms) =
+        mergeMatches $ MatchContents (pa ++ pb) : ms
+    mergeMatches (m:ms) = m : mergeMatches ms
+
+pathnameGlob :: (PosixLike m) => FilePath -> Parts -> m [String]
+pathnameGlob base = match . makePathPattern
   where
     match :: (PosixLike m) => PathPattern -> m [String]
     match = foldM steps [""]

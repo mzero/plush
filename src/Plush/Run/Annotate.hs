@@ -92,7 +92,7 @@ annotate cl cursor = coallesce <$> annoCommandList cl
         compFiles (preCursor, postCursor) = map (++postCursor) <$> do
             (tildePart, pathPart) <- tildeSplit preCursor
             paths <- pathnameGlob (fromMaybe "" $ tildeDir tildePart)
-                        $ pathPart ++ "*"
+                        $ [Singlequoted pathPart, Bare "*"]
             return $ (maybe id (map . (</>)) $ tildePrefix tildePart) paths
 
 

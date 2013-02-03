@@ -189,14 +189,11 @@ fieldSplitting ifs = expandParts $
 
 
 pathnameExpansion :: (PosixLike m) => Word -> m [Word]
-pathnameExpansion =  origIfNull $ (expandPartsM $ glob . compress)
+pathnameExpansion w = results <$> pathnameGlob "" (parts w)
     -- TODO: should skip pathnameExpansion of shell flag -f is set
   where
-    glob :: (PosixLike m) => Parts -> m [Parts]
-    glob [(Bare s)] = pathnameGlob "" s >>= return . map ((:[]).Bare)
-    glob _ = return []
-
-    origIfNull f a = (\bs -> if null bs then [a] else bs) <$> f a
+    results [] = [w]
+    results es = expandParts (const [[Bare e] | e <- es]) w
 
 
 quoteRemoval :: Word -> String
