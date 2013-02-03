@@ -89,3 +89,50 @@ Assign default operator
     argv[1] = <pear>
     argv[2] = <pear>
     argv[3] = <apple>
+
+Pattern matches, simple
+    # str='crabapple'
+    # echo ${str#crab} ${str%apple}
+    apple crab
+    # echo ${str#tree} ${str%tree}
+    crabapple crabapple
+
+Pattern matches, pattern features
+    # str='noodle'
+    # echo ${str#?}
+    oodle
+    # echo ${str#*d}
+    le
+    # echo ${str#*q}
+    noodle
+    # echo =${str#*}=
+    =noodle=
+    # echo =${str##*}=
+    ==
+    # echo ${str#[a-m]} ${str#[!a-m]} ${str#[n-z]} ${str#[!n-z]}
+    noodle oodle oodle noodle
+    # echo ${str#*[aeiou]} ${str#*[!aeiou]}
+    odle oodle
+    # str='.a*b?c\d'
+    # echo ${str#?}     # leading dot matched by wildcard (not true for globs!)
+    a*b?c\d
+    # echo ${str#*\*} ${str#*\?} ${str#*\\}     # SKIP plush
+    b?c\d c\d d
+
+Pattern matches, longest & shortest
+    # str='ababxyxy'
+    # echo ${str#a*b} ${str##a*b}
+    abxyxy xyxy
+    # echo ${str%x*y} ${str%%x*y}
+    ababxy abab
+
+Patterns on unset vars don't expand the pattern
+    # something=yesindeedy
+    # unset unknown
+    # unset run; echo =${something#${run=yes}}=; echo ${run-no}
+    =indeedy=
+    yes
+    # unset run; echo =${unknown#${run=yes}}=; echo ${run-no}
+    ==
+    no
+

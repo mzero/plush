@@ -15,46 +15,34 @@ limitations under the License.
 -}
 
 module Plush.Run.Pattern (
+    Pattern,
+    makePattern,
+
+    shortestPrefix, longestPrefix,
+    shortestSuffix, longestSuffix,
+    patternMatch,
     pathnameGlob,
     )
 where
 
+import Control.Applicative ((<$>))
 import Control.Monad (foldM)
 import Control.Monad.Exception (catchIOError)
 import Data.List (foldl', sort, tails)
 import System.FilePath (combine, (</>))
 import Text.Parsec
+import Text.Parsec.String
 
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 
 
-data PatternPart = Literal Char | CharTest (Char -> Bool) | Star
+data PatternPart = Literal Char | CharTest (Char -> Bool) | Star | NoMatch
 type Pattern = [PatternPart]
-data PatternAction = AddSlash | MatchContents Pattern
-type PathPattern = [PatternAction]
 
-pathnameGlob :: (PosixLike m) => FilePath -> String -> m [String]
-pathnameGlob base = either (\_err -> return []) match . parse patP ""
+pattern :: String -> Parser Pattern
+pattern exclude = many1 partP
   where
-    match :: (PosixLike m) => PathPattern -> m [String]
-    match = foldM steps [""]
-      where
-        steps fs p = concat `fmap` mapM (step p) fs
-
-        step (MatchContents p) dir = do
-            entries <- getDirectoryContents (ifNull "." $ base </> dir)
-                `catchIOError` (\_ -> return [])
-            return $ map (combine dir) $ sort $ filter (patMatch p) entries
-        step (AddSlash) path = do
-            isDir <- doesDirectoryExist (ifNull "/" $ base </> path)
-            return $ if isDir then [path ++ "/"] else []
-
-    ifNull d s = if null s then d else s
-
-    patP =  many1 (slashP <|> matchP)
-    slashP = char '/' >> return AddSlash
-    matchP = many1 partP >>= return . MatchContents
     partP = (char '*' >> return Star)
         <|> (char '?' >> return (CharTest (const True)))
         <|> (char '\\' >> anyChar >>= return . Literal)
@@ -69,22 +57,89 @@ pathnameGlob base = either (\_err -> return []) match . parse patP ""
                               then flip notElem
                               else flip elem
                       return $ CharTest (f $ makeCharClass (first:rest)))
-        <|> (noneOf "/" >>= return . Literal)
+        <|> (noneOf exclude >>= return . Literal)
 
     makeCharClass :: [Char] -> [Char]
     makeCharClass []                   = []
     makeCharClass (begin:'-':end:rest) = [begin .. end] ++ makeCharClass rest
     makeCharClass (c:cs)               = c : makeCharClass cs
 
-    patMatch :: Pattern -> String -> Bool
-    patMatch pattern s = any null $ foldl' (flip concatMap) [s] matchers
+-- | Compile a string into a 'Pattern'. If the string is an invalid pattern,
+-- then the resutling pattern will match no strings.
+makePattern :: String -> Pattern
+makePattern = either (\_ -> [NoMatch]) id . parse (pattern "") ""
+
+-- | Match a pattern against a string (anchored at the start), and return a
+-- list of all possible remainders (after the matched part). If the @initialDot@
+-- is 'True', then an initial dot in the string will only match a literal dot
+-- in the pattern.
+matchRemainders :: Bool -> Pattern -> String -> [String]
+matchRemainders initialDot pat s = foldl' (flip concatMap) [s] matchers
+  where
+    matchers = zipWith g (initialDot:repeat False) pat
+    g _    (Literal l)  (c:cs)  = if l == c then [cs] else []
+    g True _            ('.':_) = []
+    g _    (CharTest p) (c:cs)  = if p c then [cs] else []
+    g _    Star            cs   = tails cs
+    g _    NoMatch          _   = []
+    g _    _               []   = []
+
+-- | Test if a pattern can match the entire string with no remainders.
+patternMatch :: Pattern -> String -> Bool
+patternMatch pat s = any null $ matchRemainders True pat s
+
+
+pickRemainder :: ([(Int, String)] -> (Int, String))
+    -> Pattern -> String -> Maybe String
+pickRemainder sift pat s = pickMatch $ matchRemainders False pat s
+  where
+    pickMatch [] = Nothing
+    pickMatch rs = Just . snd . sift $ map (\r -> (length r, r)) rs
+
+-- | Return the string with the shortest prefix match removed
+shortestPrefix :: Pattern -> String -> Maybe String
+shortestPrefix = pickRemainder  maximum
+
+-- | Return the string with the longest prefix match removed
+longestPrefix :: Pattern -> String -> Maybe String
+longestPrefix = pickRemainder minimum
+
+-- | Return the string with the shortest suffix match removed
+shortestSuffix :: Pattern -> String -> Maybe String
+shortestSuffix p s = reverse <$> shortestPrefix (reverse p) (reverse s)
+
+-- | Return the string with the longest suffix match removed
+longestSuffix :: Pattern -> String -> Maybe String
+longestSuffix p s = reverse <$> longestPrefix (reverse p) (reverse s)
+
+
+
+data PatternAction = AddSlash | MatchContents Pattern
+type PathPattern = [PatternAction]
+
+pathnamePattern :: Parser PathPattern
+pathnamePattern = many1 (slashP <|> matchP)
+  where
+    slashP = char '/' >> return AddSlash
+    matchP = pattern "/" >>= return . MatchContents
+
+
+pathnameGlob :: (PosixLike m) => FilePath -> String -> m [String]
+pathnameGlob base = either (\_err -> return []) match . parse pathnamePattern ""
+  where
+    match :: (PosixLike m) => PathPattern -> m [String]
+    match = foldM steps [""]
       where
-        matchers = zipWith g (True:repeat False) pattern
-        g _    (Literal l)  (c:cs)  = if l == c then [cs] else []
-        g True _            ('.':_) = []
-        g _    (CharTest p) (c:cs)  = if p c then [cs] else []
-        g _    Star            cs   = tails cs
-        g _    _               []   = []
+        steps fs p = concat `fmap` mapM (step p) fs
 
+        step (MatchContents p) dir = do
+            entries <- getDirectoryContents (ifNull "." $ base </> dir)
+                `catchIOError` (\_ -> return [])
+            return $ map (combine dir) $ sort $ filter (globMatch p) entries
+        step (AddSlash) path = do
+            isDir <- doesDirectoryExist (ifNull "/" $ base </> path)
+            return $ if isDir then [path ++ "/"] else []
 
+    ifNull d s = if null s then d else s
 
+    globMatch pat = any null . matchRemainders True pat

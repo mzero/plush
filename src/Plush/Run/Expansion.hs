@@ -90,19 +90,25 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     pmodf (PModIndicateError t wd) = pAct (ptest t) wd (indicateError t)
     pmodf (PModUseAlternate t wd)  = pAct (not . ptest t) wd return
     pmodf PModLength               = return . show . length . fromMaybe ""
-    pmodf _ = \s ->
-        errStrLn "unsupported parameter mod" >> return (fromMaybe "" s)
+    pmodf (PModRemovePrefix False wd) = remove shortestPrefix wd
+    pmodf (PModRemovePrefix True  wd) = remove longestPrefix wd
+    pmodf (PModRemoveSuffix False wd) = remove shortestSuffix wd
+    pmodf (PModRemoveSuffix True  wd) = remove longestSuffix wd
 
-    pAct f wd act v =
-        if f v
-            then return $ fromMaybe "" v
-            else wordExpansion live wd >>= act . wordText
+    getWord wd = wordText <$> wordExpansion live wd
+
+    pAct f wd act v = if f v
+        then return $ fromMaybe "" v
+        else getWord wd >>= act
 
     ptest _     Nothing  = False
     ptest False (Just _) = True         -- plain mods use any assigned value
     ptest True  (Just s) = not $ null s -- ':' mods only use non null values
 
     setVar s = setVarEntry name (VarShellOnly, VarReadWrite, Just s) >> return s
+
+    remove f wd = maybe (return "") $ \s ->
+        getWord wd >>= return . fromMaybe s . flip f s . makePattern
 
     indicateError True ""  = shouldError " is unset or null"
     indicateError False "" = shouldError " is unset"
