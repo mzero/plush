@@ -22,6 +22,7 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
+import Data.Maybe (fromMaybe)
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
 import System.Environment (getArgs, getProgName)
@@ -36,6 +37,7 @@ import Plush.ArgParser
 import Plush.DocTest
 import Plush.Resource
 import Plush.Run
+import Plush.Run.Expansion
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.Script
@@ -148,8 +150,7 @@ setupShell opts (defProfile, defEnv) = do
     when iIsSet $ do
         match <- realAndEffectiveIDsMatch
         when match $ do
-            Shell.getVar "ENV" >>= maybeRunFile
-            -- TODO(mzero): env should be subject to parameter expansion
+            getExpandedVar "ENV" >>= maybeRunFile
   where
     iIsSet = F.interactive $ optSetFlags opts $ F.defaultFlags
     baseFlags = if iIsSet
@@ -277,7 +278,7 @@ runRepl = runInputT defaultSettings . repl
     -- See http://trac.haskell.org/haskeline/ticket/123
   where
     repl runner = do
-        (ps1, runner') <- liftIO (run (Shell.getVarDefault "PS1" "$ ") runner)
+        (ps1, runner') <- liftIO (run prompt runner)
         l <- getInputLine ps1
         case l of
             Nothing -> return ()
@@ -288,3 +289,21 @@ runRepl = runInputT defaultSettings . repl
                         outputStrLn ("Didn't use whole input: " ++ leftOver)
                     _ -> return ()
                 repl runner''
+
+    prompt :: (PosixLike m) => Shell.ShellExec m String
+    prompt = getExpandedVarDefault "PS1" "$ "
+
+--
+-- Utility
+--
+
+getExpandedVar :: (PosixLike m) => String -> Shell.ShellExec m (Maybe String)
+getExpandedVar name = do
+    val <- Shell.getVar name
+    case val of
+        Nothing -> return Nothing
+        Just s -> Just <$> contentExpansion s
+
+getExpandedVarDefault :: (PosixLike m) =>
+    String -> String -> Shell.ShellExec m String
+getExpandedVarDefault name def = fromMaybe def <$> getExpandedVar name
