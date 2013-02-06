@@ -34,7 +34,9 @@ module Plush.Parser.Tokens (
     -- * keywords
     tok_if, tok_then, tok_else, tok_elif, tok_fi, tok_do, tok_done, tok_case,
     tok_esac, tok_while, tok_until, tok_for, tok_in,
-    reservedWords
+    reservedWords,
+
+    content
     )
 where
 
@@ -152,6 +154,17 @@ wordContent endP = locatedWord bits
     bit = (backslash <|> singlequote <|> doublequote <|> dollar <|> bChar)
     bChar = (Bare . (:[])) <$> anyChar
 
+-- | Content that is processed for parameter, command, and arithmetic
+-- expansions. Used to process @ENV@ and @PSn@ variables, and also some
+-- here-documents. It is very much like the content of doublequoted text.
+-- See §2.7.4
+content :: ShellParser Parts
+content = many (cBackslash <|> cDollar <|> cBare)
+  where
+    cBackslash = char '\\' *>
+        ( ( Backslashed <$> oneOf "$`\\\n" ) <|> return (Bare "\\") )
+    cDollar = try dollar <|> (Bare . (:[]) <$> char '$')
+    cBare = Bare <$> many1 (noneOf "$`\\")
 
 bare :: ShellParser WordPart
 bare = Bare <$> many1 (noneOf nonWordChars)

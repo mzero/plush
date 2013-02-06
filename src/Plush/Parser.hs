@@ -19,10 +19,12 @@ limitations under the License.
 module Plush.Parser (
     parseCommand,
     ParseCommandResult,
+
+    parseContent,
 )
 where
 
-import Control.Applicative ((*>))
+import Control.Applicative ((*>), (<*))
 import Control.Arrow (second, (+++))
 import Text.Parsec
 
@@ -45,3 +47,12 @@ parseCommand aliases = (show +++ unprep) . shellParse nextCommand "" . prep
 
     prep = dealiasStream aliases
     unprep = second dealiasRemainder
+
+-- | Parse content that is subject to parameter, command, and arithmetic
+-- expansion. Note that this always consumes the input, and never fails!
+parseContent :: String -> Parts
+parseContent s = post . shellParse (content <* eof) "" . pre $ s
+  where
+    pre = noAliasStream
+    post = either (const [Bare s]) id
+

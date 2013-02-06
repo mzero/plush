@@ -24,6 +24,7 @@ module Plush.Parser.Aliases (
     DealiasingStream,
     dealiasStream,
     dealiasRemainder,
+    noAliasStream,
 
     aliasSubstitution,
     originalSourceColumn
@@ -82,6 +83,9 @@ dealiasStream aliases s = DAS aliases 1 [(False, "", s)]
 dealiasRemainder :: DealiasingStream -> String
 dealiasRemainder (DAS _ _ stk) = concatMap (\(_, _, cs)->cs) stk
 
+-- | Construct a stream over some input, with no aliases
+noAliasStream :: String -> DealiasingStream
+noAliasStream = dealiasStream M.empty
 
 -- Utilities
 

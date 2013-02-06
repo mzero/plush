@@ -22,6 +22,8 @@ module Plush.Run.Expansion (
     TildePart, tildeDir, tildePrefix,
     tildeSplit,
     byPathParts,
+
+    contentExpansion,
     )
 where
 
@@ -32,6 +34,7 @@ import Data.Maybe (fromMaybe)
 import System.FilePath ((</>))
 import Text.Parsec
 
+import Plush.Parser
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
@@ -70,14 +73,18 @@ wordExpansionActive :: (PosixLike m) => Word -> ShellExec m Word
 wordExpansionActive = wordExpansion True
 
 wordExpansion :: (PosixLike m) => Bool -> Word -> ShellExec m Word
-wordExpansion live w = tildeExpansion w >>= modifyPartsM (mapM we)
+wordExpansion live w =
+    tildeExpansion w >>= modifyPartsM (mapM $ basicExpansion live)
+
+basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m WordPart
+basicExpansion live = be
     -- TODO: honor the live parameter
   where
-    we (Parameter name pmod) = parameterExpansion live name pmod
+    be (Parameter name pmod) = parameterExpansion live name pmod
     -- we (Subcommand cl) = return $ Expanded (testExecute cl)
     -- TODO: arthmetic
-    we (Doublequoted dw) = mapM we dw >>= return . Doublequoted
-    we p = return p
+    be (Doublequoted dw) = mapM be dw >>= return . Doublequoted
+    be p = return p
 
 parameterExpansion :: (PosixLike m) =>
     Bool -> String -> ParameterModifier -> ShellExec m WordPart
@@ -207,3 +214,11 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
     byparts acc (x:ws) = byparts (x:acc) ws
 
     unparts = Word (location w) . intercalate [Bare ":"] . map parts
+
+
+-- | Expands content that has been parsed for parameter, command, and
+-- arithmetic expansions. Note that the input type, 'Parts' is somewhat more
+-- general, and other constructs, if present, be expanded.
+contentExpansion :: (PosixLike m) => String -> ShellExec m String
+contentExpansion s =
+    concatMap partText <$> mapM (basicExpansion True) (parseContent s)
