@@ -289,6 +289,6 @@ instance PosixLike m => PosixLike (ShellExec m) where
     pipeline cs = do
         s <- get
         lift $ pipeline [ evalStateT c s | c <- cs ]
-
+    contentFd = liftT1 contentFd
 
 type ShellUtility m = Utility (ShellExec m)

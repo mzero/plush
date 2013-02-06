@@ -21,11 +21,12 @@ module Plush.Run.Redirection (
 
 import Control.Applicative ((<$>))
 import Control.Monad.Exception (bracket, catchIOError)
+import qualified Data.ByteString.Lazy as L
 import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities (errStr, errStrLn)
+import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types
@@ -36,14 +37,14 @@ type OpenOptions = (OpenMode, Maybe FileMode, OpenFileFlags)
 
 data RedirPrim
     = RedirFile Fd FilePath OpenOptions
---  | RedirHere Fd String -- not yet supported
+    | RedirHere Fd L.ByteString
     | RedirDup Fd Fd
     | RedirClose Fd
 
 mkPrim :: (PosixLike m) => Redirect -> ShellExec m (Either String RedirPrim)
 mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
   where
-    fd = Fd . fromIntegral $ fromMaybe (defaultFd rType) maybeFd
+    fd = fromIntegral $ fromMaybe (defaultFd rType) maybeFd
 
     defaultFd RedirOutput = 1
     defaultFd RedirOutputClobber = 1
@@ -82,19 +83,13 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
     truncFileFlags = defaultFileFlags { trunc = True }
     appendFileFlags = defaultFileFlags { append = True }
 
-mkPrim (RedirectHere maybeFd hereDoc w) = debugHereDoc >>
-    return (Left "here docs not supported")
-        -- TODO(mzero): implement here docs for real
+mkPrim (RedirectHere maybeFd hereDoc _w) = return $ Right $ RedirHere fd content
   where
-    debugHereDoc = do
-        errStrLn divider
-        errStr $ (maybe "" show maybeFd) ++ "<<" ++ wordText w
-        errStr . unlines $ case hereDoc of
-            HereDocLiteral ls -> " (literal)" : ls
-            HereDocParsed ls -> " (parsed)" : ls
-            HereDocMissing -> " (missing)" : []
-        errStrLn divider
-    divider = "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"
+    fd = fromIntegral $ fromMaybe 0 maybeFd
+    content = toByteString . unlines $ case hereDoc of
+            HereDocLiteral ls -> ls
+            HereDocParsed ls -> ls -- TODO(mzero): should parse here
+            HereDocMissing -> []
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode
@@ -108,6 +103,12 @@ withRedirection (r:rs) act = do
             fileFd <- openFd fp om mfm off
             dupTo fileFd destFd
             closeFd fileFd
+            withRedirection rs act
+
+        Right (RedirHere destFd content) -> saveAway destFd $ do
+            fd <- contentFd content
+            dupTo fd destFd
+            closeFd fd
             withRedirection rs act
 
         Right (RedirDup destFd srcFd) -> saveAway destFd $ do
