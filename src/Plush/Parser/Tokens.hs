@@ -22,6 +22,8 @@ module Plush.Parser.Tokens (
     tok_io_number,
     tok_newline,
 
+    hereDoc,
+
     operator,
     tok_and_if, tok_or_if,
     tok_dless, tok_dgreat, tok_lessand, tok_greatand, tok_lessgreat,
@@ -184,7 +186,7 @@ tok_io_number = tokenize $ do
 tok_newline :: ShellParser ()
 tok_newline = tokenize $ do
     _ <- char '\n'
-    return ()
+    parseQueuedHereDocs
 
 operator :: String -> a -> ShellParser a
 operator [] _ = parserZero
@@ -200,18 +202,42 @@ operator op@(c0:_) r = tokenize $ do
     runNext ws c = runOne [ as | (a:as) <- ws, a == c ] >>= return . (c:)
     anyHead ws c = any (==c) [ a | (a:_) <- ws ]
 
+hereDoc :: HereDocPreprocess -> ([String] -> HereDoc) -> String
+    -> ShellParser HereDoc
+hereDoc prep makeHereDoc marker = nextHereDoc parseHereDoc
+  where
+    parseHereDoc = makeHereDoc <$> linesUntilMarker
+
+    linesUntilMarker = (eof >> return []) <|> do
+        line <- removeTabs <$> manyTill anyChar (char '\n')
+        if line == marker
+            then return []
+            else (line :) <$> linesUntilMarker
+        -- Note: The spec is silent on what to do when the marker is absent.
+        -- While an causing a parser error might seem reasonable, it is very
+        -- difficult because this parser is called from others wrapped in try
+        -- and it isn't possible to break out of a try in Parsec. On the other
+        -- hand, other shells just do what we do here: sliently slew to the end.
+
+    removeTabs (c:cs) | prep == HereDocStripTabs && c == '\t' = removeTabs cs
+    removeTabs cs = cs
 
 tok_and_if = operator "&&" AndThen
 tok_or_if = operator "||" OrThen
 -- tok_demi = operator ";;"
 
-tok_dless = operator "<<" RedirHere
 tok_dgreat = operator ">>" RedirAppend
 tok_lessand = operator "<&" RedirDuplicateInput
 tok_greatand = operator ">&" RedirDuplicateOutput
 tok_lessgreat = operator "<>" RedirInputOutput
-tok_dlessdash = operator "<<-" RedirHereStrip
 tok_clobber = operator ">|" RedirOutputClobber
+
+data HereDocPreprocess = HereDocPlain | HereDocStripTabs
+    deriving (Eq)
+
+tok_dless = operator "<<" HereDocPlain
+tok_dlessdash = operator "<<-" HereDocStripTabs
+
 
 tok_bang :: ShellParser Sense
 tok_bang = tokenize $ char '!' >> return Inverted

@@ -207,11 +207,10 @@ redirect_list = many1 io_redirect
 io_redirect :: ShellParser Redirect
 io_redirect = do
     n <- option Nothing $ Just <$> tok_io_number
-    (r, w) <- io_file <|> io_here
-    return $ Redirect n r w
+    io_file n <|> io_here n
 
-io_file :: ShellParser (RedirectType, Word)
-io_file = choice fileOps <&> filename
+io_file :: Maybe Int -> ShellParser Redirect
+io_file n = Redirect n <$> choice fileOps <*> filename
   where
     fileOps =
         [ operator "<" RedirInput
@@ -226,8 +225,13 @@ io_file = choice fileOps <&> filename
 filename :: ShellParser Word
 filename = tok_word -- apply rule 2
 
-io_here :: ShellParser (RedirectType, Word)
-io_here = (tok_dless <|> tok_dlessdash) <&> here_end
+io_here :: Maybe Int -> ShellParser Redirect
+io_here n = do
+    detab <- tok_dlessdash <|> tok_dless
+    marker <- here_end
+    let docType = if hasQuotedText marker then HereDocLiteral else HereDocParsed
+    doc <- hereDoc detab docType (quoteRemoval marker)
+    return $ RedirectHere n doc marker
 
 here_end :: ShellParser Word
 here_end = tok_word -- apply rule 3

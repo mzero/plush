@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ type ParseCommandResult = Either String (CommandList, String)
 -- | Parse the next "commplete_command" in the input, and return it and the
 -- remainder of the input, or an error message
 parseCommand :: Aliases -> String -> ParseCommandResult
-parseCommand aliases = (show +++ unprep) . parse nextCommand "" . prep
+parseCommand aliases = (show +++ unprep) . shellParse nextCommand "" . prep
   where
     nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
 

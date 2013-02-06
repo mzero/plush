@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities (errStr, errStrLn)
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types
@@ -59,10 +60,6 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
         RedirInputOutput   -> ok $ RedirFile fd s openForAll
             -- TODO: RedirOutput should check that file doesn't exist
 
-        RedirHere      -> err $ "here docs not supported"
-        RedirHereStrip -> err $ "here docs not supported"
-            -- TODO: implement here docs
-
         RedirDuplicateInput  | isJust dest -> ok $ RedirDup fd (fromJust dest)
         RedirDuplicateInput  | hasDash     -> ok $ RedirClose fd
         RedirDuplicateInput  | otherwise   -> err $ "bad redirect"
@@ -85,6 +82,19 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
     truncFileFlags = defaultFileFlags { trunc = True }
     appendFileFlags = defaultFileFlags { append = True }
 
+mkPrim (RedirectHere maybeFd hereDoc w) = debugHereDoc >>
+    return (Left "here docs not supported")
+        -- TODO(mzero): implement here docs for real
+  where
+    debugHereDoc = do
+        errStrLn divider
+        errStr $ (maybe "" show maybeFd) ++ "<<" ++ wordText w
+        errStr . unlines $ case hereDoc of
+            HereDocLiteral ls -> " (literal)" : ls
+            HereDocParsed ls -> " (parsed)" : ls
+            HereDocMissing -> " (missing)" : []
+        errStrLn divider
+    divider = "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode

@@ -97,6 +97,13 @@ pp = render . ppCommandList
 
     ppRedirect (Redirect mn t w) = brackets $
         maybe empty (text . show) mn <> text (redirOperator t) <> ppWord w
+    ppRedirect (RedirectHere mn hd w) = vcat $
+        (maybe empty (text . show) mn <> text "<<" <> ppWord w)
+        : ppHereDoc hd
+    ppHereDoc HereDocMissing = [text "--missing--"]
+    ppHereDoc (HereDocLiteral ls) = map text ls
+    ppHereDoc (HereDocParsed ls) = map text ls
+            -- TODO(mzero): not quite correct
 
 redirOperator :: RedirectType -> String
 redirOperator t = case t of
@@ -104,8 +111,6 @@ redirOperator t = case t of
     RedirOutput             -> ">"
     RedirOutputClobber      -> ">|"
     RedirAppend             -> ">>"
-    RedirHere               -> "<<"
-    RedirHereStrip          -> "<<-"
     RedirDuplicateInput     -> "<&"
     RedirDuplicateOutput    -> ">&"
     RedirInputOutput        -> "<>"

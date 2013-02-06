@@ -21,7 +21,6 @@ module Plush.Run.Expansion (
     wordExpansionActive,
     TildePart, tildeDir, tildePrefix,
     tildeSplit,
-    quoteRemoval,
     byPathParts,
     )
 where
@@ -194,16 +193,6 @@ pathnameExpansion w = results <$> pathnameGlob "" (parts w)
   where
     results [] = [w]
     results es = expandParts (const [[Bare e] | e <- es]) w
-
-
-quoteRemoval :: Word -> String
-quoteRemoval = concatMap qp . parts
-  where
-    qp (Backslashed '\n') = ""  -- should this be handled here or in the parse?
-    qp (Backslashed c) = [c]
-    qp (Singlequoted s) = s
-    qp (Doublequoted ps) = concatMap qp ps
-    qp p = partText p
 
 
 byPathParts :: (PosixLike m) => (Word -> ShellExec m Word)
