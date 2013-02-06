@@ -54,6 +54,74 @@ Indented here-docs
     + ⟶END
     detabbed, marker too
 
+Here-docs are subject to some expansions and not others
+Expansions that should be performed: parameter, arithmetic, subcommands
+Expansions that should not: tilde, field splitting, pathname, quote removal
+    # cat <<END
+    + ~ ~/foo
+    + END
+    ~ ~/foo
+
+    # fruit=apple
+    # cat <<END
+    + $fruit ${fruit+pear}
+    + END
+    apple pear
+
+    # cat <<END                     # SKIP plush - TODO(mzero) support
+    + the answer is $((7 * 6))
+    + END
+    the answer is 42
+
+    # cat <<END                     # SKIP plush - TODO(mzero) support
+    + the answer is `echo 42`
+    + the question is $(echo ultimate)
+    + END
+    the answer is 42
+    the question is ultimate
+
+    # cat <<END
+    + * /*
+    + END
+    * /*
+
+    # cat <<END                     # see §2.7.4 for details
+    + " ' $ x
+    + \ \n \$ \` \" \\ x
+    + what about \
+    + this
+    + END
+    " ' $ x
+    \ \n $ ` \" \ x
+    what about this
+
+If the marker is quoted, then expansions aren't performed
+    # cat <<'END'
+    + $fruit
+    + $((3 + 4))
+    + `echo hi`
+    + $(echo there)
+    + END
+    $fruit
+    $((3 + 4))
+    `echo hi`
+    $(echo there)
+
+    # cat <<\END
+    + $fruit
+    + END
+    $fruit
+
+    # cat <<"END"
+    + $fruit
+    + END
+    $fruit
+
+    # cat <<E'N'D
+    + $fruit
+    + END
+    $fruit
+    
 End
     # echo end of test hack
     end of test hack

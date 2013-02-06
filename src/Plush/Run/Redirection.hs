@@ -83,13 +83,13 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
     truncFileFlags = defaultFileFlags { trunc = True }
     appendFileFlags = defaultFileFlags { append = True }
 
-mkPrim (RedirectHere maybeFd hereDoc _w) = return $ Right $ RedirHere fd content
+mkPrim (RedirectHere maybeFd hereDoc _w) = Right . RedirHere fd <$> content
   where
     fd = fromIntegral $ fromMaybe 0 maybeFd
-    content = toByteString . unlines $ case hereDoc of
-            HereDocLiteral ls -> ls
-            HereDocParsed ls -> ls -- TODO(mzero): should parse here
-            HereDocMissing -> []
+    content = toByteString <$> case hereDoc of
+            HereDocLiteral ls -> return $ unlines ls
+            HereDocParsed ls -> contentExpansion $ unlines ls
+            HereDocMissing -> return []
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode
