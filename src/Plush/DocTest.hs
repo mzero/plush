@@ -54,9 +54,10 @@ noteFile fp (Test (Location _ l) i o c) = Test (Location (Just fp) l) i o c
 
 inputLine :: String -> Test -> Test
 inputLine  s t
-    | null (testInput t) = t { testInput = s ++ "\n", testCondition = cond s }
-    | otherwise = t { testInput = testInput t ++ s ++ "\n" }
+    | null (testInput t) = t { testInput = s' ++ "\n", testCondition = cond s }
+    | otherwise = t { testInput = testInput t ++ s' ++ "\n" }
   where
+    s' = retab s
     cond l = case keyword "SKIP" l of
         Just "" -> const False
         Just r -> not . (`elem` words r)
@@ -68,9 +69,10 @@ inputLine  s t
                        | otherwise = keyword k l'
 
 expectLine :: String -> Test -> Test
-expectLine  s t = t { testExpected = testExpected t ++ s ++ "\n" }
+expectLine  s t = t { testExpected = testExpected t ++ retab s ++ "\n" }
 
-
+retab :: String -> String
+retab = map (\c -> if c == '⟶' then '\t' else c) 
 
 extractTests :: String -> [Test]
 extractTests input = skipping $ zip [1..] $ lines input

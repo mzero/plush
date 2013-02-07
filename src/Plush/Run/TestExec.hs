@@ -190,6 +190,9 @@ iNodeFDesc i itype = FDesc iReadAll iWrite
         let s' = s { tsFileSystem = fs' }
         lift $ put s'
 
+contentFDesc :: L.ByteString -> FDesc
+contentFDesc content = FDesc (return content) (\_ -> return ())
+
 
 data TestState = TestState
     { tsWorkingDir :: FilePath      -- ^ absolute path to current working dir
@@ -338,6 +341,7 @@ instance PosixLike TestExec where
             readAll stdOutput >>= write stdInput
             c >>= next cs'
 
+    contentFd = openFDesc . contentFDesc
 
 instance PosixLikeFileStatus Entry where
     accessTime _ = fromInteger 0
@@ -378,22 +382,24 @@ updateFileSystem fs = lift $ modify (\s -> s { tsFileSystem = fs })
 updateTestState :: TestState -> TestExec ()
 updateTestState s = lift . put $ s
 
+openFDesc :: FDesc -> TestExec Fd
+openFDesc fdesc = do
+    s <- lift get
+    let fd = freeDesc 0 $ tsFDescs s
+    lift $ put s { tsFDescs = I.insert fd fdesc $ tsFDescs s}
+    return $ fromIntegral fd
+  where
+    freeDesc fd fds = if I.member fd fds then freeDesc (fd + 1) fds else fd
+
 openFile :: DirPath -> Name -> TestExec Fd
 openFile dp n = do
-    s <- lift get
-    let fs = tsFileSystem s
+    fs <- lift $ gets tsFileSystem
     case fsItemEntry fs dp n of
         Just (FileItem i) ->
             case I.lookup i $ fsStore fs of
-                Just (INode itype _) -> do
-                    let fd = freeDesc 0 $ tsFDescs s
-                    let fdesc = iNodeFDesc i itype
-                    lift $ put s { tsFDescs = I.insert fd fdesc $ tsFDescs s}
-                    return $ fromIntegral fd
+                Just (INode itype _) -> openFDesc $ iNodeFDesc i itype
                 _ -> return (-1) -- TODO: should never happen
         _ -> return (-1) -- TODO: should never happen
-  where
-    freeDesc fd fds = if I.member fd fds then freeDesc (fd + 1) fds else fd
 
 fileMustExist :: String -> FilePath -> FileSystem -> DirPath -> Name -> TestExec ()
 fileMustExist fn fp fs dp n =

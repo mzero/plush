@@ -1,0 +1,129 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Here-docs
+
+Basic test
+    # tr a-z A-Z <<END
+    + one
+    + two
+    + END
+    ONE
+    TWO
+
+Multiple here-docs
+    # tr -d '~' <<ONE; fgrep rest <<TWO; tr n-za-m a-z <<THREE 
+    + The ~~clouds~~ come and go,
+    + ONE
+    + providing a fest for all
+    + providing a nest for all
+    + providing a rest for all
+    + providing a test for all
+    + providing a vest for all
+    + TWO
+    + gur zbba ivrjref
+    + THREE
+    The clouds come and go,
+    providing a rest for all
+    the moon viewers
+
+Indented here-docs
+    # cat <<END
+    + ⟶tabbed
+    + END
+    ⟶tabbed
+    
+    # cat <<-END
+    + ⟶detabbed
+    + END
+    detabbed
+
+    # cat <<-END
+    + ⟶detabbed, marker too
+    + ⟶END
+    detabbed, marker too
+
+Here-docs are subject to some expansions and not others
+Expansions that should be performed: parameter, arithmetic, subcommands
+Expansions that should not: tilde, field splitting, pathname, quote removal
+    # cat <<END
+    + ~ ~/foo
+    + END
+    ~ ~/foo
+
+    # fruit=apple
+    # cat <<END
+    + $fruit ${fruit+pear}
+    + END
+    apple pear
+
+    # cat <<END                     # SKIP plush - TODO(mzero) support
+    + the answer is $((7 * 6))
+    + END
+    the answer is 42
+
+    # cat <<END                     # SKIP plush - TODO(mzero) support
+    + the answer is `echo 42`
+    + the question is $(echo ultimate)
+    + END
+    the answer is 42
+    the question is ultimate
+
+    # cat <<END
+    + * /*
+    + END
+    * /*
+
+    # cat <<END                     # see §2.7.4 for details
+    + " ' $ x
+    + \ \n \$ \` \" \\ x
+    + what about \
+    + this
+    + END
+    " ' $ x
+    \ \n $ ` \" \ x
+    what about this
+
+If the marker is quoted, then expansions aren't performed
+    # cat <<'END'
+    + $fruit
+    + $((3 + 4))
+    + `echo hi`
+    + $(echo there)
+    + END
+    $fruit
+    $((3 + 4))
+    `echo hi`
+    $(echo there)
+
+    # cat <<\END
+    + $fruit
+    + END
+    $fruit
+
+    # cat <<"END"
+    + $fruit
+    + END
+    $fruit
+
+    # cat <<E'N'D
+    + $fruit
+    + END
+    $fruit
+    
+End
+    # echo end of test hack
+    end of test hack
+
+

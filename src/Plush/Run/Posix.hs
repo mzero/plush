@@ -50,6 +50,7 @@ module Plush.Run.Posix (
 ) where
 
 import Control.Applicative ((<$>), (<*>))
+import Control.Concurrent (forkIO)
 import Control.Monad (foldM, when)
 import Control.Monad.Exception (MonadException, catchIf, catchIOError)
 import qualified Data.ByteString as B
@@ -156,6 +157,11 @@ class (Functor m, Monad m, MonadException m,
     -- is piped to the first, and the stdout of the last is the original stdout.
     pipeline :: [m ExitCode] -> m ExitCode
 
+    -- | A high level primitive that returns an open Fd that when read will
+    -- supply the content given.
+    contentFd :: L.ByteString -> m Fd
+
+
 
 -- | File status data as returned by 'getFileStatus' and 'getSymbolicLinkStatus'
 class PosixLikeFileStatus s where
@@ -212,6 +218,7 @@ instance PosixLike IO where
     execProcess = ioExecProcess
 
     pipeline = ioPipeline
+    contentFd = ioContentFd
 
 
 instance PosixLikeFileStatus P.FileStatus where
@@ -295,6 +302,12 @@ ioPipeline actions = next Nothing actions >>= waitAll
             Just (P.Exited e) -> return e
             _ -> return $ ExitFailure 129
 
+
+ioContentFd :: L.ByteString -> IO Fd
+ioContentFd content = do
+    (readFd, writeFd) <- P.createPipe
+    _ <- forkIO $ write writeFd content >> closeFd writeFd
+    return readFd
 
 
 ignoreUnsupportedOperation :: IO a -> IO ()

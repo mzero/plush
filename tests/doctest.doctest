@@ -1,4 +1,4 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
 -- 
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -68,6 +68,14 @@ Actually, any leading period on a line in the expected text is removed:
     ...
     ....
     .got it?
+
+Because these test files are edited with editors that (should) replace tabs
+with spaces, a tab can be represented by ⟶ in both input and output:
+
+    # echo 'a⟶z' | tr '\t' '*'
+    a*z
+    # echo 'a*z' | tr '*' '\t'
+    a⟶z
 
 Tests can be skipped by putting the keyword SKIP (all caps) on the command
 line. Note the use of the # as a comment character, since the whole line is

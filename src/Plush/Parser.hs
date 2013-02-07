@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ limitations under the License.
 module Plush.Parser (
     parseCommand,
     ParseCommandResult,
+
+    parseContent,
 )
 where
 
-import Control.Applicative ((*>))
+import Control.Applicative ((*>), (<*))
 import Control.Arrow (second, (+++))
 import Text.Parsec
 
@@ -39,9 +41,18 @@ type ParseCommandResult = Either String (CommandList, String)
 -- | Parse the next "commplete_command" in the input, and return it and the
 -- remainder of the input, or an error message
 parseCommand :: Aliases -> String -> ParseCommandResult
-parseCommand aliases = (show +++ unprep) . parse nextCommand "" . prep
+parseCommand aliases = (show +++ unprep) . shellParse nextCommand "" . prep
   where
     nextCommand = (whitespace >> linebreak *> complete_command) <&> getInput
 
     prep = dealiasStream aliases
     unprep = second dealiasRemainder
+
+-- | Parse content that is subject to parameter, command, and arithmetic
+-- expansion. Note that this always consumes the input, and never fails!
+parseContent :: String -> Parts
+parseContent s = post . shellParse (content <* eof) "" . pre $ s
+  where
+    pre = noAliasStream
+    post = either (const [Bare s]) id
+

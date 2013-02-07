@@ -76,6 +76,7 @@ data Assignment = Assignment String Word
     deriving (Eq, Show)
 
 data Redirect = Redirect (Maybe Int) RedirectType Word
+              | RedirectHere (Maybe Int) HereDoc Word -- << and <<- (def. 0)
     deriving (Eq, Show)
 
 data RedirectType
@@ -83,11 +84,14 @@ data RedirectType
     | RedirOutput -- > (def. 1)
     | RedirOutputClobber -- >| (def. 1)
     | RedirAppend -- >> (def .1)
-    | RedirHere -- << (def 0)
-    | RedirHereStrip -- <<- (def. 0)
     | RedirDuplicateInput -- <& (def. 0)
     | RedirDuplicateOutput -- >& (def. 1)
     | RedirInputOutput -- <> (def. 0)
+    deriving (Eq, Show)
+
+data HereDoc = HereDocLiteral [String]
+             | HereDocParsed [String]
+             | HereDocMissing
     deriving (Eq, Show)
 
 data ParameterModifier
@@ -159,7 +163,22 @@ compress ((Expanded s):(Expanded t):ps) = compress $ (Expanded (s ++ t)) : ps
 compress (p:ps) = p : compress ps
 compress [] = []
 
+quoteRemoval :: Word -> String
+quoteRemoval = concatMap qp . parts
+  where
+    qp (Backslashed '\n') = ""  -- should this be handled here or in the parse?
+    qp (Backslashed c) = [c]
+    qp (Singlequoted s) = s
+    qp (Doublequoted ps) = concatMap qp ps
+    qp p = partText p
 
+hasQuotedText :: Word -> Bool
+hasQuotedText = any quotedPart . parts
+  where
+    quotedPart (Backslashed _) = True
+    quotedPart (Singlequoted _) = True
+    quotedPart (Doublequoted _) = True
+    quotedPart _ = False
 
 
 -- | Source location of a parsed construct. References all the way back to the

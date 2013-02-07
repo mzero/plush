@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@ module Plush.Run.Redirection (
 
 import Control.Applicative ((<$>))
 import Control.Monad.Exception (bracket, catchIOError)
+import qualified Data.ByteString.Lazy as L
 import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
+import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types
@@ -35,14 +37,14 @@ type OpenOptions = (OpenMode, Maybe FileMode, OpenFileFlags)
 
 data RedirPrim
     = RedirFile Fd FilePath OpenOptions
---  | RedirHere Fd String -- not yet supported
+    | RedirHere Fd L.ByteString
     | RedirDup Fd Fd
     | RedirClose Fd
 
 mkPrim :: (PosixLike m) => Redirect -> ShellExec m (Either String RedirPrim)
 mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
   where
-    fd = Fd . fromIntegral $ fromMaybe (defaultFd rType) maybeFd
+    fd = fromIntegral $ fromMaybe (defaultFd rType) maybeFd
 
     defaultFd RedirOutput = 1
     defaultFd RedirOutputClobber = 1
@@ -58,10 +60,6 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
         RedirAppend        -> ok $ RedirFile fd s openForAppend
         RedirInputOutput   -> ok $ RedirFile fd s openForAll
             -- TODO: RedirOutput should check that file doesn't exist
-
-        RedirHere      -> err $ "here docs not supported"
-        RedirHereStrip -> err $ "here docs not supported"
-            -- TODO: implement here docs
 
         RedirDuplicateInput  | isJust dest -> ok $ RedirDup fd (fromJust dest)
         RedirDuplicateInput  | hasDash     -> ok $ RedirClose fd
@@ -85,6 +83,13 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
     truncFileFlags = defaultFileFlags { trunc = True }
     appendFileFlags = defaultFileFlags { append = True }
 
+mkPrim (RedirectHere maybeFd hereDoc _w) = Right . RedirHere fd <$> content
+  where
+    fd = fromIntegral $ fromMaybe 0 maybeFd
+    content = toByteString <$> case hereDoc of
+            HereDocLiteral ls -> return $ unlines ls
+            HereDocParsed ls -> contentExpansion $ unlines ls
+            HereDocMissing -> return []
 
 withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
     -> ShellExec m ExitCode
@@ -98,6 +103,12 @@ withRedirection (r:rs) act = do
             fileFd <- openFd fp om mfm off
             dupTo fileFd destFd
             closeFd fileFd
+            withRedirection rs act
+
+        Right (RedirHere destFd content) -> saveAway destFd $ do
+            fd <- contentFd content
+            dupTo fd destFd
+            closeFd fd
             withRedirection rs act
 
         Right (RedirDup destFd srcFd) -> saveAway destFd $ do
