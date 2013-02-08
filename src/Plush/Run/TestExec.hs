@@ -22,6 +22,7 @@ module Plush.Run.TestExec (
     )
     where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Exception (SomeException)
 import Control.Monad (unless, when)
 import Control.Monad.Exception (ExceptionT, runExceptionT, throwM)
@@ -332,6 +333,8 @@ instance PosixLike TestExec where
                 -- currently none of the pseudoExecs care about it
             Nothing -> exitMsg 127
                         $ fp ++ ": No such file or directory, or not executable"
+
+    captureStdout action = (,) <$> action <*> readAll stdOutput
 
     pipeline [] = return ExitSuccess
     pipeline (c0:cs) = c0 >>= next cs

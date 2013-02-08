@@ -152,6 +152,9 @@ class (Functor m, Monad m, MonadException m,
                 -> [String]     -- ^ Arguments
                 -> m ExitCode
 
+    -- | Run a computation, and returning what it wrote to stdout
+    captureStdout :: m ExitCode -> m (ExitCode, L.ByteString)
+
     -- | A high level primitive that runs each computation in an environment
     -- with the stdout of each piped to the stdin of next. The original stdin
     -- is piped to the first, and the stdout of the last is the original stdout.
@@ -216,7 +219,7 @@ instance PosixLike IO where
         return $ usersMatch && groupsMatch
 
     execProcess = ioExecProcess
-
+    captureStdout = ioCaptureStdout
     pipeline = ioPipeline
     contentFd = ioContentFd
 
@@ -301,6 +304,21 @@ ioPipeline actions = next Nothing actions >>= waitAll
         case st of
             Just (P.Exited e) -> return e
             _ -> return $ ExitFailure 129
+
+ioCaptureStdout :: IO ExitCode -> IO (ExitCode, L.ByteString)
+ioCaptureStdout action = do
+    (readFd, writeFd) <- P.createPipe
+    pid <- P.forkProcess $ do
+        closeFd readFd
+        dupTo writeFd stdOutput
+        action >>= P.exitImmediately
+    closeFd writeFd
+    out <- readAll readFd
+    closeFd readFd
+    st <- P.getProcessStatus True False pid
+    case st of
+        Just (P.Exited e) -> return (e, out)
+        _ -> return (ExitFailure 129, out)
 
 
 ioContentFd :: L.ByteString -> IO Fd
