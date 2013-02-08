@@ -28,6 +28,7 @@ module Plush.Run.Expansion (
 where
 
 import Control.Applicative ((<$>))
+import Control.Monad (void, when)
 import Data.Char (isSpace)
 import Data.List (intercalate, partition)
 import Data.Maybe (fromMaybe)
@@ -111,7 +112,9 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     ptest False (Just _) = True         -- plain mods use any assigned value
     ptest True  (Just s) = not $ null s -- ':' mods only use non null values
 
-    setVar s = setVarEntry name (VarShellOnly, VarReadWrite, Just s) >> return s
+    setVar s = do
+        when live $ void $ setVarEntry name (VarShellOnly, VarReadWrite, Just s)
+        return s
 
     remove f wd = maybe (return "") $ \s ->
         getWord wd >>= return . fromMaybe s . flip f s . makePattern
@@ -120,8 +123,10 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     indicateError False "" = shouldError " is unset"
     indicateError _ msg    = shouldError $ ": " ++ msg
 
-    shouldError msg = errStrLn (name ++ msg) >> return ""
-        -- TODO(mzero): should shell error at this point
+    shouldError msg = do
+        when live $ errStrLn (name ++ msg)
+            -- TODO(mzero): should shell error at this point
+        return ""
 
 
 
