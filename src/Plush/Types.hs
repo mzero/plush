@@ -118,7 +118,8 @@ data WordPart = Bare String
               | Singlequoted String
               | Doublequoted Parts
               | Parameter String ParameterModifier
-              | Subcommand String
+              | Commandsub CommandList
+              | Backquoted String
               | Arithmetic Word
               | Expanded String
     deriving (Eq, Show)
@@ -152,7 +153,8 @@ partText (Parameter n mm) = "${" ++ modPre mm ++ n ++ modPost mm ++ "}"
     modPost (PModRemovePrefix  True  wd) = '#' : '#' : wordText wd
     modPost (PModRemovePrefix  False wd) =       '#' : wordText wd
 
-partText (Subcommand s) = "$(" ++ s ++ ")"
+partText (Commandsub _cl) = "$(" ++ "--command substituion--" ++ ")"
+partText (Backquoted s) = "`" ++ s ++ "`"
 partText (Arithmetic wd) = "$((" ++ wordText wd ++ "))"
 
 partText (Expanded s) = s

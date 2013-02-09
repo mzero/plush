@@ -39,6 +39,7 @@ import Plush.Parser
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
+import {-# SOURCE #-} Plush.Run.Execute (execute) -- see Execute.hs-boot
 import {-# SOURCE #-} Plush.Run.Script (runScript) -- see Script.hs-boot
 import Plush.Run.ShellExec
 import Plush.Types
@@ -83,7 +84,8 @@ basicExpansion live = be
     -- TODO: honor the live parameter
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
-    be (Subcommand cmd) | live = Expanded <$> commandSubstituion cmd
+    be (Commandsub cmd) | live = Expanded <$> commandSubstituion (execute cmd)
+    be (Backquoted s)   | live = Expanded <$> commandSubstituion (runScript s)
     -- TODO: arthmetic
     be (Doublequoted dw) = mapM be dw >>= return . Doublequoted
     be p = return p
@@ -130,8 +132,9 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
         return ""
 
 
-commandSubstituion :: (PosixLike m) => String -> ShellExec m String
-commandSubstituion cmd = (process . snd) <$> captureStdout (runScript cmd)
+commandSubstituion :: (PosixLike m) =>
+    ShellExec m ExitCode -> ShellExec m String
+commandSubstituion action = (process . snd) <$> captureStdout action
   where
     process = trim "" . fromByteString
     trim _ "" = ""

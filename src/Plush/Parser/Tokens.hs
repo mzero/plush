@@ -48,6 +48,7 @@ import Text.Parsec
 
 import Plush.Parser.Aliases (originalSourceColumn)
 import Plush.Parser.Base
+import {-# SOURCE #-} Plush.Parser.Commands (complete_command)
 import Plush.Types
 import Plush.Utilities
 
@@ -117,7 +118,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
         Arithmetic <$> wordContent (string "))")
 
     subcommand = between (char '(') (char ')') $
-        Subcommand <$> unexpected "subcommands not yet supported" -- complete_command
+        Commandsub <$> complete_command
 
     variable = variableName >>= \v -> return $ Parameter v PModNone
 
@@ -147,7 +148,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
         -- TODO rather inefficient way to do this!
 
 backquote :: ShellParser WordPart
-backquote = bq *> (Subcommand <$> manyTill (bqBackslash <|> bqChar) bq)
+backquote = bq *> (Backquoted <$> manyTill (bqBackslash <|> bqChar) bq)
   where
     bq = char '`'
     bqBackslash = char '\\' *> (oneOf "$`\\" <|> return '\\')
@@ -176,7 +177,7 @@ content = many (cDollar <|> backquote <|> cBackslash <|> cBare)
 bare :: ShellParser WordPart
 bare = Bare <$> many1 (noneOf nonWordChars)
   where
-    nonWordChars = " \t\n\\\'\"$`" ++ operatorStarts
+    nonWordChars = " \t\n\\\'\"$`()" ++ operatorStarts
     operatorStarts = concatMap (take 1) operators
 
 
