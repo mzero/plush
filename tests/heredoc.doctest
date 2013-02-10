@@ -23,7 +23,7 @@ Basic test
     TWO
 
 Multiple here-docs
-    # tr -d '~' <<ONE; fgrep rest <<TWO; tr n-za-m a-z <<THREE 
+    # tr -d '~' <<ONE; fgrep rest <<TWO; tr n-za-m a-z <<THREE
     + The ~~clouds~~ come and go,
     + ONE
     + providing a fest for all
@@ -43,7 +43,7 @@ Indented here-docs
     + ⟶tabbed
     + END
     ⟶tabbed
-    
+
     # cat <<-END
     + ⟶detabbed
     + END
@@ -73,7 +73,7 @@ Expansions that should not: tilde, field splitting, pathname, quote removal
     + END
     the answer is 42
 
-    # cat <<END                     # SKIP plush - TODO(mzero) support
+    # cat <<END
     + the answer is `echo 42`
     + the question is $(echo ultimate)
     + END
@@ -121,7 +121,7 @@ If the marker is quoted, then expansions aren't performed
     + $fruit
     + END
     $fruit
-    
+
 End
     # echo end of test hack
     end of test hack

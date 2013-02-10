@@ -48,6 +48,7 @@ import Text.Parsec
 
 import Plush.Parser.Aliases (originalSourceColumn)
 import Plush.Parser.Base
+import {-# SOURCE #-} Plush.Parser.Commands (complete_command)
 import Plush.Types
 import Plush.Utilities
 
@@ -71,7 +72,7 @@ operators = words "&& || ;; << >> <& >& <> <<- >|"
 
 tok_word :: ShellParser Word
 tok_word = tokenize . locatedWord $
-    many1 (backslash <|> singlequote <|> doublequote <|> dollar <|> bare)
+    many1 (backslash <|> singlequote <|> doublequote <|> dollar <|> backquote <|> bare)
 
 -- In the shell command language, a word consisting solely of underscores,
 -- digits, and alphabetics from the portable character set. The first character
@@ -94,11 +95,11 @@ singlequote = q *> (Singlequoted <$> manyTill anyChar q)
   where q = char '\''
 
 doublequote :: ShellParser WordPart
-doublequote =
-    (q *>) $ Doublequoted <$> manyTill (dqBackslash <|> dollar <|> dqBare) q
+doublequote = q *> (Doublequoted <$> manyTill dqContent q)
   where
     q = char '"' -- '"' screws up my editor's hilighting
 
+    dqContent = dollar <|> backquote <|> dqBackslash <|> dqBare
     dqBackslash = char '\\' *>
         ( ( Backslashed <$> oneOf "$`\"\\\n" ) <|> return (Bare "\\") )
 
@@ -117,7 +118,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
         Arithmetic <$> wordContent (string "))")
 
     subcommand = between (char '(') (char ')') $
-        Subcommand <$> unexpected "subcommands not yet supported" -- complete_command
+        Commandsub <$> complete_command
 
     variable = variableName >>= \v -> return $ Parameter v PModNone
 
@@ -146,6 +147,14 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
         ]
         -- TODO rather inefficient way to do this!
 
+backquote :: ShellParser WordPart
+backquote = bq *> (Backquoted <$> manyTill (bqBackslash <|> bqChar) bq)
+    -- TODO(mzero): parse the text right here as a complete_command
+  where
+    bq = char '`'
+    bqBackslash = char '\\' *> (oneOf "$`\\" <|> return '\\')
+    bqChar = anyChar
+
 -- like tok_word, but a) spaces are allowed, and b) terminates on end
 wordContent :: ShellParser a -> ShellParser Word
 wordContent endP = locatedWord bits
@@ -159,7 +168,7 @@ wordContent endP = locatedWord bits
 -- here-documents. It is very much like the content of doublequoted text.
 -- See §2.7.4
 content :: ShellParser Parts
-content = many (cBackslash <|> cDollar <|> cBare)
+content = many (cDollar <|> backquote <|> cBackslash <|> cBare)
   where
     cBackslash = char '\\' *>
         ( ( Backslashed <$> oneOf "$`\\\n" ) <|> return (Bare "\\") )
@@ -169,7 +178,7 @@ content = many (cBackslash <|> cDollar <|> cBare)
 bare :: ShellParser WordPart
 bare = Bare <$> many1 (noneOf nonWordChars)
   where
-    nonWordChars = " \t\n\\\'\"$" ++ operatorStarts
+    nonWordChars = " \t\n\\\'\"$`()" ++ operatorStarts
     operatorStarts = concatMap (take 1) operators
 
 

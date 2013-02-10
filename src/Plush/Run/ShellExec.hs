@@ -286,6 +286,8 @@ instance PosixLike m => PosixLike (ShellExec m) where
     realAndEffectiveIDsMatch = lift realAndEffectiveIDsMatch
 
     execProcess = liftT4 execProcess
+    captureStdout a = get >>= lift . captureStdout . evalStateT a
+
     pipeline cs = do
         s <- get
         lift $ pipeline [ evalStateT c s | c <- cs ]

@@ -28,6 +28,7 @@ module Plush.Run.Expansion (
 where
 
 import Control.Applicative ((<$>))
+import Control.Monad (void, when)
 import Data.Char (isSpace)
 import Data.List (intercalate, partition)
 import Data.Maybe (fromMaybe)
@@ -38,6 +39,8 @@ import Plush.Parser
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
+import {-# SOURCE #-} Plush.Run.Execute (execute)   -- see Execute.hs-boot
+import Plush.Run.Script (runScript)
 import Plush.Run.ShellExec
 import Plush.Types
 
@@ -78,10 +81,10 @@ wordExpansion live w =
 
 basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m WordPart
 basicExpansion live = be
-    -- TODO: honor the live parameter
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
-    -- we (Subcommand cl) = return $ Expanded (testExecute cl)
+    be (Commandsub cmd) | live = Expanded <$> commandSubstituion (execute cmd)
+    be (Backquoted s)   | live = Expanded <$> commandSubstituion (runScript s)
     -- TODO: arthmetic
     be (Doublequoted dw) = mapM be dw >>= return . Doublequoted
     be p = return p
@@ -111,7 +114,9 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     ptest False (Just _) = True         -- plain mods use any assigned value
     ptest True  (Just s) = not $ null s -- ':' mods only use non null values
 
-    setVar s = setVarEntry name (VarShellOnly, VarReadWrite, Just s) >> return s
+    setVar s = do
+        when live $ void $ setVarEntry name (VarShellOnly, VarReadWrite, Just s)
+        return s
 
     remove f wd = maybe (return "") $ \s ->
         getWord wd >>= return . fromMaybe s . flip f s . makePattern
@@ -120,9 +125,21 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
     indicateError False "" = shouldError " is unset"
     indicateError _ msg    = shouldError $ ": " ++ msg
 
-    shouldError msg = errStrLn (name ++ msg) >> return ""
-        -- TODO(mzero): should shell error at this point
+    shouldError msg = do
+        when live $ errStrLn (name ++ msg)
+            -- TODO(mzero): should shell error at this point
+        return ""
 
+
+commandSubstituion :: (PosixLike m) =>
+    ShellExec m ExitCode -> ShellExec m String
+commandSubstituion action = (process . snd) <$> captureStdout action
+  where
+    process = trim "" . fromByteString
+    trim _ "" = ""
+    trim nls (c:cs)
+        | c == '\n' = trim (c:nls) cs
+        | otherwise = nls ++ c : trim "" cs
 
 
 tildeExpansion :: (PosixLike m) => Word -> ShellExec m Word
