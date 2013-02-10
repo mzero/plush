@@ -149,6 +149,7 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
 
 backquote :: ShellParser WordPart
 backquote = bq *> (Backquoted <$> manyTill (bqBackslash <|> bqChar) bq)
+    -- TODO(mzero): parse the text right here as a complete_command
   where
     bq = char '`'
     bqBackslash = char '\\' *> (oneOf "$`\\" <|> return '\\')

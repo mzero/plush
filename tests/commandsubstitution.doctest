@@ -1,0 +1,90 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Command Substitution
+
+While quite handy, command substition is about the most manical aspect of the
+shell. The two forms, $(...) and `...` parse differnetly, and the interaction
+with other constructs (especially here-documents and aliasing) is left unclear
+in the spec. Notably, the implementation in other compliant shells varies
+greatly.
+
+Note utility: This function annotates input before echoing so the tests can be
+sure of which nested commands ran.
+    # note() {
+    +   p=$1
+    +   shift
+    +   for i in $*; do echo "[$p:$i]"; done
+    + }
+    # note 1 apple
+    [1:apple]
+
+Basic command substitutions
+    # note 1 $(note 2 apple)
+    [1:[2:apple]]
+    # note 1 `note 2 apple`
+    [1:[2:apple]]
+
+Nested substitutions
+    # note 1 $(note 2 $(note 3 apple))
+    [1:[2:[3:apple]]]
+    # note 1 $(note 2 `note 3 apple`)
+    [1:[2:[3:apple]]]
+    # note 1 `note 2 $(note 3 apple)`
+    [1:[2:[3:apple]]]
+    # note 1 `note 2 \`note 3 apple\``
+    [1:[2:[3:apple]]]
+
+Output from commands should be split
+    # recho $(echo apple banana)              # multiple words
+    argv[1] = <apple>
+    argv[2] = <banana>
+
+    # recho $(echo apple; echo banana)        # multiple lines
+    argv[1] = <apple>
+    argv[2] = <banana>
+
+    # IFS=' '
+    # recho $(echo apple; echo banana; echo; echo)    # trailing newlines
+    argv[1] = <apple^Jbanana>
+    # unset IFS
+
+But not split if quoted
+    # recho "$(echo apple banana)"
+    argv[1] = <apple banana>
+
+Compound commands
+    # recho $(for i in one two three; do echo x-$i-x; done)
+    argv[1] = <x-one-x>
+    argv[2] = <x-two-x>
+    argv[3] = <x-three-x>
+
+Execution is in a subshell
+    # fruit=apple
+    # note 1 $(fruit=banana; note 2 $fruit)
+    [1:[2:banana]]
+    # echo $fruit
+    apple
+
+Output from commands doesn't do parameter, command, or arithmetic expansions
+    # fruit=apple
+    # note 1 $(echo '$fruit $(note 2 orange) $((3 + 4))')
+    [1:$fruit]
+    [1:$(note]
+    [1:2]
+    [1:orange)]
+    [1:$((3]
+    [1:+]
+    [1:4))]
+
