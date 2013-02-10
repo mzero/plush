@@ -25,11 +25,12 @@ module Plush.Parser.Tokens (
     hereDoc,
 
     operator,
-    tok_and_if, tok_or_if,
+    tok_and_if, tok_or_if, tok_dsemi,
     tok_dless, tok_dgreat, tok_lessand, tok_greatand, tok_lessgreat,
     tok_dlessdash, tok_clobber,
     tok_bang,
     tok_lparen, tok_rparen, tok_lbrace, tok_rbrace,
+    tok_bar,
 
     -- * keywords
     tok_if, tok_then, tok_else, tok_elif, tok_fi, tok_do, tok_done, tok_case,
@@ -246,7 +247,7 @@ hereDoc prep makeHereDoc marker = nextHereDoc parseHereDoc
 
 tok_and_if = operator "&&" AndThen
 tok_or_if = operator "||" OrThen
--- tok_demi = operator ";;"
+tok_dsemi = operator ";;" ()
 
 tok_dgreat = operator ">>" RedirAppend
 tok_lessand = operator "<&" RedirDuplicateInput
@@ -268,6 +269,7 @@ tok_lparen = tokenize $ char '('
 tok_rparen = tokenize $ char ')'
 tok_lbrace = tokenize $ char '{'
 tok_rbrace = tokenize $ char '}'
+tok_bar = tokenize $ char '|'
 
 keyword :: String -> ShellParser String
 keyword name = tokenize $ string name

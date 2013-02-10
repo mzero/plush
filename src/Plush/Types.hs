@@ -62,6 +62,8 @@ data CompoundCommand =
 
     | WhileLoop CommandList CommandList
     | UntilLoop CommandList CommandList
+
+    | CaseConditional Word [([Word], Maybe CommandList)]
     deriving (Eq, Show)
 
 commandWord :: Word -> SimpleCommand

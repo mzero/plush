@@ -94,17 +94,47 @@ subshell :: ShellParser CompoundCommand
 subshell = Subshell <$> (tok_lparen *> compound_list <* tok_rparen)
 
 for_clause :: ShellParser CompoundCommand
-for_clause = do
+for_clause = tok_for *> do
     -- Apply rule 5 for 'name', but basically it just means it has to look
     -- like a name and not any old word (name requires a more restricted
     -- character set).
-    name <- tok_for *> tok_name <* linebreak
+    name <- tok_name <* linebreak
     words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
     doGroup <- do_group
     return $ ForLoop name words_ doGroup
 
 case_clause :: ShellParser CompoundCommand
-case_clause = tok_case *> unexpected "case_clause not supported"
+case_clause = tok_case *> do
+    word <- tok_word <* (linebreak >> tok_in >> linebreak)
+    items <- case_list <* tok_esac
+    return $ CaseConditional word items
+
+-- N.B.: This combines the non-terminals case_list_ns and case_list, along
+-- with the fact that a case_clause can have one or the other or neither.
+-- This refactoring gives:
+--
+-- > case_list : case_item* case_item_ns?
+case_list :: ShellParser [([Word], Maybe CommandList)]
+case_list = (try case_item >>= more) <|> return []
+  where
+    more (True, ci) = return [ci]
+    more (False, ci) = (ci :) <$> case_list
+
+-- N.B.: This combines the non-terminals case_item_ns and case_item. It uses
+-- the fact that compount_list effectively starts with linebreak to simplify
+-- the parse. The Bool returned is True if the case_item_ns case is parsed.
+case_item :: ShellParser (Bool, ([Word], Maybe CommandList))
+case_item = do
+    p <- optional tok_lparen *> pattern <* tok_rparen
+    linebreak   -- matches empty, so no need for optional here
+    cl <- optionMaybe compound_list
+    ns <- option True (tok_dsemi >> return False)
+    linebreak
+    return (ns, (p, cl))
+
+pattern :: ShellParser [Word]
+pattern = notFollowedBy tok_esac >> sepBy1 tok_word tok_bar
+    -- Apply rule 4 for just the first word: don't match "esac"
 
 if_clause :: ShellParser CompoundCommand
 if_clause = do

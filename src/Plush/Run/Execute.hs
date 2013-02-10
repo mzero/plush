@@ -32,6 +32,7 @@ import Data.Monoid
 
 import Plush.Run.Command
 import Plush.Run.Expansion
+import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.Redirection
@@ -133,6 +134,7 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
     ForLoop name words_ cmds -> execFor name words_ cmds
+    CaseConditional word items -> execCase word items
     IfConditional conds mElse -> execIf conds mElse
     WhileLoop test body -> execLoop True test body
     UntilLoop test body -> execLoop False test body
@@ -151,12 +153,26 @@ execFor (Name _ name) (Just words_) cmds = do
             ExitSuccess -> execute cmds >> forLoop ws
             e@(ExitFailure {}) -> return e
 
+execCase :: (PosixLike m) =>
+    Word -> [([Word], Maybe CommandList)] -> ShellExec m ExitCode
+execCase word items = wordExpansionActive word >>= check items . quoteRemoval
+  where
+    check [] _ = success
+    check ((ps, mcl):is) w = match ps w >>= \m ->
+        if m
+            then maybe success execute mcl
+            else check is w
+    match [] _ = return False
+    match (p:ps) w = wordExpansionActive p >>= \q ->
+        if patternMatch (makePattern q) w
+            then return True
+            else match ps w
+
 execIf :: (PosixLike m) =>
     [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ExitCode
 execIf [] Nothing = success
 execIf [] (Just e) = execute e
-execIf ((c,s):css) mElse = do
-    ec <- execute c
+execIf ((c,s):css) mElse = execute c >>= \ec ->
     case ec of
         ExitFailure n | n /= 0 -> execIf css mElse
         _ -> execute s
@@ -165,8 +181,7 @@ execLoop :: (PosixLike m) =>
     Bool -> CommandList -> CommandList -> ShellExec m ExitCode
 execLoop loopWhen test body = go ExitSuccess
   where
-    go lastEc = do
-        ec <- execute test
+    go lastEc = execute test >>= \ec ->
         if loopWhen == isSuccess ec
             then execute body >>= go
             else return lastEc
@@ -206,6 +221,8 @@ execType = typeCommandList
         -- Things in the subshell can't change the state of this shell.
         Subshell {} -> return ExecuteMidground
         ForLoop _ _ cmdlist -> typeCommandList cmdlist
+        CaseConditional _ items -> minimum <$>
+            mapM (maybe (return mempty) typeCommandList . snd) items
         IfConditional conds mElse -> minimum <$>
             mapM typeCommandList
                 (maybe id (:) mElse $ concatMap (\(c,d)->[c,d]) conds)
