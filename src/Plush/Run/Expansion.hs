@@ -39,8 +39,8 @@ import Plush.Parser
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
-import {-# SOURCE #-} Plush.Run.Execute (execute) -- see Execute.hs-boot
-import {-# SOURCE #-} Plush.Run.Script (runScript) -- see Script.hs-boot
+import {-# SOURCE #-} Plush.Run.Execute (execute)   -- see Execute.hs-boot
+import Plush.Run.Script (runScript)
 import Plush.Run.ShellExec
 import Plush.Types
 
@@ -81,7 +81,6 @@ wordExpansion live w =
 
 basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m WordPart
 basicExpansion live = be
-    -- TODO: honor the live parameter
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
     be (Commandsub cmd) | live = Expanded <$> commandSubstituion (execute cmd)

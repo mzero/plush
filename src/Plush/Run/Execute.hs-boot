@@ -15,11 +15,12 @@ limitations under the License.
 -}
 
 {-
-    This is the "boot" file for Plush.Run.Script. It is used to break a module
+    This is the "boot" file for Plush.Run.Execute. It is used to break a module
     include cycle for GHC.
 
     Execution involves expansion, including command substition. Of course,
-    command substition involves execution, which it does by calling execute.
+    command substition involves execution, which it does by calling execute
+    directly (for $(...) form) or indirectly via script (for `...` form).
 -}
 
 module Plush.Run.Execute (
