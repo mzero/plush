@@ -124,6 +124,7 @@ data WordPart = Bare String
               | Backquoted String
               | Arithmetic Word
               | Expanded String
+              | IFS String
     deriving (Eq, Show)
 
 wordText :: Word -> String
@@ -160,6 +161,7 @@ partText (Backquoted s) = "`" ++ s ++ "`"
 partText (Arithmetic wd) = "$((" ++ wordText wd ++ "))"
 
 partText (Expanded s) = s
+partText (IFS s) = s
 
 compress :: Parts -> Parts
 compress ((Bare s):(Bare t):ps) = compress $ Bare (s ++ t) : ps

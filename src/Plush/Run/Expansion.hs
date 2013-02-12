@@ -30,8 +30,8 @@ where
 import Control.Applicative ((<$>))
 import Control.Monad (void, when)
 import Data.Char (isSpace)
-import Data.List (intercalate, partition)
-import Data.Maybe (fromMaybe)
+import Data.List (intercalate, intersperse, partition)
+import Data.Maybe (fromMaybe, maybeToList)
 import System.FilePath ((</>))
 import Text.Parsec
 
@@ -77,49 +77,53 @@ wordExpansionActive = wordExpansion True
 
 wordExpansion :: (PosixLike m) => Bool -> Word -> ShellExec m Word
 wordExpansion live w =
-    tildeExpansion w >>= modifyPartsM (mapM $ basicExpansion live)
+    tildeExpansion w >>= modifyPartsM (fmap concat . mapM (basicExpansion live))
 
-basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m WordPart
+basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m [WordPart]
 basicExpansion live = be
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
-    be (Commandsub cmd) | live = Expanded <$> commandSubstituion (execute cmd)
-    be (Backquoted s)   | live = Expanded <$> commandSubstituion (runScript s)
+    be (Commandsub cmd) | live = expanded <$> commandSubstituion (execute cmd)
+    be (Backquoted s)   | live = expanded <$> commandSubstituion (runScript s)
     -- TODO: arthmetic
-    be (Doublequoted dw) = mapM be dw >>= return . Doublequoted
-    be p = return p
+    be (Doublequoted dw) = mapM be dw >>= return . doublequoted . concat
+    be p = return [p]
+
+    expanded x = [Expanded x]
+    doublequoted [] = []
+    doublequoted qs = [Doublequoted qs]
+
 
 parameterExpansion :: (PosixLike m) =>
-    Bool -> String -> ParameterModifier -> ShellExec m WordPart
-parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
+    Bool -> String -> ParameterModifier -> ShellExec m [WordPart]
+parameterExpansion live name pmod
+    | name == "@" = getArgs     >>= pmodf               >>= asFields
+    | name == "*" = getArgs     >>= pmodf               >>= asParts
+    | otherwise   = getVar name >>= pmodf . maybeToList >>= asParts
   where
-    pmodf PModNone                 = return . fromMaybe ""
-    pmodf (PModUseDefault t wd)    = pAct (ptest t) wd return
-    pmodf (PModAssignDefault t wd) = pAct (ptest t) wd setVar
-    pmodf (PModIndicateError t wd) = pAct (ptest t) wd (indicateError t)
-    pmodf (PModUseAlternate t wd)  = pAct (not . ptest t) wd return
-    pmodf PModLength               = return . show . length . fromMaybe ""
-    pmodf (PModRemovePrefix False wd) = remove shortestPrefix wd
-    pmodf (PModRemovePrefix True  wd) = remove longestPrefix wd
-    pmodf (PModRemoveSuffix False wd) = remove shortestSuffix wd
-    pmodf (PModRemoveSuffix True  wd) = remove longestSuffix wd
+    pmodf = case pmod of
+        PModNone                    -> return
+        (PModUseDefault t wd)       -> pAct (pTest t) wd return
+        (PModAssignDefault t wd)    -> pAct (pTest t) wd setVar
+        (PModIndicateError t wd)    -> pAct (pTest t) wd (indicateError t)
+        (PModUseAlternate t wd)     -> pAct (not . pTest t) wd return
+        PModLength                  -> fmap ((:[]) . show) . fullLength
+        (PModRemovePrefix False wd) -> remove shortestPrefix wd
+        (PModRemovePrefix True  wd) -> remove longestPrefix wd
+        (PModRemoveSuffix False wd) -> remove shortestSuffix wd
+        (PModRemoveSuffix True  wd) -> remove longestSuffix wd
 
-    getWord wd = wordExpansion live wd
+    pAct f wd act vs = if f vs
+        then return vs
+        else getWord wd >>= act . wordText >>= return . (:[])
 
-    pAct f wd act v = if f v
-        then return $ fromMaybe "" v
-        else getWord wd >>= act . wordText
-
-    ptest _     Nothing  = False
-    ptest False (Just _) = True         -- plain mods use any assigned value
-    ptest True  (Just s) = not $ null s -- ':' mods only use non null values
+    pTest _     [] = False
+    pTest False _  = True                   -- plain mods use any assigned value
+    pTest True  vs = any (not . null) vs    -- ':' mods only use non null values
 
     setVar s = do
         when live $ void $ setVarEntry name (VarShellOnly, VarReadWrite, Just s)
         return s
-
-    remove f wd = maybe (return "") $ \s ->
-        getWord wd >>= return . fromMaybe s . flip f s . makePattern
 
     indicateError True ""  = shouldError " is unset or null"
     indicateError False "" = shouldError " is unset"
@@ -129,6 +133,29 @@ parameterExpansion live name pmod = getVar name >>= fmap Expanded . pmodf pmod
         when live $ errStrLn (name ++ msg)
             -- TODO(mzero): should shell error at this point
         return ""
+
+    fullLength [] = return 0
+    fullLength [s] = return $ length s
+    fullLength vs = do
+        ifs <- getIFS
+        return $ sum (map length vs) + (length vs - 1) * length ifs
+
+    remove _ _  [] = return []
+    remove f wd vs = do
+        pat <- makePattern <$> getWord wd
+        return $ map (\s -> fromMaybe s $ f pat s) vs
+
+    getWord = wordExpansion live
+    getIFS = take 1 <$> getVarDefault "IFS" " "
+
+    asFields = returnParts True IFS
+    asParts = returnParts False Expanded
+
+    returnParts emptyOk _ []  = return $ if emptyOk then [] else [Expanded ""]
+    returnParts _       _ [v] = return [Expanded v]
+    returnParts _       f vs  = do
+        ifs <- f <$> getIFS
+        return $ intersperse ifs $ map Expanded vs
 
 
 commandSubstituion :: (PosixLike m) =>
@@ -188,7 +215,17 @@ fieldSplitting ifs = expandParts $
     split [] . ignoreFirst . concatMap breakup . compress
   where
     breakup (Expanded s) = either err id $ parse fieldP "" s
+    breakup (Doublequoted ps) = dqBreakup ps
+    breakup (IFS _) = [Separator Explicit]
     breakup p = [FieldPart p]
+
+    dqBreakup ps = let (qs,rs) = break isIFS ps in
+        (FieldPart $ Doublequoted qs) : case rs of
+            [] -> []
+            (_:rs') -> Separator Explicit : dqBreakup rs'
+
+    isIFS (IFS _) = True
+    isIFS _ = False
 
     fieldP = many (sepWhP <|> sepExP <|> bareP)
     sepWhP = skipMany1 ifsWhite >> (sepExP <|> return (Separator Whitespace))
@@ -238,4 +275,4 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
 -- general, and other constructs, if present, be expanded.
 contentExpansion :: (PosixLike m) => String -> ShellExec m String
 contentExpansion s =
-    concatMap partText <$> mapM (basicExpansion True) (parseContent s)
+    concatMap partText . concat <$> mapM (basicExpansion True) (parseContent s)
