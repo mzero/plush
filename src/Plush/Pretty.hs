@@ -60,12 +60,20 @@ pp = render . ppCommandList
             , nest 4 $ ppCommandList cmds
             , text "done"
             ]
+        CaseConditional word items -> vcat $
+            (text "case" <+> ppWord word <+> text "in")
+            : map ppCaseItem items
+            ++ [text "esac"]
         IfConditional conds mElse -> vcat $
             concat (zipWith ppIfCondition ("if" : repeat "elif") conds)
             ++ maybe [] (\e -> [text "else", nest 4 $ ppCommandList e])  mElse
             ++ [text "fi"]
         WhileLoop condition cmds -> ppLoop "while" condition cmds
         UntilLoop condition cmds -> ppLoop "until" condition cmds
+
+    ppCaseItem (patterns, consequent) = nest 4 $ hsep $
+            intersperse (text "|") (map ppWord patterns)
+            ++ [ text ")", maybe empty ppCommandList consequent, text ";;"]
 
     ppIfCondition token (condition, consequent) =
             [ text token <+> ppCommandList condition

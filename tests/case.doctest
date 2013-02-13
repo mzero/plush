@@ -1,0 +1,133 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Basic tests of various ways case can be written, to ensure it parsed correctly.
+Tests of various places newlines can be, optional leading open parenthesis,
+optional closing double semicolon on last case, and empty cases.
+
+    # case bear in ant) echo insect;; bear) echo mammal;; carp) echo fish;; esac
+    mammal
+
+    # case bear in
+    + ant) echo insect;;
+    + bear) echo mammal;;
+    + carp) echo fish;;
+    + esac
+    mammal
+
+    # case bear in
+    + (ant) echo insect;;
+    + (bear) echo mammal;;
+    + (carp) echo fish;;
+    + esac
+    mammal
+
+    # case bear in
+    + ant)
+    +       echo insect;;
+    + bear)
+    +       echo mammal;;
+    + carp)
+    +       echo fish;;
+    + esac
+    mammal
+
+    # case bear in
+    + ant)
+    +       echo small
+    +       echo insect
+    +       ;;
+    + bear)
+    +       echo big
+    +       echo mammal
+    +       ;;
+    + carp)
+    +       echo medium
+    +       echo fish
+    +       ;;
+    + esac
+    big
+    mammal
+
+    # case bear in
+    + ant) echo insect;;
+    + bear) echo mammal;;
+    + carp) echo fish
+    + esac
+    mammal
+
+Funny handling of "esac": not allowed as first pattern variant
+    # case esac in                          # SKIP bash
+    + done) echo loop end ;;
+    + fi|esac) echo conditional end ;;
+    + esac
+    conditional end
+
+Multiple patterns
+    # case micrometer in
+    + yotta*|zetta*|exa*|peta*)             echo really big ;;
+    + tera*|giga*|mega*|kilo*|hecto*|deka*) echo big ;;
+    + deci*|centi*|milli*|micro*|nano*)     echo small ;;
+    + pico*|femto*|atto*|zepto*)            echo really small ;;
+    + esac
+    small
+
+Word under test is subject to tilde expansion, parameter expansion, command
+substitution, arithmetic expansion, and quote removal
+    # case ~/moo in $HOME/moo) echo yes ;; *) echo no;; esac
+    yes
+
+    # fruit=apple
+    # case $fruit in apple) echo yes ;; *) echo no;; esac
+    yes
+
+    # case `echo apple` in apple) echo yes ;; *) echo no;; esac
+    yes
+
+    # case $((6 * 7)) in 42) echo yes ;; *) echo no;; esac  # SKIP plush (TODO)
+    yes
+
+    # case 'ap'\p"le" in apple) echo yes ;; *) echo no;; esac
+    yes
+
+Patterns are subject to tilde expansion, parameter expansion, command
+substitution, arithmetic expansion, and quote removal
+    # case $HOME/moo in ~/moo) echo yes ;; *) echo no;; esac
+    yes
+
+    # fruit=apple
+    # case apple in $fruit) echo yes ;; *) echo no ;; esac
+    yes
+
+    # case apple in `echo apple`) echo yes ;; *) echo no ;; esac
+    yes
+
+    # case 42 in $((6 * 7))) echo yes ;; *) echo no ;; esac # SKIP plush (TODO)
+    yes
+
+    # case apple in 'ap'\p"le") echo yes ;; *) echo no ;; esac
+    yes
+
+Blank cases are okay
+    # false
+    # case banana in
+    + apple) echo bzzp;;
+    + banana) ;;
+    + casava) echo yum;;
+    + esac
+    # echo $?
+    0
+
+
+
