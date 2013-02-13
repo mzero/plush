@@ -326,6 +326,8 @@ instance PosixLike TestExec where
         homeDirs = [("tester","/home"), ("root","/"), ("nobody","/tmp")]
     realAndEffectiveIDsMatch = return True
 
+    getProcessID = return 42
+
     execProcess fp _env _cmd args = runFilePrim fp $ \_s fs _fpc dpc n -> do
         case fsExecutable fs dpc n of
             Just util -> utilExecute util args

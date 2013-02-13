@@ -146,6 +146,8 @@ class (Functor m, Monad m, MonadException m,
 
     -- From System.Process
 
+    getProcessID :: m Int
+
     execProcess :: FilePath     -- ^ Path to exec
                 -> Bindings     -- ^ Environment variable bindings
                 -> String       -- ^ Command name
@@ -218,6 +220,7 @@ instance PosixLike IO where
         groupsMatch <- (==) <$> P.getRealGroupID <*> P.getEffectiveGroupID
         return $ usersMatch && groupsMatch
 
+    getProcessID = fromIntegral <$> P.getProcessID
     execProcess = ioExecProcess
     captureStdout = ioCaptureStdout
     pipeline = ioPipeline
