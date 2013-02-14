@@ -84,6 +84,7 @@ Library
     Plush.Run.BuiltIns.WorkingDirectory
     Plush.Run.Command
     Plush.Run.Execute
+    Plush.Run.ExecuteType
     Plush.Run.Expansion
     Plush.Run.Pattern
     Plush.Run.Posix
