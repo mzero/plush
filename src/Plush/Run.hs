@@ -32,7 +32,6 @@ where
 
 import Control.Arrow (first)
 import qualified Control.Exception as Ex
-import Control.Monad.Trans.State (runStateT)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -76,10 +75,10 @@ run :: (forall m. PosixLike m => ShellExec m a) -> Runner -> IO (a, Runner)
 run act runner = case runner of
     RunPrimed r -> prime r >>= run act
 
-    RunInIO s -> runStateT act s >>= (\(a,s') -> return (a, RunInIO s'))
+    RunInIO s -> runShellExec act s >>= (\(a,s') -> return (a, RunInIO s'))
 
     RunInTest s t -> do
-        let (r,t') = runTest (runStateT act s) t
+        let (r,t') = runTest (runShellExec act s) t
         (a, s') <- either Ex.throwIO return r
         let (oe, t'') = runTest testOutput t'
         putStr $ either show (uncurry (++)) oe
@@ -114,6 +113,6 @@ testRun act runner = case runner of
     TestRunPrimed r -> testRun (primeShellState >> act) r
 
     TestRunInTest s t ->
-        let (r, t') = runTest (runStateT act s) t
+        let (r, t') = runTest (runShellExec act s) t
             (r', s') = either (\e -> (Left $ show e, s)) (first Right) r
         in  (r', TestRunInTest s' t')

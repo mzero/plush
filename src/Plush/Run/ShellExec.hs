@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language TypeSynonymInstances, TypeFamilies, FlexibleInstances #-}
+{-# Language TypeSynonymInstances, TypeFamilies, FlexibleInstances,
+    GeneralizedNewtypeDeriving #-}
 
 module Plush.Run.ShellExec (
     VarScope(..), VarMode(..), VarEntry,
     ShellState(), initialShellState,
-    ShellExec,
+    ShellExec, runShellExec,
     getName, setName,
     getArgs, setArgs,
     getFlags, setFlags,
@@ -36,10 +37,11 @@ module Plush.Run.ShellExec (
     )
     where
 
+import Control.Applicative
 import Control.Monad (join, msum, mplus)
-import Control.Monad.Exception (bracket_)
+import Control.Monad.Exception (bracket_, MonadException(..))
 import Control.Monad.Trans.Class (lift, MonadTrans)
-import Control.Monad.Trans.State
+import qualified Control.Monad.Trans.State as ST
 import qualified Data.HashMap.Strict as M
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
@@ -86,7 +88,23 @@ initialShellState = ShellState
 
 -- Shell Execution Monad
 
-type ShellExec m = StateT ShellState m
+newtype ShellExec m a = ShellExec (ST.StateT ShellState m a)
+  deriving (Functor, Applicative, Monad, MonadTrans, MonadException)
+
+runShellExec :: (Monad m) => ShellExec m a -> ShellState -> m (a, ShellState)
+runShellExec (ShellExec st) = ST.runStateT st
+
+evalShell :: (Monad m) => ShellExec m a -> ShellState -> m a
+evalShell (ShellExec st) = ST.evalStateT st
+
+get :: (Monad m) => ShellExec m ShellState
+get = ShellExec ST.get
+
+gets :: (Monad m) => (ShellState -> a) -> ShellExec m a
+gets f = ShellExec $ ST.gets f
+
+modify :: (Monad m) => (ShellState -> ShellState) -> ShellExec m ()
+modify f = ShellExec $ ST.modify f
 
 getName :: (Monad m) => ShellExec m String
 getName = gets ssName
@@ -292,11 +310,11 @@ instance PosixLike m => PosixLike (ShellExec m) where
 
     getProcessID = lift getProcessID
     execProcess = liftT4 execProcess
-    captureStdout a = get >>= lift . captureStdout . evalStateT a
+    captureStdout a = get >>= lift . captureStdout . evalShell a
 
     pipeline cs = do
         s <- get
-        lift $ pipeline [ evalStateT c s | c <- cs ]
+        lift $ pipeline [ evalShell c s | c <- cs ]
     contentFd = liftT1 contentFd
 
 type ShellUtility m = Utility (ShellExec m)
