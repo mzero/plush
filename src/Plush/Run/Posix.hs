@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# Language FlexibleContexts, TypeFamilies, ScopedTypeVariables #-}
+{-# Language FlexibleContexts, TypeFamilies #-}
 
 {-| This module represents the low level Posix interface. It is mostly a
     re-export of the interface from the System.Posix module tree. However,
@@ -49,26 +49,15 @@ module Plush.Run.Posix (
     stdJsonInput, stdJsonOutput,
 ) where
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Concurrent (forkIO)
-import Control.Monad (foldM, when)
-import Control.Monad.Exception (MonadException, catchIf, catchIOError)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Unsafe as B
+import Control.Monad.Exception (MonadException)
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Internal as B
-import Data.Foldable (forM_)
-import Foreign.Ptr (castPtr, plusPtr)
-import qualified GHC.IO.Exception as GHC
 import System.Exit
 import System.Posix.Files (stdFileMode, accessModes)
 import System.Posix.IO (stdInput, stdOutput, stdError,
-    OpenMode, OpenFileFlags, defaultFileFlags)
+    OpenMode(..), OpenFileFlags(..), defaultFileFlags)
 import System.Posix.Types
-import qualified System.IO as IO
-import qualified System.IO.Error as IO
-import qualified System.Posix as P
-import qualified System.Posix.Missing as PM
+
+import qualified Plush.Run.Posix.IO as IO
 
 
 type Bindings = [(String, String)]
@@ -177,183 +166,52 @@ class PosixLikeFileStatus s where
     isDirectory :: s -> Bool
     isSymbolicLink :: s -> Bool
 
-
-instance PosixLike IO where
-    createDirectory = P.createDirectory
-    removeDirectory = P.removeDirectory
-
-    getDirectoryContents = ioGetDirectoryContents
-
-    getWorkingDirectory = P.getWorkingDirectory
-    changeWorkingDirectory = P.changeWorkingDirectory
-
-    getInitialEnvironment = P.getEnvironment
-
-    type FileStatus IO = P.FileStatus
-
-    getFileStatus = P.getFileStatus
-    getSymbolicLinkStatus = P.getSymbolicLinkStatus
-    isExecutable path = P.fileAccess path False False True
-
-    removeLink = P.removeLink
-
-    setFileTimes = P.setFileTimes
-    touchFile = P.touchFile
-
-    openFd = P.openFd
-    createFile = P.createFile
-    closeFd = P.closeFd
-
-    readAll = ioReadAll
-    write = ioWrite
-
-    dupTo a b = P.dupTo a b >> return ()
-    dupFdCloseOnExec = PM.dupFdCloseOnExec
-    setCloseOnExec fd = P.setFdOption fd P.CloseOnExec True
-
-    getUserHomeDirectoryForName s =
-        (Just . P.homeDirectory <$> P.getUserEntryForName s)
-            `catchIOError` (\_ -> return Nothing)
-
-    realAndEffectiveIDsMatch = do
-        usersMatch <- (==) <$> P.getRealUserID <*> P.getEffectiveUserID
-        groupsMatch <- (==) <$> P.getRealGroupID <*> P.getEffectiveGroupID
-        return $ usersMatch && groupsMatch
-
-    getProcessID = fromIntegral <$> P.getProcessID
-    execProcess = ioExecProcess
-    captureStdout = ioCaptureStdout
-    pipeline = ioPipeline
-    contentFd = ioContentFd
-
-
-instance PosixLikeFileStatus P.FileStatus where
-    accessTime = P.accessTime
-    modificationTime = P.modificationTime
-
-    isRegularFile = P.isRegularFile
-    isDirectory = P.isDirectory
-    isSymbolicLink = P.isSymbolicLink
-
-
--- | 'readAll' for 'IO': Seek to the start (if possible), and read as much as
--- possible.
-ioReadAll :: Fd -> IO L.ByteString
-ioReadAll fd = do
-    ignoreUnsupportedOperation $ P.fdSeek fd IO.AbsoluteSeek 0
-    go [] >>= return . L.fromChunks . reverse
-  where
-    go bs = next >>= maybe (return bs) (go . (:bs))
-    next = readBuf `catchIOError` (\_ -> return Nothing)
-    readBuf = do
-      b <- B.createAndTrim bufSize $ (\buf ->
-                fromIntegral `fmap` P.fdReadBuf fd buf bufSize)
-      return $ if B.null b then Nothing else Just b
-    bufSize :: Num a => a
-    bufSize = 4096
-
--- | 'write' for 'IO': Seek to the end, and write.
-ioWrite :: Fd -> L.ByteString -> IO ()
-ioWrite fd = mapM_ (flip B.unsafeUseAsCStringLen writeBuf) . L.toChunks
-  where
-    writeBuf (p, n) | n > 0 = do
-        ignoreUnsupportedOperation $ P.fdSeek fd IO.SeekFromEnd 0
-        m <- fromIntegral `fmap` P.fdWriteBuf fd (castPtr p) (fromIntegral n)
-        when (0 <= m && m <= n) $ writeBuf (p `plusPtr` m, n - m)
-    writeBuf _ = return ()
-
-
--- | 'execProcess' for 'IO'
-ioExecProcess fp env cmd args = do
-        pid <- P.forkProcess $
-            PM.executeFile0 fp cmd args env `catchIOError` handler
-        mStat <- P.getProcessStatus True False pid
-        case mStat of
-            Just (P.Exited ec)  -> return ec
-            _                   -> return $ ExitFailure 129
-  where
-    handler _ = P.exitImmediately $ ExitFailure 127
-        -- NOTE(mzero): §2.9.1 seems to imply 126 in this case, but all other
-        -- shells return 127
-
--- | 'pipeline' for 'IO': fork each action, connected by a daisy chained
--- series of pipes. The first action gets the original stdInput, the last
--- command gets the original stdOutput.
-ioPipeline :: [IO ExitCode] -> IO ExitCode
-ioPipeline actions = next Nothing actions >>= waitAll
-  where
-    next pPrev [] = forM_ pPrev closeBoth >> return []
-    next pPrev [cz] = (:[]) <$> seg pPrev cz Nothing
-        -- TODO: run cz in foreground once we can stash stdInput reliably
-
-    next pPrev (c:cs) = do
-        pNext <- Just <$> P.createPipe   -- (readSide, writeSide)
-        (:) <$> seg pPrev c pNext <*> next pNext cs
-
-    seg pIn c pOut = do
-        pid <- P.forkProcess $ do
-            forM_ pIn $ \p@(r,_w) -> dupTo r stdInput >> closeBoth p
-            forM_ pOut $ \p@(_r,w) -> dupTo w stdOutput >> closeBoth p
-            c >>= P.exitImmediately
-        forM_ pIn closeBoth
-        return pid
-
-    closeBoth (r,w) = closeFd r >> closeFd w
-
-    waitAll = foldM (const wait) ExitSuccess
-
-    wait pid = do
-        st <- P.getProcessStatus True False pid
-        case st of
-            Just (P.Exited e) -> return e
-            _ -> return $ ExitFailure 129
-
-ioCaptureStdout :: IO ExitCode -> IO (ExitCode, L.ByteString)
-ioCaptureStdout action = do
-    (readFd, writeFd) <- P.createPipe
-    pid <- P.forkProcess $ do
-        closeFd readFd
-        dupTo writeFd stdOutput
-        action >>= P.exitImmediately
-    closeFd writeFd
-    out <- readAll readFd
-    closeFd readFd
-    st <- P.getProcessStatus True False pid
-    case st of
-        Just (P.Exited e) -> return (e, out)
-        _ -> return (ExitFailure 129, out)
-
-
-ioContentFd :: L.ByteString -> IO Fd
-ioContentFd content = do
-    (readFd, writeFd) <- P.createPipe
-    _ <- forkIO $ write writeFd content >> closeFd writeFd
-    return readFd
-
-
-ignoreUnsupportedOperation :: IO a -> IO ()
-ignoreUnsupportedOperation act =
-    catchIf ((== GHC.UnsupportedOperation) . IO.ioeGetErrorType)
-        (act >> return ())
-        (const $ return ())
-
-
-
 stdJsonInput, stdJsonOutput :: Fd
 stdJsonInput = Fd 3
 stdJsonOutput = Fd 4
 
--- | 'getDirectoryContents' for 'IO': Open a DirStream and read it all.
-ioGetDirectoryContents :: FilePath -> IO [FilePath]
-ioGetDirectoryContents fp = do
-    ds <- P.openDirStream fp
-    contents <- readUntilNull ds
-    P.closeDirStream ds
-    return contents
-  where
-    readUntilNull ds = do
-        entry <- P.readDirStream ds
-        if null entry
-            then return []
-            else readUntilNull ds >>= return . (entry :)
 
+instance PosixLike IO where
+    createDirectory             = IO.createDirectory
+    removeDirectory             = IO.removeDirectory
+    getDirectoryContents        = IO.getDirectoryContents
+    getWorkingDirectory         = IO.getWorkingDirectory
+    changeWorkingDirectory      = IO.changeWorkingDirectory
+
+    getInitialEnvironment       = IO.getInitialEnvironment
+
+    type FileStatus IO          = IO.FileStatus
+    getFileStatus               = IO.getFileStatus
+    getSymbolicLinkStatus       = IO.getSymbolicLinkStatus
+    isExecutable                = IO.isExecutable
+
+    removeLink                  = IO.removeLink
+    setFileTimes                = IO.setFileTimes
+    touchFile                   = IO.touchFile
+
+    openFd                      = IO.openFd
+    createFile                  = IO.createFile
+    closeFd                     = IO.closeFd
+
+    dupTo                       = IO.dupTo
+    dupFdCloseOnExec            = IO.dupFdCloseOnExec
+    setCloseOnExec              = IO.setCloseOnExec
+
+    readAll                     = IO.readAll
+    write                       = IO.write
+
+    getUserHomeDirectoryForName = IO.getUserHomeDirectoryForName
+    realAndEffectiveIDsMatch    = IO.realAndEffectiveIDsMatch
+    getProcessID                = IO.getProcessID
+
+    execProcess                 = IO.execProcess
+    captureStdout               = IO.captureStdout
+    pipeline                    = IO.pipeline
+    contentFd                   = IO.contentFd
+
+instance PosixLikeFileStatus IO.FileStatus where
+    accessTime                  = IO.accessTime
+    modificationTime            = IO.modificationTime
+    isRegularFile               = IO.isRegularFile
+    isDirectory                 = IO.isDirectory
+    isSymbolicLink              = IO.isSymbolicLink
