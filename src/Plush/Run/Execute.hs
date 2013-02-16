@@ -56,8 +56,8 @@ execAndOr ao = foldM execAndOrItem ExitSuccess ao
 
 execAndOrItem :: (PosixLike m) => ExitCode -> (Connector, (Sense, Pipeline))
     -> ShellExec m ExitCode
-execAndOrItem ExitSuccess     (AndThen, (s, p))          = execPipeSense s p
-execAndOrItem (ExitFailure e) (OrThen, (s, p))  | e /= 0 = execPipeSense s p
+execAndOrItem ExitSuccess     (AndThen, (s, p)) = execPipeSense s p
+execAndOrItem (ExitFailure _) (OrThen, (s, p))  = execPipeSense s p
 execAndOrItem e _ = return e
 
 execPipeSense :: (PosixLike m) => Sense -> [Command] -> ShellExec m ExitCode
@@ -68,10 +68,8 @@ execPipeSense s p = do
 
 sense :: Sense -> ExitCode -> ExitCode
 sense Normal   e = e
-sense Inverted ExitSuccess = ExitFailure 1
-sense Inverted (ExitFailure e)
-    | e /= 0    = ExitSuccess
-    | otherwise = ExitFailure 1
+sense Inverted ExitSuccess     = ExitFailure 1
+sense Inverted (ExitFailure _) = ExitSuccess
 
 execPipe :: (PosixLike m) => [Command] -> ShellExec m ExitCode
 execPipe [] = exitMsg 120 "Emtpy pipeline"
@@ -143,10 +141,10 @@ execFor (Name _ name) (Just words_) cmds = do
   where
     forLoop [] = getLastExitCode
     forLoop (w:ws) = do
-        ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just w)
-        case ok of
-            ExitSuccess -> execute cmds >> forLoop ws
-            e@(ExitFailure {}) -> return e
+        ec <- setVarEntry name (VarShellOnly, VarReadWrite, Just w)
+        case ec of
+            ExitSuccess   -> execute cmds >> forLoop ws
+            ExitFailure _ -> return ec
 
 execCase :: (PosixLike m) =>
     Word -> [([Word], Maybe CommandList)] -> ShellExec m ExitCode
@@ -169,8 +167,8 @@ execIf [] Nothing = success
 execIf [] (Just e) = execute e
 execIf ((c,s):css) mElse = execute c >>= \ec ->
     case ec of
-        ExitFailure n | n /= 0 -> execIf css mElse
-        _ -> execute s
+        ExitSuccess   -> execute s
+        ExitFailure _ -> execIf css mElse
 
 execLoop :: (PosixLike m) =>
     Bool -> CommandList -> CommandList -> ShellExec m ExitCode
@@ -180,8 +178,6 @@ execLoop loopWhen test body = go ExitSuccess
         if loopWhen == isSuccess ec
             then execute body >>= go
             else return lastEc
-    isSuccess (ExitFailure n) | n /= 0 = False
-    isSuccess _ = True
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
 execFunctionBody (FunctionBody body redirects) =

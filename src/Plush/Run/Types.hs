@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ failure = return $ ExitFailure 1
 exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
 exitMsg e msg = do
     errStrLn msg `catchIOError` (\_ -> return ())
-    return $ if (e == 0) then ExitSuccess else ExitFailure e
+    return $ asExitCode e
 
 notSupported :: (PosixLike m) => String -> m ExitCode
 notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)

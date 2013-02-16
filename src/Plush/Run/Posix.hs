@@ -33,6 +33,8 @@ module Plush.Run.Posix (
     -- * Misc
     -- ** Environment bindings
     Bindings,
+    -- ** stdJson
+    stdJsonInput, stdJsonOutput,
 
     -- * Re-exports
     -- ** from System.Exit
@@ -45,8 +47,6 @@ module Plush.Run.Posix (
     stdInput, stdOutput, stdError,
     OpenMode(..), OpenFileFlags(..), defaultFileFlags,
 
-    -- * Misc
-    stdJsonInput, stdJsonOutput,
 ) where
 
 import Control.Monad.Exception (MonadException)

@@ -41,7 +41,11 @@ module Plush.Run.Posix.Utilities (
     doesFileExist, doesDirectoryExist,
     -- * Path simplification
     simplifyPath, reducePath,
+
     -- * 'ExitCode' utilities
+    -- $exit
+    asExitCode, exitStatus,
+    isSuccess, isFailure,
     andThen, andThenM, untilFailureM,
 ) where
 
@@ -172,6 +176,48 @@ reducePath = simp [] . splitDirectories
           | y == "/"           = simp      ya  xs
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
+
+
+
+{- $exit
+POSIX has a concept of "Exit Status", which is a numeric value that process
+exits with at completion. It is limited to the range 0..255 by the spec.
+The shell and other utilities sometimes treat 0 as "success" and other values
+as "failure".
+
+Haskell's "System.Exit" defines the type 'ExitCode', which plush reuses.
+However, this type is slightly more general, in that it esparates the
+notion of success and failure from the numeric code (which is only supplied
+on failure). This leads to the unfortunate possibility of the value
+@(ExitFailure 0)@. Is this success or failure in a POSIX context?
+
+In the interest of harmony with Haskell's common usage, plush uses 'ExitCode'
+to reprsent "Exit Status". Further, to make code clear and consistent, it
+only distinguishes success from failure based on the constructor.
+-}
+
+-- | Convert a numeric exit status to an 'ExitCode'. Handles selection of the
+-- correct constructor. It is acceptable, and preferable, to apply 'ExitFailure'
+-- to non-zero constant. Otherwise, use this function.
+asExitCode :: Int -> ExitCode
+asExitCode i = if i == 0 then ExitSuccess else ExitFailure i
+
+-- | Extract the numeric exit status from an 'ExitCode'
+exitStatus :: ExitCode -> Int
+exitStatus ExitSuccess = 0
+exitStatus (ExitFailure n) = n
+
+-- | Convience function. It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isSuccess :: ExitCode -> Bool
+isSuccess ExitSuccess = True
+isSuccess (ExitFailure _) = False
+
+-- | Convience function.  It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isFailure :: ExitCode -> Bool
+isFailure = not . isSuccess
+
 
 -- | Returns the first 'ExitCode' that fails. (Could have been a
 -- | Monoid if we owned ExitCode.)
