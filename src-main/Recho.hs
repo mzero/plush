@@ -20,6 +20,7 @@ import System.Environment
 import System.Exit
 
 import Plush.Run.BuiltIns.Trivial (rechoExec)
+import Plush.Run.Posix.IO ()
 
 main :: IO ()
 main = getArgs >>= rechoExec >>= exitWith

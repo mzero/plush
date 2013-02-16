@@ -14,58 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-| This module exports the functions needed to create the instance of PosixIO
-    for IO. The actual instance appears in "Plush.Run.Posix". This module is
-    mostly to just remove clutter from that module.
+{-# Language TypeFamilies #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-    Note that many of these functions are just re-exports from "System.Posix".
--}
+{-| This module exports the instance of PosixIO for IO. -}
 
-
-module Plush.Run.Posix.IO (
-    P.createDirectory,
-    P.removeDirectory,
-    getDirectoryContents,
-    P.getWorkingDirectory,
-    P.changeWorkingDirectory,
-
-    getInitialEnvironment,
-
-    P.getFileStatus,
-    P.getSymbolicLinkStatus,
-    isExecutable,
-
-    P.removeLink,
-    P.setFileTimes,
-    P.touchFile,
-
-    P.openFd,
-    P.createFile,
-    P.closeFd,
-
-    dupTo,
-    PM.dupFdCloseOnExec,
-    setCloseOnExec,
-
-    readAll,
-    write,
-
-    getUserHomeDirectoryForName,
-    realAndEffectiveIDsMatch,
-    getProcessID,
-
-    execProcess,
-    captureStdout,
-    pipeline,
-    contentFd,
-
-    P.FileStatus,
-    P.accessTime,
-    P.modificationTime,
-    P.isRegularFile,
-    P.isDirectory,
-    P.isSymbolicLink,
-) where
+module Plush.Run.Posix.IO () where
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent (forkIO)
@@ -85,6 +39,52 @@ import qualified System.IO.Error as IO
 import qualified System.Posix as P
 import qualified System.Posix.Missing as PM
 
+import qualified Plush.Run.Posix as PL
+
+instance PL.PosixLike IO where
+    createDirectory             = P.createDirectory
+    removeDirectory             = P.removeDirectory
+    getDirectoryContents        = getDirectoryContents
+    getWorkingDirectory         = P.getWorkingDirectory
+    changeWorkingDirectory      = P.changeWorkingDirectory
+
+    getInitialEnvironment       = P.getEnvironment
+
+    type FileStatus IO          = P.FileStatus
+    getFileStatus               = P.getFileStatus
+    getSymbolicLinkStatus       = P.getSymbolicLinkStatus
+    isExecutable                = isExecutable
+
+    removeLink                  = P.removeLink
+    setFileTimes                = P.setFileTimes
+    touchFile                   = P.touchFile
+
+    openFd                      = P.openFd
+    createFile                  = P.createFile
+    closeFd                     = P.closeFd
+
+    dupTo                       = dupTo
+    dupFdCloseOnExec            = PM.dupFdCloseOnExec
+    setCloseOnExec              = setCloseOnExec
+
+    readAll                     = readAll
+    write                       = write
+
+    getUserHomeDirectoryForName = getUserHomeDirectoryForName
+    realAndEffectiveIDsMatch    = realAndEffectiveIDsMatch
+    getProcessID                = getProcessID
+
+    execProcess                 = execProcess
+    captureStdout               = captureStdout
+    pipeline                    = pipeline
+    contentFd                   = contentFd
+
+instance PL.PosixLikeFileStatus P.FileStatus where
+    accessTime                  = P.accessTime
+    modificationTime            = P.modificationTime
+    isRegularFile               = P.isRegularFile
+    isDirectory                 = P.isDirectory
+    isSymbolicLink              = P.isSymbolicLink
 
 
 getDirectoryContents :: FilePath -> IO [FilePath]
@@ -100,9 +100,6 @@ getDirectoryContents fp = do
             then return []
             else readUntilNull ds >>= return . (entry :)
 
-
-getInitialEnvironment :: IO [(String, String)]
-getInitialEnvironment = P.getEnvironment
 
 isExecutable :: FilePath -> IO Bool
 isExecutable path = P.fileAccess path False False True

@@ -38,6 +38,7 @@ import qualified Data.Text.Encoding.Error as T
 
 import Plush.Resource
 import Plush.Run.Posix
+import Plush.Run.Posix.IO ()
 import Plush.Run.ShellExec
 import Plush.Run.TestExec
 

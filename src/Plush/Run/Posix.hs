@@ -57,8 +57,6 @@ import System.Posix.IO (stdInput, stdOutput, stdError,
     OpenMode(..), OpenFileFlags(..), defaultFileFlags)
 import System.Posix.Types
 
-import qualified Plush.Run.Posix.IO as IO
-
 
 type Bindings = [(String, String)]
 
@@ -170,48 +168,3 @@ stdJsonInput, stdJsonOutput :: Fd
 stdJsonInput = Fd 3
 stdJsonOutput = Fd 4
 
-
-instance PosixLike IO where
-    createDirectory             = IO.createDirectory
-    removeDirectory             = IO.removeDirectory
-    getDirectoryContents        = IO.getDirectoryContents
-    getWorkingDirectory         = IO.getWorkingDirectory
-    changeWorkingDirectory      = IO.changeWorkingDirectory
-
-    getInitialEnvironment       = IO.getInitialEnvironment
-
-    type FileStatus IO          = IO.FileStatus
-    getFileStatus               = IO.getFileStatus
-    getSymbolicLinkStatus       = IO.getSymbolicLinkStatus
-    isExecutable                = IO.isExecutable
-
-    removeLink                  = IO.removeLink
-    setFileTimes                = IO.setFileTimes
-    touchFile                   = IO.touchFile
-
-    openFd                      = IO.openFd
-    createFile                  = IO.createFile
-    closeFd                     = IO.closeFd
-
-    dupTo                       = IO.dupTo
-    dupFdCloseOnExec            = IO.dupFdCloseOnExec
-    setCloseOnExec              = IO.setCloseOnExec
-
-    readAll                     = IO.readAll
-    write                       = IO.write
-
-    getUserHomeDirectoryForName = IO.getUserHomeDirectoryForName
-    realAndEffectiveIDsMatch    = IO.realAndEffectiveIDsMatch
-    getProcessID                = IO.getProcessID
-
-    execProcess                 = IO.execProcess
-    captureStdout               = IO.captureStdout
-    pipeline                    = IO.pipeline
-    contentFd                   = IO.contentFd
-
-instance PosixLikeFileStatus IO.FileStatus where
-    accessTime                  = IO.accessTime
-    modificationTime            = IO.modificationTime
-    isRegularFile               = IO.isRegularFile
-    isDirectory                 = IO.isDirectory
-    isSymbolicLink              = IO.isSymbolicLink
