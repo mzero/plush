@@ -31,14 +31,10 @@ module Plush.Run.Posix (
     PosixLikeFileStatus(..),
 
     -- * Misc
-    -- ** Environment bindings
-    Bindings,
     -- ** stdJson
     stdJsonInput, stdJsonOutput,
 
     -- * Re-exports
-    -- ** from System.Exit
-    ExitCode(..),
     -- ** from System.Posix.Types
     module System.Posix.Types,
     -- ** from System.Posix.Files
@@ -57,8 +53,8 @@ import System.Posix.IO (stdInput, stdOutput, stdError,
     OpenMode(..), OpenFileFlags(..), defaultFileFlags)
 import System.Posix.Types
 
+import Plush.Run.Types
 
-type Bindings = [(String, String)]
 
 -- | The low-level operations that make up the Posix interface.
 --

@@ -34,6 +34,7 @@ import {-# SOURCE #-} Plush.Run.Execute         -- see Execute.hs-boot
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
+import Plush.Run.Types
 import qualified Plush.Run.ShellFlags as F
 
 

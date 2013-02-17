@@ -46,6 +46,11 @@ module Plush.Run.Posix.Utilities (
     -- $exit
     asExitCode, exitStatus,
     isSuccess, isFailure,
+    -- ** Utility exits
+    success, failure,
+    exitMsg,
+    notSupported,
+    -- ** Monadic combintors
     andThen, andThenM, untilFailureM,
 ) where
 
@@ -232,4 +237,27 @@ andThenM = liftM2 andThen
 -- | Sequence a list of 'ExitCode'-returning operations until failure.
 untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
 untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
+
+
+-- | Common return from utilities when successful.
+-- > return ExitSuccess
+success :: (Monad m) => m ExitCode
+success = return ExitSuccess
+
+-- | Common return from utilities when failed.
+-- > return $ ExitFailure 1
+failure :: (Monad m) => m ExitCode
+failure = return $ ExitFailure 1
+
+-- | Exit from a utility, printing a message on 'stderr'. The first argument
+-- is the exit status value.
+exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
+exitMsg e msg = do
+    errStrLn msg `catchIOError` (\_ -> return ())
+    return $ asExitCode e
+
+-- | Exit from a utility because some feature is not (yet) supported.
+notSupported :: (PosixLike m) => String -> m ExitCode
+notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+
 
