@@ -36,12 +36,11 @@ module Plush.Run.ShellExec (
     )
     where
 
-import Control.Monad (msum, mplus)
+import Control.Monad (join, msum, mplus)
 import Control.Monad.Exception (bracket_)
 import Control.Monad.Trans.Class (lift, MonadTrans)
 import Control.Monad.Trans.State
 import qualified Data.HashMap.Strict as M
-import Data.List (intercalate)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 
@@ -66,7 +65,8 @@ varValue :: VarEntry -> String
 varValue (_,_,s) = fromMaybe "" s
 
 data ShellState = ShellState
-    { ssName :: String    -- the command name used to invoke the shell or script
+    { ssShellPid :: Int   -- the pid of this shell
+    , ssName :: String    -- the command name used to invoke the shell or script
     , ssArgs :: [String]  -- "Positional Parameters", technically
     , ssFlags :: Flags
     , ssVars :: Vars
@@ -79,7 +79,7 @@ data ShellState = ShellState
 
 initialShellState :: ShellState
 initialShellState = ShellState
-    { ssName = "plush", ssArgs = [], ssFlags = defaultFlags,
+    { ssShellPid = 0, ssName = "plush", ssArgs = [], ssFlags = defaultFlags,
       ssVars = M.empty, ssFuns = M.empty, ssAliases = M.empty,
       ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
 
@@ -112,19 +112,22 @@ getVars = gets ssVars
 getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
 getVar name = get >>= return . varOptions
   where
-    varOptions s = msum $ [normalVar s, specialVar s, positionalVar s]
-    normalVar s = varValue `fmap` M.lookup name (ssVars s)
-    specialVar s = case name of
-        "*" -> Just . intercalate (starSep s) . ssArgs $ s
-        "#" -> Just . show . length . ssArgs $ s
-        "?" -> Just . show . exitStatus . ssLastExitCode $ s
-        "-" -> Just . flagParameter . ssFlags $ s
-        "0" -> Just . ssName $ s
-        _ -> Nothing
+    varOptions s = join $ msum $ [normalVar s, specialVar s, positionalVar s]
+    normalVar s = (Just . varValue) `fmap` M.lookup name (ssVars s)
+    specialVar s = ($s) `fmap` M.lookup name specialVarActions
     positionalVar s = case readMaybe name of
-        Just n | n > 0 -> listToMaybe . drop (n - 1) $ ssArgs s
+        Just n | n > 0 -> Just . listToMaybe . drop (n - 1) $ ssArgs s
         _ -> Nothing
-    starSep = take 1 . maybe " " varValue . M.lookup "IFS" . ssVars
+
+    specialVarActions = M.fromList
+        [ ("#", Just . show . length . ssArgs)
+        , ("?", Just . show . exitStatus . ssLastExitCode)
+        , ("-", Just . flagParameter . ssFlags)
+        , ("$", Just . show . ssShellPid)
+        , ("!", const Nothing)
+        , ("0", Just . ssName)
+        ] -- NOTE: "@" and "*" are handled in Expansion.hs
+
     exitStatus ExitSuccess = 0
     exitStatus (ExitFailure n) = n
 
@@ -231,8 +234,10 @@ loadSummaries t = modify $
 
 primeShellState :: (PosixLike m) => ShellExec m ()
 primeShellState = do
+    pid <- getProcessID
     e <- map asVar `fmap` getInitialEnvironment
-    modify $ (\s -> s { ssVars = M.fromList e `M.union` ssVars s })
+    modify $ (\s ->
+        s { ssShellPid = pid, ssVars = M.fromList e `M.union` ssVars s })
   where
     asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
 
@@ -285,6 +290,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     getUserHomeDirectoryForName = liftT1 getUserHomeDirectoryForName
     realAndEffectiveIDsMatch = lift realAndEffectiveIDsMatch
 
+    getProcessID = lift getProcessID
     execProcess = liftT4 execProcess
     captureStdout a = get >>= lift . captureStdout . evalStateT a
 

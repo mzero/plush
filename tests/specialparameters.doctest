@@ -16,6 +16,76 @@ Special Parameters
 
 The shell special parameters are @ * # ? - $ ! and 0
 
+The @ special parameter expands to the positional parameters separatly. It
+retains thier separateness even within doublequotes (which means it busts
+out of the double quotes!)
+    # set alpha beta gamma
+    # recho $@
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # recho "$@"
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # cat <<END
+    + $@
+    + END
+    alpha beta gamma
+
+
+    # IFS=":"                   # doesn't matter if we change IFS
+    # recho $@
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # recho "$@"
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # cat <<END                 # SKIP bash which always uses spaces
+    + $@
+    + END
+    alpha:beta:gamma
+
+
+    # IFS=""
+    # recho $@                  # SKIP dash which expands to one arg.
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # recho "$@"
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+
+    # cat <<END                 # SKIP bash which always uses spaces
+    + $@
+    + END
+    alphabetagamma
+
+
+    # unset IFS
+
+    # recho "xx$@yy"
+    argv[1] = <xxalpha>
+    argv[2] = <beta>
+    argv[3] = <gammayy>
+
+    # recho "xx $@ yy"
+    argv[1] = <xx alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma yy>
+
+    # set --
+    # recho $@
+    # recho "$@"
+
 The * special parameter expands to the positional parameters, separated by the
 first character of IFS, if any (and defaulted to space, if unset)
     # set alpha beta gamma
@@ -27,7 +97,13 @@ first character of IFS, if any (and defaulted to space, if unset)
     # recho "$*"
     argv[1] = <alpha beta gamma>
 
-    # OLDIFS="${IFS}" IFS=":"
+    # cat <<END
+    + $*
+    + END
+    alpha beta gamma
+
+
+    # IFS=":"
     # recho $*
     argv[1] = <alpha>
     argv[2] = <beta>
@@ -36,18 +112,79 @@ first character of IFS, if any (and defaulted to space, if unset)
     # recho "$*"
     argv[1] = <alpha:beta:gamma>
 
+    # cat <<END                 # SKIP bash which always uses spaces
+    + $*
+    + END
+    alpha:beta:gamma
+
+
     # IFS=""
-    # recho $*                                          # SKIP bash
+    # recho $*                  # SKIP bash which expands to three args.
     argv[1] = <alphabetagamma>
 
     # recho "$*"
     argv[1] = <alphabetagamma>
 
-    # IFS="${OLDIFS}"
+    # cat <<END                 # SKIP bash which always uses spaces
+    + $*
+    + END
+    alphabetagamma
+
+
+    # unset IFS
     # set --
     # recho $*
     # recho "$*"
     argv[1] = <>
+
+Both $@ and $* react 'interestingly' to the various parameter expansions.
+These interpretations are left open by the spec.
+    # set --
+    # recho "${@-a b}" "${*-c d}"   # SKIP dash treats args as always set
+    argv[1] = <a b>
+    argv[2] = <c d>
+    # recho "${@:-a b}" "${*:-c d}"
+    argv[1] = <a b>
+    argv[2] = <c d>
+    # echo ${#@} ${#*}
+    0 0
+    # recho "${@%a}" "${*%a}"       # SKIP dash doesn't match by arg
+    argv[1] = <>
+
+    # set ''
+    # recho "${@-a b}" "${*-c d}"
+    argv[1] = <>
+    argv[2] = <>
+    # recho "${@:-a b}" "${*:-c d}" # SKIP bash treats having any args as non-null
+    argv[1] = <a b>
+    argv[2] = <c d>
+    # echo ${#@} ${#*}              # SKIP bash returns $#
+    0 0
+    # recho "${@%a}" "${*%a}"
+    argv[1] = <>
+    argv[2] = <>
+
+    # set alpha beta gamma
+    # recho "${@-a b}" "${*-c d}"
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+    argv[4] = <alpha beta gamma>
+    # recho "${@:-a b}" "${*:-c d}"
+    argv[1] = <alpha>
+    argv[2] = <beta>
+    argv[3] = <gamma>
+    argv[4] = <alpha beta gamma>
+    # echo ${#@} ${#*}              # SKIP bash returns $#
+    16 16
+    # recho "${@%a}" "${*%a}"       # SKIP dash doesn't match by arg
+    argv[1] = <alph>
+    argv[2] = <bet>
+    argv[3] = <gamm>
+    argv[4] = <alph bet gamm>
+
+
+
 
 The # special parameter expands to the number of positional parameters
     # set alpha beta gamma
@@ -98,6 +235,17 @@ The - special parameter expands to the state of the flags
     # set +o notify
     # echo $-
     a
+
+The $ special parameter expands to the process id of the shell itself
+    # echo ">>$$<<" | tr -d 0-9   # should be a number
+    >><<
+
+    # echo ${$+set and not null}
+    set and not null
+
+The ! special parameter expands to the most recent background pipeline
+    # echo ${!:-none}
+    none
 
 The 0 special parameter exapnds to the name of the shell
     # echo $0 | fgrep -q plush ; echo $?            # ONLY plush
