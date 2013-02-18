@@ -55,15 +55,15 @@ limitations under the License.
     </div>
     <div id="main">
       <div id="status">
-        <div id="status-ls">
-          <h1 id="status-ls-cwd">/</h1>
+        <div id="status-dir">
+          <h1 id="status-dir-cwd">/</h1>
           <table>
             <tbody>
               <tr class="file proto">
                 <td>
                   <span class="name"></span>
                   <div class="hidden">
-                    <dl class="details">
+                    <dl class="ls-details">
                       <dt class="type key">Type</dt><dd class="type value"></dd>
                       <dt class="size key">Size</dt><dd class="size value"></dd>
                       <dt class="info key">Info</dt><dd class="info value"></dd>
@@ -80,20 +80,22 @@ limitations under the License.
                       <dt class="links key">Link Count</dt><dd class="links value"></dd>
                       <dt class="target key">Target</dt><dd class="target value"></dd>
                     </dl>
+                    <dl class="svn-details">
+                      <dt class="type key">Type</dt><dd class="type value"></dd>
+                    </dl>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div id="status-vars">
-          Variables
-          <div class="hidden">
-            <p>Environment</p>
-            <dl id="context-env">
-            </dl>
+        <div id="status-env">
+          <div class="hidden proto">
             <p>Shell Vars</p>
             <dl id="context-shell">
+            </dl>
+            <p>Environment</p>
+            <dl id="context-env">
             </dl>
           </div>
         </div>
