@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +16,15 @@ limitations under the License.
 
 module Plush.Run.Types (
     Args,
-    success, failure,
-    exitMsg,
-    notSupported,
+    Bindings,
+
+    -- $exit
+    ExitCode(..),
+    intToExitCode, exitCodeToInt,
+    isSuccess, isFailure,
+
+    ShellStatus(..),
+    statusExitCode,
 
     FoundCommand(..),
     Annotation(..),
@@ -28,29 +34,75 @@ module Plush.Run.Types (
     )
 where
 
-import Control.Monad.Exception (catchIOError)
 import qualified Data.Text as T
+import System.Exit
 
-import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
 import Plush.Types.CommandSummary
 
 
 type Args = [String]
+type Bindings = [(String, String)]
 
-success :: (Monad m) => m ExitCode
-success = return ExitSuccess
+{- $exit
+POSIX has a concept of "Exit Status", which is a numeric value that process
+exits with at completion. It is limited to the range 0..255 by the spec.
+The shell and other utilities sometimes treat 0 as "success" and other values
+as "failure".
 
-failure :: (Monad m) => m ExitCode
-failure = return $ ExitFailure 1
+Haskell's "System.Exit" defines the type 'ExitCode', which plush reuses.
+However, this type is slightly more general, in that it esparates the
+notion of success and failure from the numeric code (which is only supplied
+on failure). This leads to the unfortunate possibility of the value
+@(ExitFailure 0)@. Is this success or failure in a POSIX context?
 
-exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
-exitMsg e msg = do
-    errStrLn msg `catchIOError` (\_ -> return ())
-    return $ if (e == 0) then ExitSuccess else ExitFailure e
+In the interest of harmony with Haskell's common usage, plush uses 'ExitCode'
+to reprsent "Exit Status". Further, to make code clear and consistent, it
+only distinguishes success from failure based on the constructor.
+-}
 
-notSupported :: (PosixLike m) => String -> m ExitCode
-notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+-- | Convert a numeric exit status to an 'ExitCode'. Handles selection of the
+-- correct constructor. It is acceptable, and preferable, to apply 'ExitFailure'
+-- to non-zero constant. Otherwise, use this function.
+intToExitCode :: Int -> ExitCode
+intToExitCode i = if i == 0 then ExitSuccess else ExitFailure i
+
+-- | Extract the numeric exit status from an 'ExitCode'
+exitCodeToInt :: ExitCode -> Int
+exitCodeToInt ExitSuccess = 0
+exitCodeToInt (ExitFailure n) = n
+
+-- | Convience function. It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isSuccess :: ExitCode -> Bool
+isSuccess ExitSuccess = True
+isSuccess (ExitFailure _) = False
+
+-- | Convience function.  It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isFailure :: ExitCode -> Bool
+isFailure = not . isSuccess
+
+
+-- | The result of special utilities, and of operations within the shell itself,
+-- can be more complicated than an 'ExitCode'. Importantly, they include the
+-- idea of "shell error" that causes shell termination in non-interactive
+-- shells, and abort to the user intput loop in interactive ones.
+data ShellStatus = StStatus ExitCode    -- ^ a normal "exit status"
+                 | StError ExitCode     -- ^ a "shell error"
+                 | StExit ExitCode      -- ^ exit utility invoked
+                 | StReturn ExitCode    -- ^ return from function or script
+                 | StBreak Int          -- ^ break looping command
+                 | StContinue Int       -- ^ continue looping command
+    deriving (Eq)
+
+-- | The exit status corresponding to a shell status.
+-- Unhandled control status values are mapped to error exit status values.
+statusExitCode :: ShellStatus -> ExitCode
+statusExitCode (StStatus ec) = ec
+statusExitCode (StError ec) = ec
+statusExitCode (StExit ec) = ec
+statusExitCode (StReturn ec) = ec
+statusExitCode _ = ExitFailure 123
 
 
 -- | The result of searching for a command. See "Plush.Run.BuiltIns" for
@@ -72,11 +124,13 @@ data Annotation = ExpandedTo String
     -- TODO: some of these should probably be Text rather than String
 
 
-data Utility m = Utility
-    { utilExecute  :: Args -> m ExitCode
+
+data Utility m e = Utility
+    { utilExecute  :: Args -> m e
     , utilAnnotate :: Args -> m [[Annotation]]
 --  , utilComplete :: Args -> m Completion
     }
+
 
 emptyAnnotate :: (Monad m) => Args -> m [[Annotation]]
 emptyAnnotate _ = return []

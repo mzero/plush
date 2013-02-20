@@ -103,10 +103,10 @@ export readonly unassigned environment var
 
 can't set readonly shell variable
 Note: skipped on other shells as the error message is inconsistent
+TODO(mzero): can't test this now that plush ALSO exits on shell error!
     # readonly lll=x
-    # lll=y && echo succeed || echo fail        # ONLY plush
+    # lll=y && echo succeed || echo fail        # SKIP
     var is read-only: lll
-    fail
 
 per-command exported variable bindings are restored after command exits
     # export mmm=1
@@ -125,16 +125,17 @@ Note: actually does the wrong thing here, and restores the binding.
 failing variable commands stop after failure
 Note: Skipped in dash because the error message is inconsistent.
 Note: Skipped in sh and bash because they fail this test.
+TODO(mzero): can't test this now that plush ALSO exits on shell error!
     # export nnn=1
     # export ooo=2
     # export ppp=3
     # readonly ooo
-    # unset nnn ooo ppp                         # SKIP sh dash bash
+    # unset nnn ooo ppp                         # SKIP
     var is read-only: ooo
-    # env | fgrep nnn                           # SKIP sh dash bash
-    # env | fgrep ooo                           # SKIP sh dash bash
+    # env | fgrep nnn                           # SKIP
+    # env | fgrep ooo                           # SKIP
     ooo=2
-    # env | fgrep ppp                           # SKIP sh dash bash
+    # env | fgrep ppp                           # SKIP
     ppp=3
 
 pipe in last test gives an error

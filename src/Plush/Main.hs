@@ -43,6 +43,7 @@ import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import qualified Plush.Run.ShellExec as Shell
 import qualified Plush.Run.ShellFlags as F
+import Plush.Run.Types
 import Plush.Server
 import Plush.Utilities
 
@@ -233,8 +234,8 @@ processScriptNameArgs opts script (name:args)   = processScript opts' script
 processScript :: Options -> String -> IO ()
 processScript opts script = do
     r <- initialRunner opts
-    (ec, _) <- run (runScript script) r
-    exitWith ec
+    (st, _) <- run (runScript script) r
+    exitWith $ statusExitCode st
 
 --
 -- Web & Server Modes
@@ -285,6 +286,7 @@ runRepl = runInputT defaultSettings . repl
             Just input -> do
                 (s, runner'') <- liftIO (run (runCommand input) runner')
                 case s of
+                    (StExit ec, _) -> liftIO $ exitWith ec
                     (_, Just leftOver) | not $ null leftOver ->
                         outputStrLn ("Didn't use whole input: " ++ leftOver)
                     _ -> return ()

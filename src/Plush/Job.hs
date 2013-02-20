@@ -47,7 +47,7 @@ import Plush.Run.Posix.Utilities (writeStr)
 import Plush.Run.Script (parse)
 import Plush.Run.ShellExec (getFlags, setFlags)
 import qualified Plush.Run.ShellFlags as F
-
+import Plush.Run.Types (statusExitCode)
 
 
 -- | An opaque type, holding information about a running job.
@@ -145,8 +145,8 @@ runJob st foregroundRIO childPrep r0
   where
     foreground cl runner = do
         setUp Nothing foregroundRIO (return ())
-        (exitStatus, runner') <- runCommand cl runner
-        cleanUp (return ()) exitStatus
+        (status, runner') <- runCommand cl runner
+        cleanUp (return ()) $ statusExitCode status
         return runner'
 
     background cl runner = do
@@ -154,8 +154,8 @@ runJob st foregroundRIO childPrep r0
         pid <- forkProcess $ do
                     childPrep
                     stdIOChildPrep sp
-                    (exitStatus, _runner') <- runCommand cl runner
-                    exitWith exitStatus
+                    (status, _runner') <- runCommand cl runner
+                    exitWith $ statusExitCode status
         rio <- stdIOMasterPrep sp
         setUp (Just pid) rio $ checkUp (stdIOCloseMasters sp) pid
         return runner

@@ -1,0 +1,148 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Break and Continue tests
+
+    for loops
+        # for y in :-a :-b break-c :-d;
+        + do ${y%%-*}; echo ${y##*-}; done
+        a
+        b
+
+        # for y in :-a :-b continue-c :-d;
+        + do ${y%%-*}; echo ${y##*-}; done
+        a
+        b
+        d
+
+
+    while loops (until assumed the same)
+        # set true : one   true break two   true : three   false : four
+        # while $1; do c=$2 m=$3; shift 3; $c; echo $m; done
+        one
+
+        # set true : one   true continue two   true : three   false : four
+        # while $1; do c=$2 m=$3; shift 3; $c; echo $m; done
+        one
+        three
+
+
+    nested
+        # for outer in alpha beta gamma
+        + do
+        +    echo $outer
+        +    for inner in delta epsilon
+        +    do
+        +        echo $inner
+        +        break 2
+        +        echo --inner--
+        +    done
+        +    echo --outer--
+        + done
+        alpha
+        delta
+
+        # for outer in alpha beta gamma
+        + do
+        +    echo $outer
+        +    for inner in delta epsilon
+        +    do
+        +        echo $inner
+        +        continue 2
+        +        echo --inner--
+        +    done
+        +    echo --outer--
+        + done
+        alpha
+        delta
+        beta
+        delta
+        gamma
+        delta
+
+    TODO(mzero): should test that when n is > nest depth, it breaks/continues
+    from the top most loop (rather than fall off the end of the shell)
+
+Return tests
+
+    basic return
+        # f() { echo a; return; echo b; }
+        # f
+        a
+
+    returns exit code
+        # f() { return 42; }
+        # f; echo $?
+        42
+
+    returns even when nested in a loop
+        # f() { for x in a b c; do echo $x; return; done; }
+        # f
+        a
+
+    returns only one level when nested in a function
+        # f() { echo a; return; echo b; }
+        # g() { echo y; f; echo z; }
+        # g
+        y
+        a
+        z
+
+    returns last command if no code given
+        # f() { true; return; }
+        # f; echo $?
+        0
+
+        # f() { false; return; }
+        # f; echo $?
+        1
+
+    return also returns from dot scripts
+        set up
+        # cd /tmp
+        # rm -rf doctest
+        # mkdir doctest
+        # cd doctest
+
+        return from script
+        # echo 'echo pre' > dottest
+        # echo 'return' >> dottest
+        # echo 'echo post' >> dottest
+        # . ./dottest; echo $?
+        pre
+        0
+
+        return from script with exit code
+        # echo 'echo pre' > dottest
+        # echo 'return 36' >> dottest
+        # echo 'echo post' >> dottest
+        # . ./dottest; echo $?
+        pre
+        36
+
+        return from script even when nested in a loop
+        # echo 'echo pre' > dottest
+        # echo 'for x in a b; do echo $x; return; done' >> dottest
+        # echo 'echo post' >> dottest
+        # . ./dottest
+        pre
+        a
+
+        clean up
+        # cd /tmp
+        # rm -rf doctest
+
+
+Exit tests
+...well, if you can thing of a way to test this, I'm all ears!

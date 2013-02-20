@@ -32,8 +32,6 @@ module Plush.Run.ShellExec (
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
     primeShellState,
-
-    ShellUtility,
     )
     where
 
@@ -81,10 +79,16 @@ data ShellState = ShellState
 
 initialShellState :: ShellState
 initialShellState = ShellState
-    { ssShellPid = 0, ssName = "plush", ssArgs = [], ssFlags = defaultFlags,
-      ssVars = M.empty, ssFuns = M.empty, ssAliases = M.empty,
-      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
-
+    { ssShellPid = 0
+    , ssName = "plush"
+    , ssArgs = []
+    , ssFlags = defaultFlags
+    , ssVars = M.empty
+    , ssFuns = M.empty
+    , ssAliases = M.empty
+    , ssLastExitCode = ExitSuccess
+    , ssSummaries = M.empty
+    }
 
 -- Shell Execution Monad
 
@@ -110,27 +114,27 @@ getName :: (Monad m) => ShellExec m String
 getName = gets ssName
 
 setName :: (Monad m) => String -> ShellExec m ()
-setName name = modify $ (\s -> s { ssName = name })
+setName name = modify $ \s -> s { ssName = name }
 
 getArgs :: (Monad m) => ShellExec m [String]
 getArgs = gets ssArgs
 
 setArgs :: (Monad m) => [String] -> ShellExec m ()
-setArgs args = modify $ (\s -> s { ssArgs = args })
+setArgs args = modify $ \s -> s { ssArgs = args }
 
 getFlags :: (Monad m) => ShellExec m Flags
 getFlags = gets ssFlags
 
 setFlags :: (Monad m) => Flags -> ShellExec m ()
-setFlags flags = modify $ (\s -> s { ssFlags = flags })
+setFlags flags = modify $ \s -> s { ssFlags = flags }
 
 getVars :: (Monad m, Functor m) => ShellExec m Vars
 getVars = gets ssVars
 
 getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
-getVar name = get >>= return . varOptions
+getVar name = gets varOptions
   where
-    varOptions s = join $ msum $ [normalVar s, specialVar s, positionalVar s]
+    varOptions s = join $ msum [normalVar s, specialVar s, positionalVar s]
     normalVar s = (Just . varValue) `fmap` M.lookup name (ssVars s)
     specialVar s = ($s) `fmap` M.lookup name specialVarActions
     positionalVar s = case readMaybe name of
@@ -139,15 +143,12 @@ getVar name = get >>= return . varOptions
 
     specialVarActions = M.fromList
         [ ("#", Just . show . length . ssArgs)
-        , ("?", Just . show . exitStatus . ssLastExitCode)
+        , ("?", Just . show . exitCodeToInt . ssLastExitCode)
         , ("-", Just . flagParameter . ssFlags)
         , ("$", Just . show . ssShellPid)
         , ("!", const Nothing)
         , ("0", Just . ssName)
         ] -- NOTE: "@" and "*" are handled in Expansion.hs
-
-    exitStatus ExitSuccess = 0
-    exitStatus (ExitFailure n) = n
 
 getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
@@ -155,16 +156,15 @@ getVarDefault name def = fromMaybe def `fmap` getVar name
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
 getVarEntry name = gets ssVars >>= return . M.lookup name
 
-setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
+setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ShellStatus
 setVarEntry name entry = do
     curr <- getVarEntry name
     case combineVarEntries curr entry of
         Just newVarEntry -> do
             modify $ \s -> s { ssVars = M.insert name newVarEntry $ ssVars s }
             success
-        Nothing -> do
-            errStrLn $ "var is read-only: " ++ name
-            failure
+        Nothing ->
+            shellError 1 $ "var is read-only: " ++ name
     -- TODO: shouldn't be able to set specials or positionals
 
 -- | combineVarEntries maybeExisting newVarEntry
@@ -194,7 +194,7 @@ combineVarEntries (Just (_, VarReadOnly, old)) (VarExported, _, Nothing) =
 -- Otherwise fail:
 combineVarEntries _ _ = Nothing
 
-unsetVarEntry :: (PosixLike m) => String -> ShellExec m ExitCode
+unsetVarEntry :: (PosixLike m) => String -> ShellExec m ShellStatus
 unsetVarEntry name = do
     curr <- getVarEntry name
     case curr of
@@ -202,9 +202,8 @@ unsetVarEntry name = do
         Just (_, VarReadWrite, _) -> do
             modify $ \s -> s { ssVars = M.delete name $ ssVars s }
             success
-        _ -> do
-            errStrLn $ "var is read-only: " ++ name
-            failure
+        _ ->
+            shellError 1 $ "var is read-only: " ++ name
 
 getEnv :: (Monad m, Functor m) => ShellExec m Bindings
 getEnv = getVars >>= return . foldr getBinding [] . M.toList
@@ -240,7 +239,7 @@ getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
 
 setLastExitCode :: (Monad m) => ExitCode -> ShellExec m ()
-setLastExitCode ec = modify $ (\s -> s { ssLastExitCode = ec })
+setLastExitCode ec = modify $ \s -> s { ssLastExitCode = ec }
 
 getSummary :: (Monad m, Functor m) =>
     String -> ShellExec m (Maybe CommandSummary)
@@ -254,8 +253,8 @@ primeShellState :: (PosixLike m) => ShellExec m ()
 primeShellState = do
     pid <- getProcessID
     e <- map asVar `fmap` getInitialEnvironment
-    modify $ (\s ->
-        s { ssShellPid = pid, ssVars = M.fromList e `M.union` ssVars s })
+    modify $ \s ->
+        s { ssShellPid = pid, ssVars = M.fromList e `M.union` ssVars s }
   where
     asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
 
@@ -317,4 +316,3 @@ instance PosixLike m => PosixLike (ShellExec m) where
         lift $ pipeline [ evalShell c s | c <- cs ]
     contentFd = liftT1 contentFd
 
-type ShellUtility m = Utility (ShellExec m)

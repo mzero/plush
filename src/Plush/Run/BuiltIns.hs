@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ where
 
 import qualified Data.HashMap.Strict as M
 
+import Plush.Run.BuiltIns.Control
 import Plush.Run.BuiltIns.Evaluation
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
@@ -34,8 +35,6 @@ import Plush.Run.BuiltIns.Trivial
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.WorkingDirectory
 import Plush.Run.Posix
-import Plush.Run.ShellExec
-import Plush.Run.Types
 
 
 -- | Special Built-In Utilities (§2.14)
@@ -44,23 +43,25 @@ import Plush.Run.Types
 -- shell.
 special :: (PosixLike m) => String -> Maybe (ShellUtility m)
 special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
-    [ ("complete", complete)
-    , ("context", context)
+    [ (".", dot)
     , (":", colon)
-    , ("set", set)
+    , ("break", break_)
+    , ("continue", continue_)
+    , ("eval", eval)
+    , ("exit", exit_)
     , ("export", export)
     , ("readonly", readonly)
-    , ("unset", unset)
+    , ("return", return_)
+    , ("set", set)
     , ("shift", shift)
-    , (".", dot)
-    , ("eval", eval)
+    , ("unset", unset)
+    -- plush extensions
+    , ("complete", complete)
+    , ("context", context)
     , ("plush-version", plushVersion)
     ]
     -- eventually will include:
-    -- break, continue, exec, exit
-    -- return, times, trap
-    -- plush extensions:
-    -- complete, context
+    -- exec, times, trap
 
 -- | Direct Built-In Utilities (§2.9.1)
 -- These are executed without PATH search. These commands may have side-effects
@@ -93,7 +94,7 @@ builtin = flip M.lookup $ M.fromList $ map (fixup unBuiltIn)
 -- | Utilities that should act as executables in the TestExec monad.
 -- These will be found by path search, and then "executed". TestExec arranges
 -- that when the corresponding files are exectued, these run.
-pseudoExecs :: (PosixLike m) => M.HashMap String (Utility m)
+pseudoExecs :: (PosixLike m) => M.HashMap String (RegularUtility m)
 pseudoExecs = M.fromList $ map (fixup unUtility) $
     alwaysBuiltin ++ otherBuiltins
 

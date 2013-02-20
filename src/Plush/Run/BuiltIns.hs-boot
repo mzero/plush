@@ -32,8 +32,8 @@ module Plush.Run.BuiltIns (
     )
 where
 
+import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
-import Plush.Run.ShellExec
 
 special :: (PosixLike m) => String -> Maybe (ShellUtility m)
 direct :: (PosixLike m) => String -> Maybe (ShellUtility m)

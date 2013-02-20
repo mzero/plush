@@ -63,9 +63,11 @@ dot = SpecialUtility . const $ Utility dotExec emptyAnnotate
                 bracket_
                     (unless (null args) $ setArgs args)
                     (unless (null args) $ setArgs oldArgs)
-                    (runFile fp)
+                    (handleReturn <$> runFile fp)
             else
                 runFirstFound args fps
 
-    runFirstFound _ [] = exitMsg 127 "script file not found"
-        -- TODO: should be a shell error, exiting non-interactive shells
+    runFirstFound _ [] = shellError 127 "script file not found"
+
+    handleReturn (StReturn ec) = StStatus ec
+    handleReturn st = st

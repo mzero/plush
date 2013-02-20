@@ -41,12 +41,12 @@ import Plush.Types
 -- | A function to run a utility. The `Bindings` are the variable assignments
 -- from the command line, since how they are interpreted depends on the type
 -- of utility being invoked.
-type UtilityRunner m = Bindings -> Args -> ShellExec m ExitCode
+type UtilityRunner m = Bindings -> Args -> ShellExec m ShellStatus
 
 -- | To run a shell function, a function to execute the body of the function
 -- must be passed in.
 type FunctionRunner m =
-    (FunctionBody -> ShellExec m ExitCode) -> UtilityRunner m
+    (FunctionBody -> ShellExec m ShellStatus) -> UtilityRunner m
 
 -- | The found action for a utility includes the function (`UtilityRunner`) for
 -- how to execute it. When the utility turns out to be a function, this code
@@ -111,7 +111,7 @@ commandSearch cmd
                           emptyAnnotate)
     externalExec fp = withEnvVars $ \args -> do
         env <- getEnv
-        execProcess fp env cmd args
+        StStatus <$> execProcess fp env cmd args
 
     functionExec fb ef = setShellVars (\args -> withFunContext args $ ef fb)
         -- §2.9.5 states that when executed, functions have the assignment
@@ -123,8 +123,8 @@ commandSearch cmd
     -- TODO: unsure if emptyAnnotate is correct here, or perhaps defaultAnnotate
 
 setShellVars :: (PosixLike m) =>
-                (Args -> ShellExec m ExitCode) ->
-                Bindings -> Args -> ShellExec m ExitCode
+                (Args -> ShellExec m ShellStatus) ->
+                Bindings -> Args -> ShellExec m ShellStatus
 setShellVars exec bindings args =
     untilFailureM setShellVar bindings `andThenM` exec args
   where
@@ -132,8 +132,8 @@ setShellVars exec bindings args =
         setVarEntry name (VarShellOnly, VarReadWrite, Just val)
 
 withEnvVars :: (PosixLike m) =>
-               (Args -> ShellExec m ExitCode) ->
-               Bindings -> Args -> ShellExec m ExitCode
+               (Args -> ShellExec m ShellStatus) ->
+               Bindings -> Args -> ShellExec m ShellStatus
 withEnvVars exec bindings args = do
     prev <- currentVarEntries bindings
     finally (setEnvVars bindings `andThenM` exec args)
@@ -143,7 +143,7 @@ currentVarEntries :: (PosixLike m) =>
     Bindings -> ShellExec m [(String, Maybe VarEntry)]
 currentVarEntries as = mapM (\(name, _) -> (name,) <$> getVarEntry name) as
 
-setEnvVars :: (PosixLike m) => Bindings -> ShellExec m ExitCode
+setEnvVars :: (PosixLike m) => Bindings -> ShellExec m ShellStatus
 setEnvVars bindings = untilFailureM setEnvVar bindings
   where
     setEnvVar (name, val) =

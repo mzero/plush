@@ -60,12 +60,12 @@ import Plush.Types.CommandSummary
 --       exec flags args = ...
 --       ...
 -- @
-stdSyntax :: (PosixLike m) =>
-    [OptionSpec a]                  -- ^ options
-    -> a                            -- ^ the initial option state
-    -> (a -> Args -> m ExitCode)    -- ^ utility function
-    -> CommandSummary   -- ^ summary information for error help messages
-    -> Utility m
+stdSyntax :: (PosixLike m, Returnable r) =>
+    [OptionSpec a]          -- ^ options
+    -> a                    -- ^ the initial option state
+    -> (a -> Args -> m r)   -- ^ utility function
+    -> CommandSummary       -- ^ summary information for error help messages
+    -> Utility m r
 stdSyntax options opt0 action summary = Utility exec anno
   where
     exec cmdLineArgs = case mconcat $ processArgs options cmdLineArgs of
@@ -88,7 +88,7 @@ perArg :: (PosixLike m) =>
 perArg cmd opts args = mapM (reportError . cmd opts) args >>= return . maximum
 
 -- | Catch any errors, report them, and return an error exit code.
-reportError :: (PosixLike m) => m ExitCode -> m ExitCode
+reportError :: (PosixLike m, Returnable r) => m r -> m r
 reportError act = act `catchAll`  (exitMsg 1 . show)
 
 
