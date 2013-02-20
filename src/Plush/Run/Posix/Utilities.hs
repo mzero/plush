@@ -181,7 +181,7 @@ andThen exitCode _ = exitCode
 
 -- | Sequence 'ExitCode'-returning operations until failure.
 andThenM :: (Monad m) => m ExitCode -> m ExitCode -> m ExitCode
-andThenM = liftM2 andThen
+andThenM a b = do e <- a; if e == ExitSuccess then b else return e
 
 -- | Sequence a list of 'ExitCode'-returning operations until failure.
 untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode

@@ -122,5 +122,20 @@ Note: actually does the wrong thing here, and restores the binding.
     # set | tr -d \'\" | fgrep nnn
     nnn=2
 
+failing variable commands stop after failure
+Note: Skipped in dash because the error message is inconsistent.
+Note: Skipped in sh and bash because they fail this test.
+    # export nnn=1
+    # export ooo=2
+    # export ppp=3
+    # readonly ooo
+    # unset nnn ooo ppp                         # SKIP sh dash bash
+    var is read-only: ooo
+    # env | fgrep nnn                           # SKIP sh dash bash
+    # env | fgrep ooo                           # SKIP sh dash bash
+    ooo=2
+    # env | fgrep ppp                           # SKIP sh dash bash
+    ppp=3
+
 pipe in last test gives an error
     # dummy=test
