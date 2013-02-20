@@ -59,25 +59,25 @@ parseInput s = do
     return pcr
 
 -- | Run a single command, parsed out of a string.
-runCommand :: (PosixLike m) => String -> ShellExec m (ExitCode, Maybe String)
+runCommand :: (PosixLike m) => String -> ShellExec m (ShellStatus, Maybe String)
 runCommand cmds = do
     pcr <- parseInput cmds
     case pcr of
-        Left errs -> errStrLn errs >> return (ExitFailure 125, Nothing)
-        Right (cl, rest) -> execute cl >>= return . (\ec -> (ec, Just rest))
+        Left errs -> shellError 125 errs >>= return . (\st -> (st, Nothing))
+        Right (cl, rest) -> execute cl >>= return . (\st -> (st, Just rest))
 
 -- | Run all the commands, parsed from a string
-runScript :: (PosixLike m) => String -> ShellExec m ExitCode
-runScript cmds0 = rc (ExitSuccess, Just cmds0)
+runScript :: (PosixLike m) => String -> ShellExec m ShellStatus
+runScript cmds0 = rc (StStatus ExitSuccess, Just cmds0)
   where
     rc (_, Just cmds) | not (null cmds) = runCommand cmds >>= rc
-    rc (ec, _) = setLastExitCode ec >> return ec
+    rc (st, _) = return st
 
 -- | Run all commands from a file.
-runFile :: (PosixLike m) => FilePath -> ShellExec m ExitCode
+runFile :: (PosixLike m) => FilePath -> ShellExec m ShellStatus
 runFile fp = do
     mscript <- (Just <$> readAllFile fp) `catchIOError` (\_ -> return Nothing)
     case mscript of
-        Nothing -> return $ ExitFailure 127
+        Nothing -> shellError 127 $ "file couldn't be read: " ++ fp
         Just script -> runScript script
 

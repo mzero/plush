@@ -41,7 +41,7 @@ eval = SpecialUtility . const $ Utility evalExec emptyAnnotate
     evalExec args = let cmdline = dropWhile isBlank $ intercalate " " args in
         if null cmdline
             then success
-            else fst <$> runCommand cmdline
+            else statusExitCode . fst <$> runCommand cmdline
 
 
 dot :: (PosixLike m) => SpecialUtility m
@@ -63,7 +63,7 @@ dot = SpecialUtility . const $ Utility dotExec emptyAnnotate
                 bracket_
                     (unless (null args) $ setArgs args)
                     (unless (null args) $ setArgs oldArgs)
-                    (runFile fp)
+                    (statusExitCode <$> runFile fp)
             else
                 runFirstFound args fps
 

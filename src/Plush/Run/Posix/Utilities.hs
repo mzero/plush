@@ -210,8 +210,8 @@ exitMsg e msg = do
     returnCode $ intToExitCode e
 
 -- | Exit from a utility because some feature is not (yet) supported.
-notSupported :: (PosixLike m) => String -> m ExitCode
-notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+notSupported :: (PosixLike m) => String -> m ShellStatus
+notSupported s = shellError 121 ("*** Not Supported: " ++ s)
 
 -- | Generate a shell error. This will exit a non-interactive shell.
 shellError :: (PosixLike m) => Int -> String -> m ShellStatus
@@ -226,11 +226,11 @@ shellSequence actions = go actions (StStatus ExitSuccess)
     go (a:as) (StStatus _) = a >>= go as
     go _ st = return st
 
--- | Sequence 'ExitCode'-returning operations until failure.
-andThenM :: (Monad m) => m ExitCode -> m ExitCode -> m ExitCode
-andThenM a b = do e <- a; if e == ExitSuccess then b else return e
+-- | Sequence 'ShellStatus'-returning operations until failure.
+andThenM :: (Monad m) => m ShellStatus -> m ShellStatus -> m ShellStatus
+andThenM a b = do e <- a; case e of (StStatus _) -> b ; _ -> return e
 
--- | Sequence a list of 'ExitCode'-returning operations until failure.
-untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
-untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
+-- | Sequence a list of 'ShellStatus'-returning operations until failure.
+untilFailureM :: (Monad m) => (a -> m ShellStatus) -> [a] -> m ShellStatus
+untilFailureM f as = foldl andThenM (return $ StStatus ExitSuccess) (map f as)
 

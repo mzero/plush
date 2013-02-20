@@ -152,16 +152,15 @@ getVarDefault name def = fromMaybe def `fmap` getVar name
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
 getVarEntry name = gets ssVars >>= return . M.lookup name
 
-setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ExitCode
+setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ShellStatus
 setVarEntry name entry = do
     curr <- getVarEntry name
     case combineVarEntries curr entry of
         Just newVarEntry -> do
             modify $ \s -> s { ssVars = M.insert name newVarEntry $ ssVars s }
             success
-        Nothing -> do
-            errStrLn $ "var is read-only: " ++ name
-            failure
+        Nothing ->
+            shellError 1 $ "var is read-only: " ++ name
     -- TODO: shouldn't be able to set specials or positionals
 
 -- | combineVarEntries maybeExisting newVarEntry
@@ -191,7 +190,7 @@ combineVarEntries (Just (_, VarReadOnly, old)) (VarExported, _, Nothing) =
 -- Otherwise fail:
 combineVarEntries _ _ = Nothing
 
-unsetVarEntry :: (PosixLike m) => String -> ShellExec m ExitCode
+unsetVarEntry :: (PosixLike m) => String -> ShellExec m ShellStatus
 unsetVarEntry name = do
     curr <- getVarEntry name
     case curr of
@@ -199,9 +198,8 @@ unsetVarEntry name = do
         Just (_, VarReadWrite, _) -> do
             modify $ \s -> s { ssVars = M.delete name $ ssVars s }
             success
-        _ -> do
-            errStrLn $ "var is read-only: " ++ name
-            failure
+        _ ->
+            shellError 1 $ "var is read-only: " ++ name
 
 getEnv :: (Monad m, Functor m) => ShellExec m Bindings
 getEnv = getVars >>= return . foldr getBinding [] . M.toList

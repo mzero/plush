@@ -106,7 +106,6 @@ Note: skipped on other shells as the error message is inconsistent
     # readonly lll=x
     # lll=y && echo succeed || echo fail        # ONLY plush
     var is read-only: lll
-    fail
 
 per-command exported variable bindings are restored after command exits
     # export mmm=1

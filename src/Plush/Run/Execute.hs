@@ -37,94 +37,89 @@ import Plush.Run.Types
 import Plush.Types
 
 
-execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode
+-- | Base case for compound operations (folds, etc.)
+-- > defaultSuccess = StStatus ExitSuccess
+defaultSuccess :: ShellStatus
+defaultSuccess = StStatus ExitSuccess
+
+
+execute :: (PosixLike m) => CommandList -> ShellExec m ShellStatus
 execute cl = do
     flags <- getFlags
     if F.noexec flags
         then success
         else execCommandList cl
 
-execCommandList :: (PosixLike m) => CommandList -> ShellExec m ExitCode
-execCommandList = foldM (const execCommandItem) ExitSuccess
+execCommandList :: (PosixLike m) => CommandList -> ShellExec m ShellStatus
+execCommandList = shellSequence . map listItem
+  where
+    listItem (ao, Sequential) = execAndOr ao
+    listItem (_, Background)  = notSupported "Background execution"
 
-execCommandItem :: (PosixLike m) => (AndOrList, Execution) -> ShellExec m ExitCode
-execCommandItem (ao, Sequential) = execAndOr ao
-execCommandItem (_, Background) = notSupported "Background execution"
+execAndOr :: (PosixLike m) => AndOrList -> ShellExec m ShellStatus
+execAndOr = foldM andOrItem defaultSuccess
+  where
+    andOrItem (StStatus ExitSuccess)     (AndThen, (s, p)) = execPipeSense s p
+    andOrItem (StStatus (ExitFailure _)) (OrThen, (s, p))  = execPipeSense s p
+    andOrItem e _ = return e
 
-execAndOr :: (PosixLike m) => AndOrList -> ShellExec m ExitCode
-execAndOr ao = foldM execAndOrItem ExitSuccess ao
-
-execAndOrItem :: (PosixLike m) => ExitCode -> (Connector, (Sense, Pipeline))
-    -> ShellExec m ExitCode
-execAndOrItem ExitSuccess     (AndThen, (s, p))          = execPipeSense s p
-execAndOrItem (ExitFailure e) (OrThen, (s, p))  | e /= 0 = execPipeSense s p
-execAndOrItem e _ = return e
-
-execPipeSense :: (PosixLike m) => Sense -> [Command] -> ShellExec m ExitCode
+execPipeSense :: (PosixLike m) => Sense -> [Command] -> ShellExec m ShellStatus
 execPipeSense s p = do
-    e <- sense s `fmap` execPipe p
-    setLastExitCode e
-    return e
+    st <- execPipe p
+    case st of
+        StStatus e -> let e' = sense s e
+                      in setLastExitCode e' >> return (StStatus e')
+        _ -> return st
+  where
+    sense Normal   e = e
+    sense Inverted ExitSuccess     = ExitFailure 1
+    sense Inverted (ExitFailure _) = ExitSuccess
 
-sense :: Sense -> ExitCode -> ExitCode
-sense Normal   e = e
-sense Inverted ExitSuccess = ExitFailure 1
-sense Inverted (ExitFailure e)
-    | e /= 0    = ExitSuccess
-    | otherwise = ExitFailure 1
-
-execPipe :: (PosixLike m) => [Command] -> ShellExec m ExitCode
-execPipe [] = exitMsg 120 "Emtpy pipeline"
+execPipe :: (PosixLike m) => [Command] -> ShellExec m ShellStatus
+execPipe [] = shellError 120 "Emtpy pipeline"
 execPipe [c] = execCommand c
-execPipe cs = pipeline $ map execCommand cs
+execPipe cs = StStatus <$> pipeline [statusExitCode <$> execCommand c | c <- cs]
 
-execCommand :: (PosixLike m) => Command -> ShellExec m ExitCode
-execCommand (Simple cmd) = execSimpleCommand cmd
-execCommand (Compound cmd redirects) =
-    execCompoundCommand cmd redirects
+execCommand :: (PosixLike m) => Command -> ShellExec m ShellStatus
+execCommand (Simple cmd)                 = execSimpleCommand cmd
+execCommand (Compound cmd redirects)     = execCompoundCommand cmd redirects
 execCommand (Function (Name _ name) fun) = setFun name fun >> success
 
-execSimpleCommand :: (PosixLike m) => SimpleCommand -> ShellExec m ExitCode
-execSimpleCommand (SimpleCommand [] _ (_:_)) =
-    notSupported "Bare redirection"
-execSimpleCommand (SimpleCommand [] as []) =
-    untilFailureM setShellVar as
+execSimpleCommand :: (PosixLike m) => SimpleCommand -> ShellExec m ShellStatus
 execSimpleCommand (SimpleCommand ws as rs) = do
     bindings <- forM as parseAssignment
-    expandAndSplit ws >>= withRedirection rs . execFields bindings
+    cmdAndArgs <- expandAndSplit ws
 
-execFields :: (PosixLike m) => Bindings -> [String] -> ShellExec m ExitCode
-execFields bindings (cmd:args) = do
     flags <- getFlags
-    when (F.xtrace flags) $ xtrace bindings cmd args
-    (_, ex, _) <- commandSearch cmd
-    case ex of
-        UtilityAction ua  -> ua bindings args
-        FunctionAction fa -> fa execFunctionBody bindings args
+    when (F.xtrace flags) $ xtrace bindings cmdAndArgs
 
-execFields _ [] = exitMsg 122 "Empty command"
+    withRedirection rs $ do
+        case cmdAndArgs of
+            [] -> untilFailureM (uncurry setShellVar) bindings
+            (cmd:args) -> do
+                (_, ex, _) <- commandSearch cmd
+                case ex of
+                    UtilityAction ua  -> ua bindings args
+                    FunctionAction fa -> fa execFunctionBody bindings args
+  where
+    parseAssignment (Assignment name w) = do
+        we <- byPathParts wordExpansionActive w
+        return (name, quoteRemoval we)
 
-xtrace :: (PosixLike m) => Bindings -> String -> [String] -> ShellExec m ()
-xtrace bindings cmd args = do
+xtrace :: (PosixLike m) => Bindings -> [String] -> ShellExec m ()
+xtrace bindings cmdAndArgs = do
     getVarDefault "PS4" "+ " >>= errStr -- TODO(mzero): should expand PS4
     errStrLn $ intercalate " " line
   where
-    line = map showBinding bindings ++ cmd : args
+    line = map showBinding bindings ++ cmdAndArgs
     showBinding (var,val) = var ++ '=' : val
 
-parseAssignment :: (PosixLike m) => Assignment -> ShellExec m (String, String)
-parseAssignment (Assignment name w) = (name,) <$> parseAssignmentValue w
+setShellVar :: (PosixLike m) => String -> String -> ShellExec m ShellStatus
+setShellVar name v = setVarEntry name (VarShellOnly, VarReadWrite, Just v)
 
-setShellVar :: (PosixLike m) => Assignment -> ShellExec m ExitCode
-setShellVar (Assignment name w) = do
-    v <- parseAssignmentValue w
-    setVarEntry name (VarShellOnly, VarReadWrite, Just v)
-
-parseAssignmentValue :: (PosixLike m) => Word -> ShellExec m String
-parseAssignmentValue w = quoteRemoval <$> byPathParts wordExpansionActive w
 
 execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
-    -> ShellExec m ExitCode
+    -> ShellExec m ShellStatus
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
     Subshell _cmds -> notSupported "Subshell"
@@ -135,21 +130,16 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     UntilLoop test body -> execLoop False test body
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
-    -> ShellExec m ExitCode
+    -> ShellExec m ShellStatus
 execFor _ Nothing _ = notSupported "missing 'in' means substitute $@"
 execFor (Name _ name) (Just words_) cmds = do
     setLastExitCode ExitSuccess
     expandAndSplit words_ >>= forLoop
   where
-    forLoop [] = getLastExitCode
-    forLoop (w:ws) = do
-        ok <- setVarEntry name (VarShellOnly, VarReadWrite, Just w)
-        case ok of
-            ExitSuccess -> execute cmds >> forLoop ws
-            e@(ExitFailure {}) -> return e
+    forLoop = runLoop True . map (\w -> (setShellVar name w, cmds))
 
 execCase :: (PosixLike m) =>
-    Word -> [([Word], Maybe CommandList)] -> ShellExec m ExitCode
+    Word -> [([Word], Maybe CommandList)] -> ShellExec m ShellStatus
 execCase word items = wordExpansionActive word >>= check items . quoteRemoval
   where
     check [] _ = success
@@ -164,24 +154,44 @@ execCase word items = wordExpansionActive word >>= check items . quoteRemoval
             else match ps w
 
 execIf :: (PosixLike m) =>
-    [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ExitCode
+    [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ShellStatus
 execIf [] Nothing = success
 execIf [] (Just e) = execute e
-execIf ((c,s):css) mElse = execute c >>= \ec ->
-    case ec of
-        ExitFailure n | n /= 0 -> execIf css mElse
-        _ -> execute s
+execIf ((c,s):css) mElse = execute c >>= \st ->
+    case st of
+        StStatus ExitSuccess     -> execute s
+        StStatus (ExitFailure _) -> execIf css mElse
+        _                        -> return st
 
 execLoop :: (PosixLike m) =>
-    Bool -> CommandList -> CommandList -> ShellExec m ExitCode
-execLoop loopWhen test body = go ExitSuccess
-  where
-    go lastEc = execute test >>= \ec ->
-        if loopWhen == isSuccess ec
-            then execute body >>= go
-            else return lastEc
+    Bool -> CommandList -> CommandList -> ShellExec m ShellStatus
+execLoop loopWhen test body = runLoop loopWhen $ repeat (execute test, body)
 
-execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
+
+runLoop :: (PosixLike m) =>
+    Bool -> [(ShellExec m ShellStatus, CommandList)] -> ShellExec m ShellStatus
+runLoop loopWhen = flip go defaultSuccess
+  where
+    go _ (StBreak n)        | n == 1 = return defaultSuccess
+                            | n > 1  = return (StBreak $ n - 1)
+                            | otherwise = shellError 120 "Bad break"
+
+    go as (StContinue n)    | n == 1 = go as defaultSuccess
+                            | n > 1  = return (StContinue $ n - 1)
+                            | otherwise = shellError 120 "Bad continue"
+
+    go ((pre,body):as) st@(StStatus _) = do
+        p <- pre
+        case p of
+            StStatus ec | loopWhen == isSuccess ec -> execute body >>= go as
+            _ -> return st
+
+    go _ st = return st
+
+
+
+execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ShellStatus
 execFunctionBody (FunctionBody body redirects) =
     execCompoundCommand body redirects
+
 

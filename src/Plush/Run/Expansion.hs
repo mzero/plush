@@ -160,10 +160,10 @@ parameterExpansion live name pmod
 
 
 commandSubstituion :: (PosixLike m) =>
-    ShellExec m ExitCode -> ShellExec m String
-commandSubstituion action = (process . snd) <$> captureStdout action
+    ShellExec m ShellStatus -> ShellExec m String
+commandSubstituion act = process <$> captureStdout (statusExitCode <$> act)
   where
-    process = trim "" . fromByteString
+    process = trim "" . fromByteString . snd
     trim _ "" = ""
     trim nls (c:cs)
         | c == '\n' = trim (c:nls) cs

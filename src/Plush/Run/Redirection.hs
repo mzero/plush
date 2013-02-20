@@ -26,7 +26,7 @@ import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities (exitMsg, toByteString)
+import Plush.Run.Posix.Utilities (shellError, toByteString)
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types
@@ -91,13 +91,13 @@ mkPrim (RedirectHere maybeFd hereDoc _w) = Right . RedirHere fd <$> content
             HereDocParsed ls -> contentExpansion $ unlines ls
             HereDocMissing -> return []
 
-withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ExitCode
-    -> ShellExec m ExitCode
+withRedirection :: (PosixLike m) => [Redirect] -> ShellExec m ShellStatus
+    -> ShellExec m ShellStatus
 withRedirection [] act = act
 withRedirection (r:rs) act = do
     errOrPrim <- mkPrim r
     case errOrPrim of
-        Left err -> exitMsg 125 err
+        Left err -> shellError 125 err
 
         Right (RedirFile destFd fp (om, mfm, off)) -> saveAway destFd $ do
             fileFd <- openFd fp om mfm off

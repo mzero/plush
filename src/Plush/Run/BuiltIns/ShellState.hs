@@ -190,9 +190,9 @@ unset = SpecialUtility $ stdSyntax options "" go
   where
     options = [ flag 'v', flag 'f' ]
 
-    go "v" names = untilFailureM unsetVarEntry names
+    go "v" names = statusExitCode <$> untilFailureM unsetVarEntry names
     go "f" names = mapM_ unsetFun names >> success
-    go _flags names = untilFailureM unsetVarEntry names
+    go _flags names = statusExitCode <$> untilFailureM unsetVarEntry names
                       `andThenM` (mapM_ unsetFun names >> success)
 
 modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options "" go
@@ -200,7 +200,7 @@ modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options ""
     options = [ flag 'p' ]  -- echo exports
 
     go "p" [] = showVars >> success
-    go _flags nameVals = untilFailureM defVar nameVals
+    go _flags nameVals = statusExitCode <$> untilFailureM defVar nameVals
 
     showVars = getVars >>= mapM_ (outStr . varFmt) . sort . M.toList
     varFmt (n, ve@(_, _, val)) | hasModifier ve =
