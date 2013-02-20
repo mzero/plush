@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,8 @@ import qualified Data.HashMap.Lazy as HM
 import qualified Data.Text as T
 import System.Exit
 import qualified System.Posix.Signals as S
+
+import Plush.Run.Types (exitCodeToInt, intToExitCode)
 
 
 -- | Requests to the shell thread are given an identifier by the submitter.
@@ -148,21 +150,18 @@ instance FromJSON OutputItem where
 -- @{ running: false, exitcode: /s/ }@
 newtype FinishedItem = FinishedItem ExitCode
 instance ToJSON FinishedItem where
-    toJSON (FinishedItem ExitSuccess) = exitObject 0
-    toJSON (FinishedItem (ExitFailure i)) = exitObject i
+    toJSON (FinishedItem ec) = exitObject $ exitCodeToInt ec
 instance FromJSON FinishedItem where
     parseJSON (Object v) = do
         r <- v .: "running"
         if r
             then mzero
-            else FinishedItem . asExitCode <$> v .: "exitcode"
+            else FinishedItem . intToExitCode <$> v .: "exitcode"
     parseJSON _ = mzero
 
 exitObject :: Int -> Value
 exitObject i = object [ "running" .= False, "exitcode" .= i ]
 
-asExitCode :: Int -> ExitCode
-asExitCode i = if i == 0 then ExitSuccess else ExitFailure i
 
 -- | Elements of a run response.
 -- JSON serialized simply as each variant's JSON serialization

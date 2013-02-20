@@ -42,6 +42,7 @@ import Plush.Run.Posix.Utilities
 import {-# SOURCE #-} Plush.Run.Execute (execute)   -- see Execute.hs-boot
 import Plush.Run.Script (runScript)
 import Plush.Run.ShellExec
+import Plush.Run.Types
 import Plush.Types
 
 -- | Like 'expandActive', but preforms the final quote removal as well

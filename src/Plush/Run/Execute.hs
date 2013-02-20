@@ -180,8 +180,6 @@ execLoop loopWhen test body = go ExitSuccess
         if loopWhen == isSuccess ec
             then execute body >>= go
             else return lastEc
-    isSuccess (ExitFailure n) | n /= 0 = False
-    isSuccess _ = True
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ExitCode
 execFunctionBody (FunctionBody body redirects) =

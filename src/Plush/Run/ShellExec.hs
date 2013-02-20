@@ -139,15 +139,12 @@ getVar name = get >>= return . varOptions
 
     specialVarActions = M.fromList
         [ ("#", Just . show . length . ssArgs)
-        , ("?", Just . show . exitStatus . ssLastExitCode)
+        , ("?", Just . show . exitCodeToInt . ssLastExitCode)
         , ("-", Just . flagParameter . ssFlags)
         , ("$", Just . show . ssShellPid)
         , ("!", const Nothing)
         , ("0", Just . ssName)
         ] -- NOTE: "@" and "*" are handled in Expansion.hs
-
-    exitStatus ExitSuccess = 0
-    exitStatus (ExitFailure n) = n
 
 getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name

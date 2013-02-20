@@ -41,10 +41,18 @@ module Plush.Run.Posix.Utilities (
     doesFileExist, doesDirectoryExist,
     -- * Path simplification
     simplifyPath, reducePath,
-    -- * 'ExitCode' utilities
-    andThen, andThenM, untilFailureM,
+
+    -- * Utility exits
+    Returnable(..),
+    success, failure,
+    exitMsg,
+    notSupported,
+    shellError,
+    -- ** Monadic combintors
+    shellSequence, andThenM, untilFailureM,
 ) where
 
+import Control.Applicative ((<$>))
 import Control.Monad.Exception (bracket, catchIOError)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
@@ -59,6 +67,7 @@ import System.FilePath
 import qualified System.Posix.Files as P
 
 import Plush.Run.Posix
+import Plush.Run.Types
 
 -- | String like classes that can be used with 'readAll' and friends.
 -- Instances for strings use lenient UTF-8 decoding.
@@ -172,11 +181,50 @@ reducePath = simp [] . splitDirectories
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
 
--- | Returns the first 'ExitCode' that fails. (Could have been a
--- | Monoid if we owned ExitCode.)
-andThen :: ExitCode -> ExitCode -> ExitCode
-andThen ExitSuccess exitCode = exitCode
-andThen exitCode _ = exitCode
+
+
+class Returnable e where
+    returnCode :: (Monad m) => ExitCode -> m e
+
+instance Returnable ExitCode where
+    returnCode = return
+
+instance Returnable ShellStatus where
+    returnCode = return . StStatus
+
+-- | Common return from utilities when successful.
+-- > return ExitSuccess
+success :: (Monad m, Returnable e) => m e
+success = returnCode ExitSuccess
+
+-- | Common return from utilities when failed.
+-- > return $ ExitFailure 1
+failure :: (Monad m, Returnable e) => m e
+failure = returnCode $ ExitFailure 1
+
+-- | Exit from a utility, printing a message on 'stderr'. The first argument
+-- is the exit status value.
+exitMsg :: (PosixLike m, Returnable e) => Int -> String -> m e
+exitMsg e msg = do
+    errStrLn msg `catchIOError` (\_ -> return ())
+    returnCode $ intToExitCode e
+
+-- | Exit from a utility because some feature is not (yet) supported.
+notSupported :: (PosixLike m) => String -> m ExitCode
+notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+
+-- | Generate a shell error. This will exit a non-interactive shell.
+shellError :: (PosixLike m) => Int -> String -> m ShellStatus
+shellError e msg = StError <$> exitMsg e msg
+
+-- | Perform each action in turn, stopping if one returns anything other than
+-- a 'StStatus' value. Return the result of the last action executed. If the
+-- list is empty, returns @StStatus ExitSuccess@.
+shellSequence :: (Monad m) => [m ShellStatus] -> m ShellStatus
+shellSequence actions = go actions (StStatus ExitSuccess)
+  where
+    go (a:as) (StStatus _) = a >>= go as
+    go _ st = return st
 
 -- | Sequence 'ExitCode'-returning operations until failure.
 andThenM :: (Monad m) => m ExitCode -> m ExitCode -> m ExitCode
