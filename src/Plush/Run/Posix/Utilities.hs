@@ -45,7 +45,6 @@ module Plush.Run.Posix.Utilities (
     andThen, andThenM, untilFailureM,
 ) where
 
-import Control.Monad (liftM2)
 import Control.Monad.Exception (bracket, catchIOError)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
