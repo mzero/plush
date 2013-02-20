@@ -192,6 +192,7 @@ runLoop loopWhen = flip go defaultSuccess
 
 execFunctionBody :: (PosixLike m) => FunctionBody -> ShellExec m ShellStatus
 execFunctionBody (FunctionBody body redirects) =
-    execCompoundCommand body redirects
-
-
+    handleReturn <$> execCompoundCommand body redirects
+  where
+    handleReturn (StReturn ec) = StStatus ec
+    handleReturn st = st

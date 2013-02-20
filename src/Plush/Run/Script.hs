@@ -70,7 +70,7 @@ runCommand cmds = do
 runScript :: (PosixLike m) => String -> ShellExec m ShellStatus
 runScript cmds0 = rc (StStatus ExitSuccess, Just cmds0)
   where
-    rc (_, Just cmds) | not (null cmds) = runCommand cmds >>= rc
+    rc (StStatus _, Just cmds) | not (null cmds) = runCommand cmds >>= rc
     rc (st, _) = return st
 
 -- | Run all commands from a file.

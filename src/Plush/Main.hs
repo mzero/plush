@@ -286,6 +286,7 @@ runRepl = runInputT defaultSettings . repl
             Just input -> do
                 (s, runner'') <- liftIO (run (runCommand input) runner')
                 case s of
+                    (StExit ec, _) -> liftIO $ exitWith ec
                     (_, Just leftOver) | not $ null leftOver ->
                         outputStrLn ("Didn't use whole input: " ++ leftOver)
                     _ -> return ()

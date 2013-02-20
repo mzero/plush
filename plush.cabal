@@ -72,6 +72,7 @@ Library
     Plush.Resource
     Plush.Run.Annotate
     Plush.Run.BuiltIns
+    Plush.Run.BuiltIns.Control
     Plush.Run.BuiltIns.Evaluation
     Plush.Run.BuiltIns.FileSystem
     Plush.Run.BuiltIns.Grep

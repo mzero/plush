@@ -24,6 +24,7 @@ where
 
 import qualified Data.HashMap.Strict as M
 
+import Plush.Run.BuiltIns.Control
 import Plush.Run.BuiltIns.Evaluation
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
@@ -42,23 +43,25 @@ import Plush.Run.Posix
 -- shell.
 special :: (PosixLike m) => String -> Maybe (ShellUtility m)
 special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
-    [ ("complete", complete)
-    , ("context", context)
+    [ (".", dot)
     , (":", colon)
-    , ("set", set)
+    , ("break", break_)
+    , ("continue", continue_)
+    , ("eval", eval)
+    , ("exit", exit_)
     , ("export", export)
     , ("readonly", readonly)
-    , ("unset", unset)
+    , ("return", return_)
+    , ("set", set)
     , ("shift", shift)
-    , (".", dot)
-    , ("eval", eval)
+    , ("unset", unset)
+    -- plush extensions
+    , ("complete", complete)
+    , ("context", context)
     , ("plush-version", plushVersion)
     ]
     -- eventually will include:
-    -- break, continue, exec, exit
-    -- return, times, trap
-    -- plush extensions:
-    -- complete, context
+    -- exec, times, trap
 
 -- | Direct Built-In Utilities (§2.9.1)
 -- These are executed without PATH search. These commands may have side-effects

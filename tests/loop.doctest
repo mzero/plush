@@ -24,14 +24,16 @@ tests of parsing - none of these produce output!
     + done
 
 test looping behavior
-N.B.: Don't use the [ ] form of test: It is broken on Mac OS X & OpenBSD (!)
-    # set true uno true dos true tres false cuatro true cinco
+    # set true uno   true dos   true tres   false cuatro   true cinco
     # while $1; do echo $2; shift 2; done
     uno
     dos
     tres
-    # set false moja false mbili false tatu true nne false tano
+
+    # set false moja   false mbili   false tatu   true nne   false tano
     # until $1; do echo $2; shift 2; done
     moja
     mbili
     tatu
+
+

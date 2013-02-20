@@ -103,8 +103,9 @@ export readonly unassigned environment var
 
 can't set readonly shell variable
 Note: skipped on other shells as the error message is inconsistent
+TODO(mzero): can't test this now that plush ALSO exits on shell error!
     # readonly lll=x
-    # lll=y && echo succeed || echo fail        # ONLY plush
+    # lll=y && echo succeed || echo fail        # SKIP
     var is read-only: lll
 
 per-command exported variable bindings are restored after command exits
