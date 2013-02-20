@@ -124,11 +124,13 @@ data Annotation = ExpandedTo String
     -- TODO: some of these should probably be Text rather than String
 
 
-data Utility m = Utility
-    { utilExecute  :: Args -> m ExitCode
+
+data Utility m e = Utility
+    { utilExecute  :: Args -> m e
     , utilAnnotate :: Args -> m [[Annotation]]
 --  , utilComplete :: Args -> m Completion
     }
+
 
 emptyAnnotate :: (Monad m) => Args -> m [[Annotation]]
 emptyAnnotate _ = return []

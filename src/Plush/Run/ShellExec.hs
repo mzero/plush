@@ -32,8 +32,6 @@ module Plush.Run.ShellExec (
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
     primeShellState,
-
-    ShellUtility,
     )
     where
 
@@ -312,4 +310,3 @@ instance PosixLike m => PosixLike (ShellExec m) where
         lift $ pipeline [ evalShell c s | c <- cs ]
     contentFd = liftT1 contentFd
 
-type ShellUtility m = Utility (ShellExec m)

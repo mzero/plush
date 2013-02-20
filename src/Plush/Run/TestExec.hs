@@ -41,6 +41,7 @@ import System.FilePath
 import System.IO.Error
 
 import Plush.Run.BuiltIns
+import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
 import Plush.Run.Types
@@ -73,7 +74,7 @@ fsFileExists fs dp n = maybe False isFile $ fsItemEntry fs dp n
     isFile (FileItem _) = True
     isFile _ = False
 
-fsExecutable :: FileSystem -> DirPath -> Name -> Maybe (Utility TestExec)
+fsExecutable :: FileSystem -> DirPath -> Name -> Maybe (RegularUtility TestExec)
 fsExecutable fs dp n = fsItemEntry fs dp n >>= iNode >>= getExec
   where
     iNode (FileItem i) = I.lookup i (fsStore fs)
@@ -155,7 +156,7 @@ initialFileSystem = foldl' (flip ($)) rootFS $
     addExec n fs = fsAddINode IExec fs "/bin" n
 
 
-testExecs :: M.HashMap String (Utility TestExec)
+testExecs :: M.HashMap String (RegularUtility TestExec)
 testExecs = pseudoExecs
 
 

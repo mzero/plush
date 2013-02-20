@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,8 +34,6 @@ import Plush.Run.BuiltIns.Trivial
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.WorkingDirectory
 import Plush.Run.Posix
-import Plush.Run.ShellExec
-import Plush.Run.Types
 
 
 -- | Special Built-In Utilities (§2.14)
@@ -93,7 +91,7 @@ builtin = flip M.lookup $ M.fromList $ map (fixup unBuiltIn)
 -- | Utilities that should act as executables in the TestExec monad.
 -- These will be found by path search, and then "executed". TestExec arranges
 -- that when the corresponding files are exectued, these run.
-pseudoExecs :: (PosixLike m) => M.HashMap String (Utility m)
+pseudoExecs :: (PosixLike m) => M.HashMap String (RegularUtility m)
 pseudoExecs = M.fromList $ map (fixup unUtility) $
     alwaysBuiltin ++ otherBuiltins
 

@@ -94,7 +94,7 @@ commandSearch cmd
     search lkup processBindings fc alt =
         maybe alt (\util ->
             return (fc,
-                    UtilityAction (processBindings $ (fmap StStatus) . utilExecute util),
+                    UtilityAction (processBindings $ utilExecute util),
                     utilAnnotate util))
             $ lkup cmd
 

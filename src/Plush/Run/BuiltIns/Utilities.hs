@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 module Plush.Run.BuiltIns.Utilities (
 
     -- $types
+    RegularUtility, ShellUtility,
+
     SpecialUtility(..), DirectUtility(..), BuiltInUtility(..),
     unSpecial, unDirect, unBuiltIn, unUtility,
 
@@ -39,12 +41,16 @@ import Plush.Types.CommandSummary
 -- built in utilities is @'ShellUtility' m@. These types wrap that and form
 -- a promise for how the utility operates.
 
+type RegularUtility m = Utility m ExitCode
+type ShellUtility m = Utility (ShellExec m) ShellStatus
+
 
 -- | Special Built-In Utilities (§2.14)
 -- These found without PATH search, and execute directly within the shell.
 -- In particular, variable assignments made with these commands affect the
 -- shell.
-newtype SpecialUtility m = SpecialUtility (CommandSummary -> ShellUtility m)
+newtype SpecialUtility m =
+    SpecialUtility (CommandSummary -> Utility (ShellExec m) ShellStatus)
 
 -- | Direct Built-In Utilities (§2.9.1)
 -- These are executed without PATH search. These commands may have side-effects
@@ -52,14 +58,16 @@ newtype SpecialUtility m = SpecialUtility (CommandSummary -> ShellUtility m)
 -- but are invoked as if they were external commands. In particular, variable
 -- assignments only affect the environment variables available to these commands
 -- and not the shell's variables.
-newtype DirectUtility m = DirectUtility (CommandSummary -> ShellUtility m)
+newtype DirectUtility m =
+    DirectUtility (CommandSummary -> Utility (ShellExec m) ExitCode)
 
 -- | Regular Built-In Utilities (§2.9.1)
 -- If PATH search succeeds in finding an executable for these, then the built-in
 -- version may be executed instead. However, it is run in an environment
 -- equivalent to one the executable would have run in. These built-ins can't
 -- affect the shell state.
-newtype BuiltInUtility m = BuiltInUtility (CommandSummary -> Utility m)
+newtype BuiltInUtility m =
+    BuiltInUtility (CommandSummary -> Utility m ExitCode)
 
 
 
@@ -67,28 +75,30 @@ unSpecial :: (PosixLike m) => String -> SpecialUtility m -> ShellUtility m
 unSpecial name (SpecialUtility csu) = bindSummary name csu
 
 unDirect :: (PosixLike m) => String -> DirectUtility m -> ShellUtility m
-unDirect name (DirectUtility csu) = bindSummary name csu
+unDirect name (DirectUtility csu) = wrapReturn $ bindSummary name csu
 
 unBuiltIn :: (PosixLike m) => String -> BuiltInUtility m -> ShellUtility m
-unBuiltIn name (BuiltInUtility csu) = bindSummary name csu'
+unBuiltIn name (BuiltInUtility csu) = wrapReturn $ bindSummary name csu'
   where
     csu' summ = case csu summ of
         (Utility e a) -> Utility (runLifted e) (runLifted a)
     runLifted exec args = lift $ exec args
 
-unUtility :: (PosixLike m) => String -> BuiltInUtility m -> Utility m
+unUtility :: (PosixLike m) => String -> BuiltInUtility m -> RegularUtility m
 unUtility name (BuiltInUtility csu) = bindName name csu
 
 bindSummary :: (PosixLike m) =>
-    String -> (CommandSummary -> ShellUtility m) -> ShellUtility m
+    String -> (CommandSummary -> Utility (ShellExec m) e) -> Utility (ShellExec m) e
 bindSummary name csu = Utility (bind utilExecute) (bind utilAnnotate)
   where
     bind f args = getSummary name >>= ($args) . f . csu . fromMaybe s0
     s0 = CommandSummary (T.pack name) T.empty []
 
 bindName :: (PosixLike m) =>
-    String -> (CommandSummary -> Utility m) -> Utility m
+    String -> (CommandSummary -> Utility m e) -> Utility m e
 bindName name csu = csu s0
   where
     s0 = CommandSummary (T.pack name) T.empty []
 
+wrapReturn :: (Monad m) => Utility m ExitCode -> Utility m ShellStatus
+wrapReturn (Utility e a) = Utility (\args -> e args >>= return . StStatus) a
