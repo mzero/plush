@@ -79,10 +79,16 @@ data ShellState = ShellState
 
 initialShellState :: ShellState
 initialShellState = ShellState
-    { ssShellPid = 0, ssName = "plush", ssArgs = [], ssFlags = defaultFlags,
-      ssVars = M.empty, ssFuns = M.empty, ssAliases = M.empty,
-      ssLastExitCode = ExitSuccess, ssSummaries = M.empty }
-
+    { ssShellPid = 0
+    , ssName = "plush"
+    , ssArgs = []
+    , ssFlags = defaultFlags
+    , ssVars = M.empty
+    , ssFuns = M.empty
+    , ssAliases = M.empty
+    , ssLastExitCode = ExitSuccess
+    , ssSummaries = M.empty
+    }
 
 -- Shell Execution Monad
 
@@ -108,27 +114,27 @@ getName :: (Monad m) => ShellExec m String
 getName = gets ssName
 
 setName :: (Monad m) => String -> ShellExec m ()
-setName name = modify $ (\s -> s { ssName = name })
+setName name = modify $ \s -> s { ssName = name }
 
 getArgs :: (Monad m) => ShellExec m [String]
 getArgs = gets ssArgs
 
 setArgs :: (Monad m) => [String] -> ShellExec m ()
-setArgs args = modify $ (\s -> s { ssArgs = args })
+setArgs args = modify $ \s -> s { ssArgs = args }
 
 getFlags :: (Monad m) => ShellExec m Flags
 getFlags = gets ssFlags
 
 setFlags :: (Monad m) => Flags -> ShellExec m ()
-setFlags flags = modify $ (\s -> s { ssFlags = flags })
+setFlags flags = modify $ \s -> s { ssFlags = flags }
 
 getVars :: (Monad m, Functor m) => ShellExec m Vars
 getVars = gets ssVars
 
 getVar :: (Monad m, Functor m) => String -> ShellExec m (Maybe String)
-getVar name = get >>= return . varOptions
+getVar name = gets varOptions
   where
-    varOptions s = join $ msum $ [normalVar s, specialVar s, positionalVar s]
+    varOptions s = join $ msum [normalVar s, specialVar s, positionalVar s]
     normalVar s = (Just . varValue) `fmap` M.lookup name (ssVars s)
     specialVar s = ($s) `fmap` M.lookup name specialVarActions
     positionalVar s = case readMaybe name of
@@ -233,7 +239,7 @@ getLastExitCode :: (Monad m) => ShellExec m ExitCode
 getLastExitCode = gets ssLastExitCode
 
 setLastExitCode :: (Monad m) => ExitCode -> ShellExec m ()
-setLastExitCode ec = modify $ (\s -> s { ssLastExitCode = ec })
+setLastExitCode ec = modify $ \s -> s { ssLastExitCode = ec }
 
 getSummary :: (Monad m, Functor m) =>
     String -> ShellExec m (Maybe CommandSummary)
@@ -247,8 +253,8 @@ primeShellState :: (PosixLike m) => ShellExec m ()
 primeShellState = do
     pid <- getProcessID
     e <- map asVar `fmap` getInitialEnvironment
-    modify $ (\s ->
-        s { ssShellPid = pid, ssVars = M.fromList e `M.union` ssVars s })
+    modify $ \s ->
+        s { ssShellPid = pid, ssVars = M.fromList e `M.union` ssVars s }
   where
     asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
 
