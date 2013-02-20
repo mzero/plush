@@ -30,6 +30,7 @@ where
 
 import Plush.Run.Posix
 import Plush.Run.ShellExec
+import Plush.Run.Types
 import Plush.Types
 
 execute :: (PosixLike m) => CommandList -> ShellExec m ExitCode

@@ -146,9 +146,6 @@ getVar name = get >>= return . varOptions
         , ("0", Just . ssName)
         ] -- NOTE: "@" and "*" are handled in Expansion.hs
 
-    exitStatus ExitSuccess = 0
-    exitStatus (ExitFailure n) = n
-
 getVarDefault :: (Monad m, Functor m) => String -> String -> ShellExec m String
 getVarDefault name def = fromMaybe def `fmap` getVar name
 

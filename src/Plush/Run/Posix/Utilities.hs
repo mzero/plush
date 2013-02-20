@@ -41,7 +41,16 @@ module Plush.Run.Posix.Utilities (
     doesFileExist, doesDirectoryExist,
     -- * Path simplification
     simplifyPath, reducePath,
+
     -- * 'ExitCode' utilities
+    -- $exit
+    asExitCode, exitStatus,
+    isSuccess, isFailure,
+    -- ** Utility exits
+    success, failure,
+    exitMsg,
+    notSupported,
+    -- ** Monadic combintors
     andThen, andThenM, untilFailureM,
 ) where
 
@@ -173,6 +182,48 @@ reducePath = simp [] . splitDirectories
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
 
+
+
+{- $exit
+POSIX has a concept of "Exit Status", which is a numeric value that process
+exits with at completion. It is limited to the range 0..255 by the spec.
+The shell and other utilities sometimes treat 0 as "success" and other values
+as "failure".
+
+Haskell's "System.Exit" defines the type 'ExitCode', which plush reuses.
+However, this type is slightly more general, in that it esparates the
+notion of success and failure from the numeric code (which is only supplied
+on failure). This leads to the unfortunate possibility of the value
+@(ExitFailure 0)@. Is this success or failure in a POSIX context?
+
+In the interest of harmony with Haskell's common usage, plush uses 'ExitCode'
+to reprsent "Exit Status". Further, to make code clear and consistent, it
+only distinguishes success from failure based on the constructor.
+-}
+
+-- | Convert a numeric exit status to an 'ExitCode'. Handles selection of the
+-- correct constructor. It is acceptable, and preferable, to apply 'ExitFailure'
+-- to non-zero constant. Otherwise, use this function.
+asExitCode :: Int -> ExitCode
+asExitCode i = if i == 0 then ExitSuccess else ExitFailure i
+
+-- | Extract the numeric exit status from an 'ExitCode'
+exitStatus :: ExitCode -> Int
+exitStatus ExitSuccess = 0
+exitStatus (ExitFailure n) = n
+
+-- | Convience function. It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isSuccess :: ExitCode -> Bool
+isSuccess ExitSuccess = True
+isSuccess (ExitFailure _) = False
+
+-- | Convience function.  It is acceptable to just case or match on the
+-- constructors of 'ExitCode' alone.
+isFailure :: ExitCode -> Bool
+isFailure = not . isSuccess
+
+
 -- | Returns the first 'ExitCode' that fails. (Could have been a
 -- | Monoid if we owned ExitCode.)
 andThen :: ExitCode -> ExitCode -> ExitCode
@@ -186,4 +237,27 @@ andThenM a b = do e <- a; if e == ExitSuccess then b else return e
 -- | Sequence a list of 'ExitCode'-returning operations until failure.
 untilFailureM :: (Monad m) => (a -> m ExitCode) -> [a] -> m ExitCode
 untilFailureM f as = foldr andThenM (return ExitSuccess) (map f as)
+
+
+-- | Common return from utilities when successful.
+-- > return ExitSuccess
+success :: (Monad m) => m ExitCode
+success = return ExitSuccess
+
+-- | Common return from utilities when failed.
+-- > return $ ExitFailure 1
+failure :: (Monad m) => m ExitCode
+failure = return $ ExitFailure 1
+
+-- | Exit from a utility, printing a message on 'stderr'. The first argument
+-- is the exit status value.
+exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
+exitMsg e msg = do
+    errStrLn msg `catchIOError` (\_ -> return ())
+    return $ asExitCode e
+
+-- | Exit from a utility because some feature is not (yet) supported.
+notSupported :: (PosixLike m) => String -> m ExitCode
+notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+
 

@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@ limitations under the License.
 
 module Plush.Run.Types (
     Args,
-    success, failure,
-    exitMsg,
-    notSupported,
+    Bindings,
+    ExitCode(..),   -- rexported from System.Exit
 
     FoundCommand(..),
     Annotation(..),
@@ -28,29 +27,14 @@ module Plush.Run.Types (
     )
 where
 
-import Control.Monad.Exception (catchIOError)
 import qualified Data.Text as T
+import System.Exit
 
-import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
 import Plush.Types.CommandSummary
 
 
 type Args = [String]
-
-success :: (Monad m) => m ExitCode
-success = return ExitSuccess
-
-failure :: (Monad m) => m ExitCode
-failure = return $ ExitFailure 1
-
-exitMsg :: (PosixLike m) => Int -> String -> m ExitCode
-exitMsg e msg = do
-    errStrLn msg `catchIOError` (\_ -> return ())
-    return $ if (e == 0) then ExitSuccess else ExitFailure e
-
-notSupported :: (PosixLike m) => String -> m ExitCode
-notSupported s = exitMsg 121 ("*** Not Supported: " ++ s)
+type Bindings = [(String, String)]
 
 
 -- | The result of searching for a command. See "Plush.Run.BuiltIns" for
