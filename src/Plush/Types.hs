@@ -122,7 +122,7 @@ data WordPart = Bare String
               | Parameter String ParameterModifier
               | Commandsub CommandList
               | Backquoted String
-              | Arithmetic Word
+              | Arithmetic Parts
               | Expanded String
               | IFS String
     deriving (Eq, Show)
@@ -158,7 +158,7 @@ partText (Parameter n mm) = "${" ++ modPre mm ++ n ++ modPost mm ++ "}"
 
 partText (Commandsub _cl) = "$(" ++ "--command substituion--" ++ ")"
 partText (Backquoted s) = "`" ++ s ++ "`"
-partText (Arithmetic wd) = "$((" ++ wordText wd ++ "))"
+partText (Arithmetic ps) = "$((" ++ concatMap partText ps ++ "))"
 
 partText (Expanded s) = s
 partText (IFS s) = s

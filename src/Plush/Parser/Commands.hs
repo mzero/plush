@@ -98,10 +98,10 @@ for_clause = tok_for *> do
     -- Apply rule 5 for 'name', but basically it just means it has to look
     -- like a name and not any old word (name requires a more restricted
     -- character set).
-    name <- tok_name <* linebreak
+    var <- tok_name <* linebreak
     words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
     doGroup <- do_group
-    return $ ForLoop name words_ doGroup
+    return $ ForLoop var words_ doGroup
 
 case_clause :: ShellParser CompoundCommand
 case_clause = tok_case *> do

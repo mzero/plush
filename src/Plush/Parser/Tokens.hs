@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Plush.Parser.Tokens (
     whitespace,
 
@@ -37,7 +39,8 @@ module Plush.Parser.Tokens (
     tok_esac, tok_while, tok_until, tok_for, tok_in,
     reservedWords,
 
-    content
+    content,
+    name
     )
 where
 
@@ -81,12 +84,10 @@ tok_word = tokenize . locatedWord $
 tok_name :: ShellParser Name
 tok_name = tokenize $ do
     start <- originalSourceColumn
-    x <- satisfy $ \c -> Char.isAscii c && (Char.isLetter c || c == '_')
-    xs <- many $ satisfy $ \c ->
-        Char.isAscii c && (Char.isLetter c || Char.isDigit c || c == '_')
+    n <- name
     end <- originalSourceColumn
     let loc = Span start end
-    return $ Name loc (x:xs)
+    return $ Name loc n
 
 backslash :: ShellParser WordPart
 backslash = char '\\' *> (Backslashed <$> anyChar)
@@ -115,8 +116,8 @@ dollar = char '$' *> ( parameter <|> arithmetic <|> subcommand <|> variable )
         <|>
         (Parameter <$> variableName <*> option PModNone modification)
 
-    arithmetic = between (try $ string "((") (string "))") $
-        Arithmetic <$> wordContent (string "))")
+    arithmetic = (try $ string "((") >>
+        Arithmetic . concat <$> manyTill arithmeticContent (string "))")
 
     subcommand = between (char '(') (char ')') $
         Commandsub <$> complete_command
@@ -163,6 +164,18 @@ wordContent endP = locatedWord bits
     bits = (lookAhead (try endP) >> return []) <|> liftM2 (:) bit bits
     bit = (backslash <|> singlequote <|> doublequote <|> dollar <|> bChar)
     bChar = (Bare . (:[])) <$> anyChar
+
+-- | Like doublequote content, but slightly different! See §2.6.4
+arithmeticContent :: ShellParser [WordPart]
+arithmeticContent = a dollar <|> a backquote <|> aBackslash <|> aParen <|> aBare
+  where
+    a = ((:[]) <$>)
+    aBackslash = char '\\' *>
+        a ( ( Backslashed <$> oneOf "$`\\\n" ) <|> return (Bare "\\") )
+    aParen = char '(' >> manyTill arithmeticContent (char ')') >>=
+        return . (Bare "(" :) . (++ [Bare ")"]) . concat
+        -- This is not expressly part of §2.6.4, but needed for $((3*(4+5)))
+    aBare = a $ Bare <$> many1 (noneOf "()$`\\")
 
 -- | Content that is processed for parameter, command, and arithmetic
 -- expansions. Used to process @ENV@ and @PSn@ variables, and also some
@@ -272,7 +285,7 @@ tok_rbrace = tokenize $ char '}'
 tok_bar = tokenize $ char '|'
 
 keyword :: String -> ShellParser String
-keyword name = tokenize $ string name
+keyword s = tokenize $ string s
 
 tok_if = keyword "if"
 tok_then = keyword "then"
@@ -291,3 +304,11 @@ tok_in = keyword "in"
 reservedWords :: [String]
 reservedWords =
     words "if then else elif fi do done case esac while until for { } ! in"
+
+name :: (Stream s m Char) => ParsecT s u m String
+name = (:) <$> nameStart <*> many nameContinue
+  where
+    nameStart = satisfy $ \c -> Char.isAscii c && (Char.isLetter c || c == '_')
+    nameContinue = satisfy $ \c ->
+        Char.isAscii c && (Char.isLetter c || Char.isDigit c || c == '_')
+
