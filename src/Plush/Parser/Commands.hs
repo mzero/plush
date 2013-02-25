@@ -98,8 +98,12 @@ for_clause = tok_for *> do
     -- Apply rule 5 for 'name', but basically it just means it has to look
     -- like a name and not any old word (name requires a more restricted
     -- character set).
-    var <- tok_name <* linebreak
-    words_ <- optionMaybe $ tok_in *> many tok_word <* sequential_sep
+    var <- tok_name
+    words_ <-
+        try (linebreak >> tok_in *> (Just <$> many tok_word) <* sequential_sep)
+        <|> (optional sequential_sep >> return Nothing)
+        -- NOTE: This grammar allows: for x; do ... done  (note the ;)
+        -- The spec doesn't but is expected to be amended to admit it
     doGroup <- do_group
     return $ ForLoop var words_ doGroup
 

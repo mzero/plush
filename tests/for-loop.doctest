@@ -18,7 +18,7 @@ basic for loop
     a
     b
     c
-    # echo $x # shell for is not very sanitary
+    # echo $x
     c
 
 more cmds in the body
@@ -30,6 +30,49 @@ more cmds in the body
 
 no words
     # for x in; do echo $x; done
+
+no 'in' means use positional variables
+    # set a b
+    # for x do echo $x; done        # note this is the original syntax!
+    a
+    b
+
+the syntax is somewhat convoluted, with several distinct forms allowed:
+    # for x in 1 2
+    + do echo $x; done
+    1
+    2
+
+    # for x in 1 2
+    + do
+    +    echo $x
+    + done
+    1
+    2
+
+    # for x
+    + in 1 2 ;
+    + do
+    +    echo $x
+    + done
+    1
+    2
+
+    # for x; do echo $x; done        # not in spec, but in upcoming corrigenda
+    a
+    b
+
+    # for x
+    + do echo $x; done
+    a
+    b
+
+    # for x
+    + do
+    +    echo $x
+    + done
+    a
+    b
 
 expand variables
     # ws='a b'

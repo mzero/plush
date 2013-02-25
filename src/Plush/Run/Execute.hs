@@ -131,10 +131,8 @@ execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ShellStatus
-execFor _ Nothing _ = notSupported "missing 'in' means substitute $@"
-execFor (Name _ name) (Just words_) cmds = do
-    setLastExitCode ExitSuccess
-    expandAndSplit words_ >>= forLoop
+execFor (Name _ name) inWords cmds =
+    maybe getArgs expandAndSplit inWords >>= forLoop
   where
     forLoop = runLoop True . map (\w -> (setShellVar name w, cmds))
 
