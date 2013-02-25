@@ -212,7 +212,7 @@ tok_assignment_word = tokenize $ do
     v <- char '_' <|> letter
     vs <- many (char '_' <|> alphaNum)
     _ <- char '='
-    w <- tok_word
+    w <- tok_word <|> locatedWord (return [])
     return $ Assignment (v:vs) w
 
 tok_io_number :: ShellParser Int

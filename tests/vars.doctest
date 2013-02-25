@@ -30,6 +30,10 @@ set empty shell variable
     # set | tr -d \'\" | fgrep bbb
     bbb=
 
+    # bbbalt=
+    # set | tr -d \'\" | fgrep bbbalt
+    bbbalt=
+
 export environment var
     # export ccc=x
     # export -p | tr -d \'\" | fgrep ccc
