@@ -83,6 +83,14 @@ Multiple patterns
     + esac
     small
 
+    # case all in
+    +     *oo | *aa ) echo double vowel ;;
+    + ⟶*ll⟶|⟶*dd⟶)⟶echo double consonant ;;
+    +     *00 | \
+    +     *99 ) echo double digit ;;
+    + esac
+    double consonant
+
 Word under test is subject to tilde expansion, parameter expansion, command
 substitution, arithmetic expansion, and quote removal
     # case ~/moo in $HOME/moo) echo yes ;; *) echo no;; esac

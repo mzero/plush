@@ -65,8 +65,10 @@ import Plush.Utilities
 
 whitespace :: ShellParser ()
 whitespace = do
-    skipMany (satisfy isBlank)
+    skipMany (void (satisfy isBlank) <|> try (void $ string "\\\n"))
     optional $ char '#' >> skipMany (satisfy (/= '\n'))
+    -- Handling of backslash-newline here is not perfect. See notes in
+    -- tests/quote.doctest.
 
 tokenize :: ShellParser a -> ShellParser a
 tokenize p = try p <* whitespace
