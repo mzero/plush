@@ -122,7 +122,7 @@ execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
     -> ShellExec m ShellStatus
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
-    Subshell _cmds -> notSupported "Subshell"
+    Subshell cmds -> subshell $ execCommandList cmds
     ForLoop name words_ cmds -> execFor name words_ cmds
     CaseConditional word items -> execCase word items
     IfConditional conds mElse -> execIf conds mElse

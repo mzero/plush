@@ -1,0 +1,88 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Subshells need to execute without affecting the shell state
+
+Working directory stays the same
+    # mkdir /tmp/doctest
+    # cd /tmp/doctest
+    # mkdir sub
+    # (cd sub; echo hi > message; echo *)
+    message
+    # echo *
+    sub
+    # cat sub/message
+    hi
+    # cd /tmp
+    # rm -rf /tmp/doctest
+
+Parameters and environment variables
+    # set pre-arg
+    # (set post-arg new-arg; echo $# $@)
+    2 post-arg new-arg
+    # echo $# $@
+    1 pre-arg
+
+    # x=pre-shell-var
+    # (x=post-shell-var z=new-shell-var; echo $x $z)
+    post-shell-var new-shell-var
+    # echo $x =$z=
+    pre-shell-var ==
+
+    # export y=pre-export-var
+    # (export y=post-export-var z=new-export-var; echo $y $z)
+    post-export-var new-export-var
+    # echo $y =$z=
+    pre-export-var ==
+
+Functions
+    # f() { echo pre-function; }
+    # ( f() { echo post-function; }; f )
+    post-function
+    # f
+    pre-function
+
+Options
+    # set +$- -m
+    # (set -a; echo $-)
+    am
+    # echo $-
+    m
+
+    # (set -x; echo hello)
+    .+ echo hello
+    hello
+    # echo world
+    world
+
+Aliases
+Note: you can't test that an alias set inside the subshell is used within the
+subshell because the whole subshell expression is subject to alias expansion
+before it is run. Hence in the test the subshell still prints 'hi,'
+    # shopt -s expand_aliases       # ONLY bash
+    # alias greet='echo hi,'
+    # (alias greet='echo yo,'; greet Ferb)
+    hi, Ferb
+    # greet Ferb
+    hi, Ferb
+
+
+TODO(mzero): Things left to test that shouldn't affect the parent shell,
+once implemented:
+    - open file descriptors changed by exec
+    - umask changes
+    - trap changes
+    - process ids from async lists
+
+
