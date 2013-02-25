@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-extra="$@"
-tests="tests/*.doctest"
+extra=""
+while true
+do
+    case $1 in
+        --) shift; break;;
+        -*) extra="$extra $1"; shift;;
+        *) break;;
+    esac
+done
+
+tests="${*:-tests/*.doctest}"
 plush="./dist/build/plush/plush"
 
 test_shell_if_exists() {
