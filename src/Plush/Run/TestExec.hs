@@ -23,6 +23,7 @@ module Plush.Run.TestExec (
     where
 
 import Control.Applicative ((<$>), (<*>))
+import Control.Arrow (first)
 import Control.Exception (SomeException)
 import Control.Monad (unless, when)
 import Control.Monad.Exception (ExceptionT, runExceptionT, throwM)
@@ -309,6 +310,7 @@ instance PosixLike TestExec where
         lift $ put s { tsFDescs = I.delete (fromIntegral fd) fds }
 
     readAll fd = runFdPrim "readAll" fd $ \_s _fds desc -> fdReadAll desc
+    readLine fd = runFdPrim "readLine" fd $ readLinePrim fd
     write fd bs = runFdPrim "write" fd $ \_s _fds desc -> fdWrite desc bs
     dupTo fdFrom fdTo =
         runFdPrim "dupTo" fdFrom $ \s fds desc ->
@@ -381,6 +383,17 @@ runFdPrim fn fd prim = do
                                 Nothing (Just $ "<" ++ show fd ++ ">")
         Just desc -> prim s fds desc
 
+-- N.B.: This will not work on pipes as it breaks the pipe!
+readLinePrim :: Fd -> FdPrim (TestExec L.ByteString)
+readLinePrim fd s fds desc = do
+    (line, rest) <- breakLine <$> fdReadAll desc
+    let desc' = contentFDesc rest
+    lift $ put s { tsFDescs = I.insert (fromIntegral fd) desc' fds }
+    return line
+  where
+    breakLine b = let (pre, post) = L.break (== w8nl) b in
+        maybe (pre, post) (first $ L.snoc pre) $ L.uncons post
+    w8nl = fromIntegral $ fromEnum '\n'
 
 updateFileSystem :: FileSystem -> TestExec ()
 updateFileSystem fs = lift $ modify (\s -> s { tsFileSystem = fs })

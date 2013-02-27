@@ -79,7 +79,7 @@ read_ = DirectUtility $ stdSyntax options "" go
         (ifsWhite, ifsSeparator) = partition isSpace ifs
 
     getInput rFlag = do
-        line <- fromByteString <$> readAll stdInput     -- TODO(mzero): wrong!
+        line <- fromByteString <$> readLine stdInput
         if rFlag
             then return $ deNewline line
             else case deContinue "" line of

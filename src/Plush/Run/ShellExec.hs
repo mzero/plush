@@ -311,6 +311,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     closeFd = liftT1 closeFd
 
     readAll = liftT1 readAll
+    readLine = liftT1 readLine
     write = liftT2 write
 
     dupTo = liftT2 dupTo

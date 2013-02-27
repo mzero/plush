@@ -125,6 +125,38 @@ Trailing whitespace is removed
     # cd
     # rm -rf /tmp/doctest
 
+Reads only one line
+    # read a b c <<\END; recho "$a" "$b" "$c"
+    + one
+    + two
+    + three
+    + four
+    + END
+    argv[1] = <one>
+    argv[2] = <>
+    argv[3] = <>
+
+    Reads more if there is line continuation
+    # read a b c <<\END; recho "$a" "$b" "$c"
+    + one \
+    + two\
+    + three
+    + four
+    + END
+    argv[1] = <one>
+    argv[2] = <twothree>
+    argv[3] = <>
+
+    But not if there is -r
+    # read -r a b c <<\END; recho "$a" "$b" "$c"
+    + one \
+    + two\
+    + three
+    + four
+    + END
+    argv[1] = <one>
+    argv[2] = <\>
+    argv[3] = <>
 
 Backslashes quote anything (except new lines)
     # read a b c <<\END; recho "$a" "$b" "$c"
@@ -173,3 +205,4 @@ But what if backslash is in IFS?
     argv[3] = <2\\3\\4\\5>
 
     # unset IFS
+
