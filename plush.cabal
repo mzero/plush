@@ -77,6 +77,7 @@ Library
     Plush.Run.BuiltIns.FileSystem
     Plush.Run.BuiltIns.Grep
     Plush.Run.BuiltIns.Plush
+    Plush.Run.BuiltIns.ScriptTools
     Plush.Run.BuiltIns.ShellState
     Plush.Run.BuiltIns.Syntax
     Plush.Run.BuiltIns.Text
