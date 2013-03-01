@@ -22,6 +22,7 @@ limitations under the License.
 module Plush.Run.Posix.IO () where
 
 import Control.Applicative ((<$>), (<*>))
+import Control.Arrow (second)
 import Control.Concurrent (forkIO)
 import Control.Monad (foldM, when)
 import Control.Monad.Exception (catchIOError, catchIf)
@@ -116,18 +117,20 @@ setCloseOnExec fd = P.setFdOption fd P.CloseOnExec True
 readAll :: Fd -> IO L.ByteString
 readAll fd = do
     ignoreUnsupportedOperation $ P.fdSeek fd IO.AbsoluteSeek 0
-    readLoop (const False) 4096 fd
+    snd <$> readLoop (const False) 4096 fd
 
-readLine :: Fd -> IO L.ByteString
+readLine :: Fd -> IO (Bool, L.ByteString)
 readLine fd = readLoop (== bnl) 1 fd
   where
     bnl = B.singleton $ fromIntegral $ fromEnum '\n'
 
-readLoop :: (B.ByteString -> Bool) -> Int -> Fd -> IO L.ByteString
-readLoop exitTest bufSize fd = L.fromChunks <$> go
+readLoop :: (B.ByteString -> Bool) -> Int -> Fd -> IO (Bool, L.ByteString)
+readLoop exitTest bufSize fd = second L.fromChunks <$> go
   where
-    go = next >>= \b -> (b:) <$> if test b then return [] else go
-    test b = B.null b || exitTest b
+    go = next >>= \b -> second (b:) <$> case () of
+        _ | B.null b   -> return (True, [])
+          | exitTest b -> return (False, [])
+          | otherwise  -> go
     next = readBuf `catchIOError` (\_ -> return B.empty)
     readBuf = B.createAndTrim bufSize $ (\buf ->
                 fromIntegral `fmap` P.fdReadBuf fd buf (fromIntegral bufSize))

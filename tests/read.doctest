@@ -206,3 +206,17 @@ But what if backslash is in IFS?
 
     # unset IFS
 
+Reading past EOF returns non-zero exit code
+    # echo hello | (read a; echo $?; read b; echo $?)
+    0
+    1
+
+    # echo -n hello | read a; echo $?
+    1
+
+    # echo 'hello\' | read a; echo $?
+    1
+
+bug with last test and pipes
+    # true
+

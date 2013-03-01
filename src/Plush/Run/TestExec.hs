@@ -23,7 +23,6 @@ module Plush.Run.TestExec (
     where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Arrow (first)
 import Control.Exception (SomeException)
 import Control.Monad (unless, when)
 import Control.Monad.Exception (ExceptionT, runExceptionT, throwM)
@@ -384,15 +383,16 @@ runFdPrim fn fd prim = do
         Just desc -> prim s fds desc
 
 -- N.B.: This will not work on pipes as it breaks the pipe!
-readLinePrim :: Fd -> FdPrim (TestExec L.ByteString)
+readLinePrim :: Fd -> FdPrim (TestExec (Bool, L.ByteString))
 readLinePrim fd s fds desc = do
-    (line, rest) <- breakLine <$> fdReadAll desc
+    (eof, line, rest) <- breakLine <$> fdReadAll desc
     let desc' = contentFDesc rest
     lift $ put s { tsFDescs = I.insert (fromIntegral fd) desc' fds }
-    return line
+    return (eof, line)
   where
     breakLine b = let (pre, post) = L.break (== w8nl) b in
-        maybe (pre, post) (first $ L.snoc pre) $ L.uncons post
+        maybe (True, pre, post) (\(nl, rest) -> (False, L.snoc pre nl, rest))
+            $ L.uncons post
     w8nl = fromIntegral $ fromEnum '\n'
 
 updateFileSystem :: FileSystem -> TestExec ()

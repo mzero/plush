@@ -114,9 +114,11 @@ class (Functor m, Monad m, MonadException m,
     -- the stream is empty.
     readAll :: Fd -> m L.ByteString
     -- | Read until the next newline, if any. The newline is included in the
-    -- result. This operation is on an 'Fd' and so in very inefficient, and may
-    -- not work on pipes correctly. Use sparingly.
-    readLine :: Fd -> m L.ByteString
+    -- result. The 'Bool' return value indicates if EOF or other error was
+    -- encountered while reading.
+    -- This operation is on an 'Fd' and so in very inefficient, and may not work
+    -- n pipes correctly. Use sparingly.
+    readLine :: Fd -> m (Bool, L.ByteString)
     -- | Write to an output. If the output is a seekable stream, it is seeked
     -- to the end.
     write :: Fd -> L.ByteString -> m ()

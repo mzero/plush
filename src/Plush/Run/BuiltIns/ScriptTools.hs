@@ -20,6 +20,7 @@ module Plush.Run.BuiltIns.ScriptTools (
 where
 
 import Control.Applicative ((<$>))
+import Control.Arrow (second)
 import Data.Char (isSpace)
 import Data.List (partition)
 
@@ -38,10 +39,14 @@ read_ = DirectUtility $ stdSyntax options "" go
     go _ [] = exitMsg 127 "read: no variable names supplied"
     go flags names = do
         let rFlag = 'r' `elem` flags
-        input <- getInput rFlag
+        (inErr, input) <- getInput rFlag
         ifs <- getVarDefault "IFS" " \t\n"
         let bindings = fieldSplit rFlag ifs names input
-        untilFailureM setShellVar bindings >>= return . statusExitCode
+        setErr <- untilFailureM setShellVar bindings
+        case (statusExitCode setErr, inErr) of
+            (ExitSuccess      , False) -> success
+            (ExitSuccess      , True ) -> failure
+            (e@(ExitFailure _), _    ) -> return e
 
     setShellVar (name, val) =
         setVarEntry name (VarShellOnly, VarReadWrite, Just val)
@@ -79,12 +84,13 @@ read_ = DirectUtility $ stdSyntax options "" go
         (ifsWhite, ifsSeparator) = partition isSpace ifs
 
     getInput rFlag = do
-        line <- fromByteString <$> readLine stdInput
+        (err, bs) <- readLine stdInput
+        let line = fromByteString bs
         if rFlag
-            then return $ deNewline line
+            then return (err, deNewline line)
             else case deContinue "" line of
-                Nothing -> return $ deNewline line
-                Just line' -> (line' ++) <$> getInput rFlag
+                Just line' | not err -> second (line' ++) <$> getInput rFlag
+                _                    -> return (err, deNewline line)
 
     deNewline "" = ""
     deNewline "\n" = ""
