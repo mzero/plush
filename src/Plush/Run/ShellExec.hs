@@ -26,6 +26,7 @@ module Plush.Run.ShellExec (
     getFlags, setFlags,
     varValue, getVars, getVar, getVarDefault,
     getVarEntry, setVarEntry, unsetVarEntry,
+    setShellVar, setEnvVar,
     getFun, setFun, unsetFun, withFunContext,
     getAliases, setAliases,
     getEnv,
@@ -160,7 +161,7 @@ getVarDefault name def = fromMaybe def `fmap` getVar name
 getVarEntry :: (Monad m) => String -> ShellExec m (Maybe VarEntry)
 getVarEntry name = gets ssVars >>= return . M.lookup name
 
-setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ShellStatus
+setVarEntry :: (PosixLike m) => String -> VarEntry -> ShellExec m ErrorCode
 setVarEntry name entry = do
     curr <- getVarEntry name
     case combineVarEntries curr entry of
@@ -198,7 +199,7 @@ combineVarEntries (Just (_, VarReadOnly, old)) (VarExported, _, Nothing) =
 -- Otherwise fail:
 combineVarEntries _ _ = Nothing
 
-unsetVarEntry :: (PosixLike m) => String -> ShellExec m ShellStatus
+unsetVarEntry :: (PosixLike m) => String -> ShellExec m ErrorCode
 unsetVarEntry name = do
     curr <- getVarEntry name
     case curr of
@@ -208,6 +209,16 @@ unsetVarEntry name = do
             success
         _ ->
             shellError 1 $ "var is read-only: " ++ name
+
+setShellVar :: (PosixLike m) => String -> String -> ShellExec m ErrorCode
+setShellVar name v = setVarEntry name (VarShellOnly, VarReadWrite, Just v)
+
+setEnvVar :: (PosixLike m) => String -> String -> ShellExec m ErrorCode
+setEnvVar name v = setVarEntry name (VarExported, VarReadWrite, Just v)
+
+
+
+
 
 getEnv :: (Monad m, Functor m) => ShellExec m Bindings
 getEnv = getVars >>= return . foldr getBinding [] . M.toList

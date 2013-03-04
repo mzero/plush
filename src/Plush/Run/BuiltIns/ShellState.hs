@@ -1,5 +1,5 @@
 {-
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -190,17 +190,19 @@ unset = SpecialUtility $ stdSyntax options "" go
   where
     options = [ flag 'v', flag 'f' ]
 
-    go "v" names = untilFailureM unsetVarEntry names
-    go "f" names = mapM_ unsetFun names >> success
-    go _flags names = untilFailureM unsetVarEntry names
-                      `andThenM` (mapM_ unsetFun names >> success)
+    go "v" names = unsetVars names >>= returnError
+    go "f" names = unsetFuns names
+    go _flags names = unsetVars names >>= ifError returnError (unsetFuns names)
+
+    unsetVars names = untilErrorM $ map unsetVarEntry names
+    unsetFuns names = mapM_ unsetFun names >> success
 
 modifyVar cmdName hasModifier mkVarEntry = SpecialUtility $ stdSyntax options "" go
   where
     options = [ flag 'p' ]  -- echo exports
 
     go "p" [] = showVars >> success
-    go _flags nameVals = untilFailureM defVar nameVals
+    go _flags nameVals = untilErrorM (map defVar nameVals) >>= returnError
 
     showVars = getVars >>= mapM_ (outStr . varFmt) . sort . M.toList
     varFmt (n, ve@(_, _, val)) | hasModifier ve =

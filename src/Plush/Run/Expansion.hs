@@ -125,7 +125,7 @@ parameterExpansion live name pmod
     pTest True  vs = any (not . null) vs    -- ':' mods only use non null values
 
     setVar s = do
-        when live $ void $ setVarEntry name (VarShellOnly, VarReadWrite, Just s)
+        when live $ void $ setShellVar name s
         return s
 
     indicateError True ""  = shouldError " is unset or null"

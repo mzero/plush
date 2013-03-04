@@ -61,12 +61,12 @@ cd = DirectUtility $ stdSyntax options "L" go
         go8 pr d = go910 pr (simplifyPath d)
         go910 pr d = do
             p <- getVarDefault "PWD" ""
-            _ <- setVarEntry "OLDPWD" (VarExported, VarReadWrite, Just p)
+            _ <- setEnvVar "OLDPWD" p
             -- Unlike bash and dash, if OLDPWD is marked readonly, we don't fail.
             changeWorkingDirectory d
             _ <- if physical
-                 then setVarEntry "PWD" (VarExported, VarReadWrite, Just d)
+                 then setEnvVar "PWD" d
                       -- TODO: This is wrong, should be same as pwd -P
-                 else setVarEntry "PWD" (VarExported, VarReadWrite, Just d)
+                 else setEnvVar "PWD" d
             when pr $ outStrLn d
             success

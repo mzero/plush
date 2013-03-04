@@ -15,17 +15,21 @@ limitations under the License.
 -}
 
 module Plush.Run.Types (
+    -- * Common
     Args,
     Bindings,
 
+    -- * Return Values
     -- $exit
     ExitCode(..),
     intToExitCode, exitCodeToInt,
-    isSuccess, isFailure,
+
+    ErrorCode(..),
 
     ShellStatus(..),
     statusExitCode,
 
+    -- * Commands
     FoundCommand(..),
     Annotation(..),
 
@@ -44,20 +48,22 @@ type Args = [String]
 type Bindings = [(String, String)]
 
 {- $exit
-POSIX has a concept of "Exit Status", which is a numeric value that process
+POSIX has a concept of "Exit Status", which is a numeric value that processes
 exits with at completion. It is limited to the range 0..255 by the spec.
-The shell and other utilities sometimes treat 0 as "success" and other values
+The shell and other utilities generally treat 0 as "success" and other values
 as "failure".
 
-Haskell's "System.Exit" defines the type 'ExitCode', which plush reuses.
-However, this type is slightly more general, in that it esparates the
-notion of success and failure from the numeric code (which is only supplied
-on failure). This leads to the unfortunate possibility of the value
-@(ExitFailure 0)@. Is this success or failure in a POSIX context?
+Haskell's "System.Exit" defines the type 'ExitCode'. However, this type is
+slightly more general, in that it separates the notion of success and failure
+from the numeric code (which is only supplied on failure). This leads to the
+unfortunate possibility of the value @(ExitFailure 0)@. Is this success or
+failure in a POSIX context?
 
 In the interest of harmony with Haskell's common usage, plush uses 'ExitCode'
 to reprsent "Exit Status". Further, to make code clear and consistent, it
-only distinguishes success from failure based on the constructor.
+only distinguishes success from failure based on the constructor. The type is
+reexported in this module because most of the plush code shouldn't be using
+the standard System libraries.
 -}
 
 -- | Convert a numeric exit status to an 'ExitCode'. Handles selection of the
@@ -71,24 +77,22 @@ exitCodeToInt :: ExitCode -> Int
 exitCodeToInt ExitSuccess = 0
 exitCodeToInt (ExitFailure n) = n
 
--- | Convience function. It is acceptable to just case or match on the
--- constructors of 'ExitCode' alone.
-isSuccess :: ExitCode -> Bool
-isSuccess ExitSuccess = True
-isSuccess (ExitFailure _) = False
 
--- | Convience function.  It is acceptable to just case or match on the
--- constructors of 'ExitCode' alone.
-isFailure :: ExitCode -> Bool
-isFailure = not . isSuccess
+-- | Shell errors exit the shell with an exit status. This type wraps the
+-- normal 'ExitCode' for such a purpose. It provides some type clarity for
+-- those situations where a shell error is possible, but other status values
+-- are not.
+newtype ErrorCode = ErrorCode { errorExitCode :: ExitCode }
+    deriving (Eq)
 
 
--- | The result of special utilities, and of operations within the shell itself,
--- can be more complicated than an 'ExitCode'. Importantly, they include the
+-- | The result of special utilities, and of execution within the shell itself,
+-- can be more complicated than an 'ExitCode'. Importantly, it includes the
 -- idea of "shell error" that causes shell termination in non-interactive
--- shells, and abort to the user intput loop in interactive ones.
+-- shells, and abort to the user intput loop in interactive ones. It also
+-- includes the flow control operations like @break@ and @continue@.
 data ShellStatus = StStatus ExitCode    -- ^ a normal "exit status"
-                 | StError ExitCode     -- ^ a "shell error"
+                 | StError ErrorCode    -- ^ a "shell error"
                  | StExit ExitCode      -- ^ exit utility invoked
                  | StReturn ExitCode    -- ^ return from function or script
                  | StBreak Int          -- ^ break looping command
@@ -99,7 +103,7 @@ data ShellStatus = StStatus ExitCode    -- ^ a normal "exit status"
 -- Unhandled control status values are mapped to error exit status values.
 statusExitCode :: ShellStatus -> ExitCode
 statusExitCode (StStatus ec) = ec
-statusExitCode (StError ec) = ec
+statusExitCode (StError ec) = errorExitCode ec
 statusExitCode (StExit ec) = ec
 statusExitCode (StReturn ec) = ec
 statusExitCode _ = ExitFailure 123

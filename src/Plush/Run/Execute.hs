@@ -95,7 +95,7 @@ execSimpleCommand (SimpleCommand ws as rs) = do
 
     withRedirection rs $ do
         case cmdAndArgs of
-            [] -> untilFailureM (uncurry setShellVar) bindings
+            [] -> bindVars setShellVar bindings >>= returnError
             (cmd:args) -> do
                 (_, ex, _) <- commandSearch cmd
                 case ex of
@@ -114,9 +114,6 @@ xtrace bindings cmdAndArgs = do
     line = map showBinding bindings ++ cmdAndArgs
     showBinding (var,val) = var ++ '=' : val
 
-setShellVar :: (PosixLike m) => String -> String -> ShellExec m ShellStatus
-setShellVar name v = setVarEntry name (VarShellOnly, VarReadWrite, Just v)
-
 
 execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
     -> ShellExec m ShellStatus
@@ -134,7 +131,8 @@ execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
 execFor (Name _ name) inWords cmds =
     maybe getArgs expandAndSplit inWords >>= forLoop
   where
-    forLoop = runLoop True . map (\w -> (setShellVar name w, cmds))
+    forLoop = runLoop True . map step
+    step w = (setShellVar name w >>= returnError, cmds)
 
 execCase :: (PosixLike m) =>
     Word -> [([Word], Maybe CommandList)] -> ShellExec m ShellStatus

@@ -126,28 +126,20 @@ setShellVars :: (PosixLike m) =>
                 (Args -> ShellExec m ShellStatus) ->
                 Bindings -> Args -> ShellExec m ShellStatus
 setShellVars exec bindings args =
-    untilFailureM setShellVar bindings `andThenM` exec args
-  where
-    setShellVar (name, val) =
-        setVarEntry name (VarShellOnly, VarReadWrite, Just val)
+    bindVars setShellVar bindings >>= ifError returnError (exec args)
 
 withEnvVars :: (PosixLike m) =>
                (Args -> ShellExec m ShellStatus) ->
                Bindings -> Args -> ShellExec m ShellStatus
 withEnvVars exec bindings args = do
     prev <- currentVarEntries bindings
-    finally (setEnvVars bindings `andThenM` exec args)
+    finally
+        (bindVars setEnvVar bindings >>= ifError returnError (exec args))
         (forM_ prev restoreVarEntries)
 
 currentVarEntries :: (PosixLike m) =>
     Bindings -> ShellExec m [(String, Maybe VarEntry)]
 currentVarEntries as = mapM (\(name, _) -> (name,) <$> getVarEntry name) as
-
-setEnvVars :: (PosixLike m) => Bindings -> ShellExec m ShellStatus
-setEnvVars bindings = untilFailureM setEnvVar bindings
-  where
-    setEnvVar (name, val) =
-        setVarEntry name (VarExported, VarReadWrite, Just val)
 
 restoreVarEntries (name, Just val) = void $ setVarEntry name val
 restoreVarEntries (name, Nothing) = void $ unsetVarEntry name

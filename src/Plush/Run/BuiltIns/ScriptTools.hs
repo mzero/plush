@@ -42,14 +42,9 @@ read_ = DirectUtility $ stdSyntax options "" go
         (inErr, input) <- getInput rFlag
         ifs <- getVarDefault "IFS" " \t\n"
         let bindings = fieldSplit rFlag ifs names input
-        setErr <- untilFailureM setShellVar bindings
-        case (statusExitCode setErr, inErr) of
-            (ExitSuccess      , False) -> success
-            (ExitSuccess      , True ) -> failure
-            (e@(ExitFailure _), _    ) -> return e
-
-    setShellVar (name, val) =
-        setVarEntry name (VarShellOnly, VarReadWrite, Just val)
+        bindVars setShellVar bindings
+            >>= ifError (return . errorExitCode)
+                        (if inErr then failure else success)
 
     -- read's field splitting is defined with reference to section §2.6.5
     -- Field Splitting. However, the specification for read differs in

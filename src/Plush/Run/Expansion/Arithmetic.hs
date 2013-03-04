@@ -63,12 +63,12 @@ data Expr = ExConstant ArithType
           | ExFetch String
           | ExStore String Expr
 
--- | Errors during evalutaion. These are just 'ShellStatus' values from calls to
+-- | Errors during evalutaion. These are just 'ErrorCode' values from calls to
 -- 'shellError'. Rather than throw them in the 'PosixLIke' monad, these will be
 -- used in an 'ErrorT' monad wrapper to insulate them from other errors.
-newtype EvalError = EvalError ShellStatus
+newtype EvalError = EvalError ErrorCode
 instance Error EvalError where
-    noMsg = EvalError $ StError (ExitFailure 1)
+    noMsg = EvalError $ ErrorCode (ExitFailure 1)
 
 -- | Evaluate an expression tree. The extra 'ErrorT' monad layer isolates the
 -- errors that can happen here from other errors thrown in 'PosixLike' monad.
@@ -82,17 +82,16 @@ evaluate (ExFetch var) = do
     mn <- lift (getVar var)
     case readMaybe <$> mn of
         Just (Just n) -> return n
-        _ -> do
-            st <- lift (shellError 127
+        _ -> lift (shellError 127
                             ("variable " ++ var ++ ": value isn't numeric"))
-            throwError $ EvalError st
+                >>= throwErrorCode
 evaluate (ExStore var e) = do
     n <- evaluate e
-    st <- lift $ setVarEntry var (VarShellOnly, VarReadWrite, Just $ show n)
-    case st of
-        StStatus _ -> return n
-        _          -> throwError $ EvalError st
+    lift (setShellVar var $ show n) >>= ifError throwErrorCode (return ())
+    return n
 
+throwErrorCode :: (Monad m) => ErrorCode -> ErrorT EvalError m a
+throwErrorCode = throwError . EvalError
 
 --
 -- Parsing
