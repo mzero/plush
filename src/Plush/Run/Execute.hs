@@ -29,6 +29,7 @@ import Plush.Run.Command
 import Plush.Run.Expansion
 import Plush.Run.Pattern
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.Redirection
 import Plush.Run.ShellExec

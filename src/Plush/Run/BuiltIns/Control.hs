@@ -26,7 +26,7 @@ import Control.Applicative ((<$>))
 
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
+import Plush.Run.Posix.Return
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Utilities

@@ -92,6 +92,7 @@ Library
     Plush.Run.Pattern
     Plush.Run.Posix
     Plush.Run.Posix.IO
+    Plush.Run.Posix.Return
     Plush.Run.Posix.Utilities
     Plush.Run.Redirection
     Plush.Run.Script

@@ -47,7 +47,7 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Text as T
 
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities
+import Plush.Run.Posix.Return
 import Plush.Run.ShellFlags
 import Plush.Run.Types
 import Plush.Types

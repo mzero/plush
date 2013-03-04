@@ -32,6 +32,7 @@ import Plush.Parser
 import Plush.Pretty
 import {-# SOURCE #-} Plush.Run.Execute         -- see Execute.hs-boot
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types

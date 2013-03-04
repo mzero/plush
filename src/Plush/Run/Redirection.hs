@@ -26,7 +26,8 @@ import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
-import Plush.Run.Posix.Utilities (shellError, toByteString)
+import Plush.Run.Posix.Return (shellError)
+import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types

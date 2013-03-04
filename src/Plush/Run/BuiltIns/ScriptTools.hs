@@ -27,6 +27,7 @@ import Data.List (partition)
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types

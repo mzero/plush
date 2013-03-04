@@ -44,6 +44,7 @@ import Plush.Run.BuiltIns.Utilities
 import Plush.Run.BuiltIns.Syntax
 import Plush.Run.Command
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.ShellFlags

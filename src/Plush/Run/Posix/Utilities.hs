@@ -16,15 +16,6 @@ limitations under the License.
 
 {-# Language FlexibleInstances, TypeSynonymInstances #-}
 
-{-| This module represents the low level Posix interface. It is mostly a
-    re-export of the interface from the System.Posix module tree. However,
-    all operations in IO are instead exported as versions in (PosixIO m) => m.
-    This enables code to be written to this Posix interface, but then be run
-    in either IO, or in other monads that offer the implementation of Posix,
-    but perhaps, don't actually affect the underlying system. See TestExec.
--}
-
-
 module Plush.Run.Posix.Utilities (
     -- * Input convenience functions
     PosixInStr(..),
@@ -41,20 +32,8 @@ module Plush.Run.Posix.Utilities (
     doesFileExist, doesDirectoryExist,
     -- * Path simplification
     simplifyPath, reducePath,
-
-    -- * Exit, Error, and Status
-    Returnable, Errorable, isSuccess,
-    success, failure,
-    exitMsg,
-    notSupported,
-    shellError,
-    returnError,
-    -- ** Monadic combintors
-    shellSequence, ifError, untilErrorM, bindVars,
 ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad (foldM)
 import Control.Monad.Exception (bracket, catchIOError)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
@@ -64,12 +43,10 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
-import System.Exit
 import System.FilePath
 import qualified System.Posix.Files as P
 
 import Plush.Run.Posix
-import Plush.Run.Types
 
 -- | String like classes that can be used with 'readAll' and friends.
 -- Instances for strings use lenient UTF-8 decoding.
@@ -182,110 +159,3 @@ reducePath = simp [] . splitDirectories
           | y == "/"           = simp      ya  xs
           | y /= ".."          = simp      ys  xs
     simp       ys    (   x:xs) = simp   (x:ys) xs
-
-
--- | Types that can be used as a return value from a shell operation. See
--- "Plush.Run.Types" for a description of the different return types. This
--- typeclass enables a common set of utilities for such values.
-class Returnable e where
-    returnableSuccess       :: e
-    intToReturnable         :: Int -> e
-    isSuccess               :: e -> Bool
-
-instance Returnable ExitCode where
-    returnableSuccess       = ExitSuccess
-    intToReturnable         = intToExitCode
-    isSuccess ExitSuccess   = True
-    isSuccess _             = False
-
-instance Returnable ErrorCode where
-    returnableSuccess       = ErrorCode returnableSuccess
-    intToReturnable         = ErrorCode . intToReturnable
-    isSuccess               = isSuccess . errorExitCode
-
-instance Returnable ShellStatus where
-    returnableSuccess       = StStatus returnableSuccess
-    intToReturnable         = StStatus . intToReturnable
-    isSuccess (StStatus e)  = isSuccess e
-    isSuccess _             = False
-
--- | Return as successful.
-success :: (Monad m, Returnable e) => m e
-success = return returnableSuccess
-
--- | Return as failed with an exit status of 1.
-failure :: (Monad m, Returnable e) => m e
-failure = return $ intToReturnable 1
-
--- | Return as failed, printing a message on 'stderr'. The first argument
--- is the exit status value.
-exitMsg :: (PosixLike m, Returnable e) => Int -> String -> m e
-exitMsg e msg = do
-    errStrLn msg `catchIOError` (\_ -> return ())
-    return $ intToReturnable e
-
--- | Types that can be used as a return value from shell operations that can
--- produce a shell error. See "Plush.Run.Types" for a description of these
--- types.
-class (Returnable e) => Errorable e where
-    isError :: e -> Bool
-    exitCodeToError :: ExitCode -> e
-    errorToStatus :: e -> ShellStatus
-
-instance Errorable ErrorCode where
-    isError             = not . isSuccess
-    exitCodeToError     = ErrorCode
-    errorToStatus e     = if isSuccess e then returnableSuccess
-                                         else StError e
-
-instance Errorable ShellStatus where
-    isError (StError _) = True
-    isError _           = False
-    exitCodeToError e   = if isSuccess e then returnableSuccess
-                                         else StError (exitCodeToError e)
-    errorToStatus       = id
-
--- | Shell error from a utility because some feature is not (yet) supported.
-notSupported :: (PosixLike m, Errorable e) => String -> m e
-notSupported s = shellError 121 ("*** Not Supported: " ++ s)
-
--- | Generate a shell error. This will exit a non-interactive shell.
-shellError :: (PosixLike m, Errorable e) => Int -> String -> m e
-shellError e msg = exitCodeToError <$> exitMsg e msg
-
--- | Given a possible error, return that as an error 'ShellStatus'.
--- Otherwise just return success. This is useful in contexts where an operation
--- produces a possible error of one type, but needs to be returned as another.
-returnError :: (Monad m, Errorable e) => e -> m ShellStatus
-returnError = return . errorToStatus
-
--- | Perform each action in turn, stopping if one returns anything other than
--- a 'StStatus' value. Return the result of the last action executed. If the
--- list is empty, returns @StStatus ExitSuccess@.
-shellSequence :: (Monad m) => [m ShellStatus] -> m ShellStatus
-shellSequence actions = go actions returnableSuccess
-  where
-    go (a:as) (StStatus _) = a >>= go as
-    go _ st = return st
-
--- | If the last argument is an error, then supply it to the error handling
--- function (first argument). Otherwise, return the second argument.
---
--- Often used in a monadic context like so:
---
--- > setShellVar name value >>= ifError returnError $ do
--- >      -- code to execute if not an error
-ifError :: (Errorable e) => (e -> a) -> a -> e -> a
-ifError f a e = if isError e then f e else a
-
--- | Sequence a list actions, stopping if any of them return an error. Returns
--- the result of the last action run, or success if there were no actions.
-untilErrorM :: (Monad m, Errorable e) => [m e] -> m e
-untilErrorM = foldM (\e a -> ifError return a e) returnableSuccess
-
--- | Apply an action (usually 'setShellVar' or 'setEnvVar') to a set of
--- bindings. This uses 'untilErrorM' to stop on the first error if any, and
--- return the result of the last action run.
-bindVars :: (Monad m, Errorable e) =>
-    (String -> String -> m e) -> Bindings -> m e
-bindVars f = untilErrorM . map (uncurry f)

@@ -43,6 +43,7 @@ import System.IO.Error
 import Plush.Run.BuiltIns
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 

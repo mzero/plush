@@ -34,6 +34,7 @@ import Data.Monoid
 
 import Plush.ArgParser
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.Types
 import Plush.Types.CommandSummary

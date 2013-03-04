@@ -31,6 +31,7 @@ import Text.Parsec.String
 
 import Plush.Parser.Tokens (name)
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
 import Plush.Run.Types

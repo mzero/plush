@@ -28,6 +28,7 @@ import System.FilePath
 
 import Plush.Run.BuiltIns.Utilities
 import Plush.Run.Posix
+import Plush.Run.Posix.Return
 import Plush.Run.Posix.Utilities
 import Plush.Run.Script
 import Plush.Run.ShellExec
