@@ -22,6 +22,7 @@ limitations under the License.
 module Plush.Run.Posix.IO () where
 
 import Control.Applicative ((<$>), (<*>))
+import Control.Arrow (second)
 import Control.Concurrent (forkIO)
 import Control.Monad (foldM, when)
 import Control.Monad.Exception (catchIOError, catchIf)
@@ -68,6 +69,7 @@ instance PL.PosixLike IO where
     setCloseOnExec              = setCloseOnExec
 
     readAll                     = readAll
+    readLine                    = readLine
     write                       = write
 
     getUserHomeDirectoryForName = getUserHomeDirectoryForName
@@ -115,16 +117,23 @@ setCloseOnExec fd = P.setFdOption fd P.CloseOnExec True
 readAll :: Fd -> IO L.ByteString
 readAll fd = do
     ignoreUnsupportedOperation $ P.fdSeek fd IO.AbsoluteSeek 0
-    go [] >>= return . L.fromChunks . reverse
+    snd <$> readLoop (const False) 4096 fd
+
+readLine :: Fd -> IO (Bool, L.ByteString)
+readLine fd = readLoop (== bnl) 1 fd
   where
-    go bs = next >>= maybe (return bs) (go . (:bs))
-    next = readBuf `catchIOError` (\_ -> return Nothing)
-    readBuf = do
-      b <- B.createAndTrim bufSize $ (\buf ->
-                fromIntegral `fmap` P.fdReadBuf fd buf bufSize)
-      return $ if B.null b then Nothing else Just b
-    bufSize :: Num a => a
-    bufSize = 4096
+    bnl = B.singleton $ fromIntegral $ fromEnum '\n'
+
+readLoop :: (B.ByteString -> Bool) -> Int -> Fd -> IO (Bool, L.ByteString)
+readLoop exitTest bufSize fd = second L.fromChunks <$> go
+  where
+    go = next >>= \b -> second (b:) <$> case () of
+        _ | B.null b   -> return (True, [])
+          | exitTest b -> return (False, [])
+          | otherwise  -> go
+    next = readBuf `catchIOError` (\_ -> return B.empty)
+    readBuf = B.createAndTrim bufSize $ (\buf ->
+                fromIntegral `fmap` P.fdReadBuf fd buf (fromIntegral bufSize))
 
 -- | 'write' for 'IO': Seek to the end, and write.
 write :: Fd -> L.ByteString -> IO ()

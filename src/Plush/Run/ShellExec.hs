@@ -32,6 +32,7 @@ module Plush.Run.ShellExec (
     getLastExitCode, setLastExitCode,
     getSummary, loadSummaries,
     primeShellState,
+    subshell,
     )
     where
 
@@ -106,6 +107,9 @@ get = ShellExec ST.get
 
 gets :: (Monad m) => (ShellState -> a) -> ShellExec m a
 gets f = ShellExec $ ST.gets f
+
+put :: (Monad m) => ShellState -> ShellExec m ()
+put s = ShellExec $ ST.put s
 
 modify :: (Monad m) => (ShellState -> ShellState) -> ShellExec m ()
 modify f = ShellExec $ ST.modify f
@@ -258,6 +262,15 @@ primeShellState = do
   where
     asVar (var, val) = (var,(VarExported, VarReadWrite, Just val))
 
+subshell :: (PosixLike m) => ShellExec m a -> ShellExec m a
+subshell act = do
+    s <- get
+    wd <- getWorkingDirectory
+    bracket_ (return ()) (changeWorkingDirectory wd >> put s) act
+    -- TODO(mzero): needs to restore umask and traps once those are implemented,
+    -- also, once exec redirection can leave files open/redirected, those need
+    -- to be restored as well
+
 
 liftT1 :: (Monad m, MonadTrans t) => (a -> m r) -> a -> t m r
 liftT2 :: (Monad m, MonadTrans t) => (a -> b -> m r) -> a -> b -> t m r
@@ -298,6 +311,7 @@ instance PosixLike m => PosixLike (ShellExec m) where
     closeFd = liftT1 closeFd
 
     readAll = liftT1 readAll
+    readLine = liftT1 readLine
     write = liftT2 write
 
     dupTo = liftT2 dupTo

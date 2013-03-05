@@ -29,6 +29,7 @@ import Plush.Run.BuiltIns.Evaluation
 import Plush.Run.BuiltIns.FileSystem
 import Plush.Run.BuiltIns.Grep
 import Plush.Run.BuiltIns.Plush
+import Plush.Run.BuiltIns.ScriptTools
 import Plush.Run.BuiltIns.ShellState
 import Plush.Run.BuiltIns.Text
 import Plush.Run.BuiltIns.Trivial
@@ -71,16 +72,17 @@ special = flip M.lookup $ M.fromList $ map (fixup unSpecial)
 -- and not the shell's variables.
 direct :: (PosixLike m) => String -> Maybe (ShellUtility m)
 direct = flip M.lookup $ M.fromList $ map (fixup unDirect)
-        [ ("cd", cd)
+        [ ("alias", alias)
+        , ("cd", cd)
         , ("env", env)
         , ("false", false)
+        , ("read", read_)
         , ("true", true)
-        , ("alias", alias)
         , ("unalias", unalias)
         ]
     -- eventually will also include:
     -- bg, command, fc, fg, getopts, jobs, kill,
-    -- newgrp, pwd, read, umask, wait
+    -- newgrp, pwd, umask, wait
 
 -- | Regular Built-In Utilities (§2.9.1)
 -- If PATH search succeeds in finding an executable for these, then the built-in

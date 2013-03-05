@@ -36,6 +36,7 @@ import System.FilePath ((</>))
 import Text.Parsec
 
 import Plush.Parser
+import Plush.Run.Expansion.Arithmetic
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
@@ -84,15 +85,16 @@ basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m [WordPart]
 basicExpansion live = be
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
-    be (Commandsub cmd) | live = expanded <$> commandSubstituion (execute cmd)
-    be (Backquoted s)   | live = expanded <$> commandSubstituion (runScript s)
-    -- TODO: arthmetic
-    be (Doublequoted dw) = mapM be dw >>= return . doublequoted . concat
+    be (Commandsub cmd) | live = commandSubstituion (execute cmd) >>= expanded
+    be (Backquoted s)   | live = commandSubstituion (runScript s) >>= expanded
+    be (Arithmetic aw) = beAll aw >>= arithmeticExpansion >>= expanded
+    be (Doublequoted dw) = beAll dw >>= doublequoted
     be p = return [p]
 
-    expanded x = [Expanded x]
-    doublequoted [] = []
-    doublequoted qs = [Doublequoted qs]
+    beAll = fmap concat . mapM be
+    expanded x = return [Expanded x]
+    doublequoted [] = return []
+    doublequoted qs = return [Doublequoted qs]
 
 
 parameterExpansion :: (PosixLike m) =>
@@ -157,6 +159,10 @@ parameterExpansion live name pmod
     returnParts _       f vs  = do
         ifs <- f <$> getIFS
         return $ intersperse ifs $ map Expanded vs
+
+
+arithmeticExpansion :: (PosixLike m) => [WordPart] -> ShellExec m String
+arithmeticExpansion = runArithmetic . concat . map partText
 
 
 commandSubstituion :: (PosixLike m) =>
