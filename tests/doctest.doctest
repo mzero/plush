@@ -1,11 +1,11 @@
 -- Copyright 2012-2013 Google Inc. All Rights Reserved.
--- 
+--
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
 -- You may obtain a copy of the License at
--- 
+--
 --     http://www.apache.org/licenses/LICENSE-2.0
--- 
+--
 -- Unless required by applicable law or agreed to in writing, software
 -- distributed under the License is distributed on an "AS IS" BASIS,
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,12 +22,12 @@ blank line, or another test:
 
     # echo Hello World
     Hello World
-    
+
     # echo First test
     First test
     # echo Second test
     Second test
-    
+
     # true
     # false
     # echo tests need not have results
@@ -35,7 +35,7 @@ blank line, or another test:
 
 The commands to execute can be spread out on multiple lines, using the secondary
 prompt. The expected output can also be multiple lines long:
-    
+
     # echo Testing &&
     + echo Multi Line
     Testing
@@ -49,7 +49,7 @@ outdented
 
     # echo indented
     indented
-    
+
         # echo indented more
         indented more
 
@@ -77,13 +77,26 @@ with spaces, a tab can be represented by ⟶ in both input and output:
     # echo 'a*z' | tr '*' '\t'
     a⟶z
 
+Some shell operations cause a "shell error", which causes the shell to exit.
+While doctests are normally run as a single script, if a shell exit is expected,
+then the rest of the doctest is run in a new script. An expected shell error
+is indicated with an exclaimation point
+
+    # . this-file-does-not-exist
+    ! not found
+    ! No such file
+
+Becuase shell error messages are not standardized, there can be multiple
+exclaimation lines, only one of which has to match. It is considered a match if
+the text on the exclaimation line appears in the output.
+
 Tests can be skipped by putting the keyword SKIP (all caps) on the command
 line. Note the use of the # as a comment character, since the whole line is
 still passed to shell when it isn't skipped (see below).
 
     # crashes                                       # SKIP
     the output is skipped, too
-    
+
 The skip can be limited to some test scenario(s), which is the name of the
 shell under test: "plush", "sh", "bash", "dash", etc...
 

@@ -23,11 +23,11 @@ module Plush.DocTest (
 import Control.Applicative ((<$>))
 import Control.Monad (join, when)
 import Control.Monad.Trans.Class (lift)
-import Data.List (foldl', intercalate, isPrefixOf, partition)
+import Data.List (foldl', intercalate, isInfixOf, isPrefixOf, partition)
 import System.FilePath (takeFileName)
 import System.IO (hFlush, hSetBuffering, BufferMode(NoBuffering), stdout)
+import System.Process (readProcessWithExitCode)
 
-import Plush.DocTest.Posix
 import Plush.Run
 import Plush.Run.Execute
 import Plush.Run.Script
@@ -39,18 +39,22 @@ data Location = Location { _locFile :: Maybe FilePath, _locLine :: Int }
 instance Show Location where
     show (Location mf l) = maybe "" (++ ", ") mf ++ "line " ++ show l
 
+setFile :: FilePath -> Location -> Location
+setFile fp (Location _ l) = Location (Just fp) l
+
 data Test = Test
     { testLoc :: Location
     , testInput :: String
     , testExpected :: String
+    , testExpectedError :: [String]
     , testCondition :: String -> Bool
     }
 
 newTest :: Int -> Test
-newTest i = Test (Location Nothing i) "" "" (const True)
+newTest i = Test (Location Nothing i) "" "" [] (const True)
 
 noteFile :: FilePath -> Test -> Test
-noteFile fp (Test (Location _ l) i o c) = Test (Location (Just fp) l) i o c
+noteFile fp t = t { testLoc = setFile fp $ testLoc t }
 
 inputLine :: String -> Test -> Test
 inputLine  s t
@@ -71,8 +75,11 @@ inputLine  s t
 expectLine :: String -> Test -> Test
 expectLine  s t = t { testExpected = testExpected t ++ retab s ++ "\n" }
 
+expectError :: String -> Test -> Test
+expectError  s t = t { testExpectedError = testExpectedError t ++ [s] }
+
 retab :: String -> String
-retab = map (\c -> if c == '⟶' then '\t' else c) 
+retab = map (\c -> if c == '⟶' then '\t' else c)
 
 extractTests :: String -> [Test]
 extractTests input = skipping $ zip [1..] $ lines input
@@ -92,7 +99,7 @@ extractTests input = skipping $ zip [1..] $ lines input
     expect test leadin lls@((_,s):ls) =
         case findExpectLine leadin s of
             Nothing -> test : skipping lls
-            Just r -> expect (expectLine r test) leadin ls
+            Just f -> expect (f test) leadin ls
     expect test _ lls = test : skipping lls
 
     findInitialPrompt = go ""
@@ -109,14 +116,23 @@ extractTests input = skipping $ zip [1..] $ lines input
     findExpectLine leadin s = removeLeadin leadin s >>= go
       where
         go "" = Nothing
-        go ('.':t) = Just t
+        go ('.':t) = Just $ expectLine t
+        go ('!':' ':t) = Just $ expectError t
         go (c:' ':_) | c == '#' = Nothing
-        go t = Just t
+        go t = Just $ expectLine t
 
     removeLeadin [] s = Just s
     removeLeadin (l:ls) (c:cs) | l == c = removeLeadin ls cs
     removeLeadin _ _ = Nothing
 
+breakTestsAtErrors :: [Test] -> [[Test]]
+breakTestsAtErrors = go []
+  where
+    go [] [] = []
+    go qs [] = [qs]
+    go qs (t:ts)
+        | null (testExpectedError t) = go (qs ++ [t]) ts
+        | otherwise                  = (qs ++ [t]) : go [] ts
 
 docTestFile :: FilePath -> IO [Test]
 docTestFile fp =
@@ -136,11 +152,23 @@ rightAlign :: Int -> String -> String
 rightAlign n = reverse . leftAlign n . reverse
 
 data Result = BadParse String
-            | LeftoverParse String
             | UnexpectedResult String
+            | UnexpectedError String
             | Skipped
             | Success
     deriving Eq
+
+determineResult :: Test -> String -> String -> Result
+determineResult test actualOut actualErr =
+    if expectedOut == actualOut
+        then if null expectedErrs || any (`isInfixOf` actualErr) expectedErrs
+            then Success
+            else UnexpectedError actualErr
+        else UnexpectedResult actualOut
+  where
+    expectedOut = testExpected test
+    expectedErrs = testExpectedError test
+
 
 reportResult :: Test -> Result -> IO ()
 reportResult test result = case result of
@@ -149,16 +177,18 @@ reportResult test result = case result of
         putStrLn "Parse error: "
         putStrIndented errs
 
-    LeftoverParse remainder -> do
-        failHeader
-        putStrLn "Parse didn't consume whole input:"
-        putStrIndented remainder
-
     UnexpectedResult actual -> do
         failHeader
         putStrLn "Expecting:"
         putStrIndented $ testExpected test
         putStrLn "Actual:"
+        putStrIndented actual
+
+    UnexpectedError actual -> do
+        failHeader
+        putStrLn "Expected one of these errors:"
+        mapM_ putStrIndented $ testExpectedError test
+        putStrLn "Actual error:"
         putStrIndented actual
 
     Skipped -> do
@@ -205,7 +235,8 @@ runAndReport name verbose testF fps = do
         then "=== Running " ++ name ++ " ===\n"
         else leftAlign 48 $ "Running " ++ name ++ "... "
     hFlush stdout
-    results <- mapM (\fp -> docTestFile fp >>= testF) fps
+    tests <- mapM docTestFile fps
+    results <- mapM testF $ concatMap breakTestsAtErrors tests
     reportResults verbose $ concat results
     when verbose $ putStrLn ""
 
@@ -227,15 +258,13 @@ runTest t r0 =
   where
     exec (c,"") r =
         let (result, r') = testRun (execute c >> lift testOutput) r
-            actual = case result of
-                Left e -> e
-                Right (out,err) -> err ++ out
-        in if testExpected t == actual
-            then (Success, r')
-            else (UnexpectedResult actual, r')
-    exec (_,extra) r = (LeftoverParse extra, r)
-    badParse errs r = (BadParse errs, r)
-
+            (actualOut, actualErr) = either (\e -> (e, "")) id result
+        in (determineResult t actualOut actualErr, r')
+    exec (_,extra) r = badParse ("Leftover input: " ++ extra) r
+    badParse errs r =
+        if null (testExpectedError t)
+            then (BadParse errs, r)
+            else (determineResult t "" errs, r)
 
 runDocTests :: Bool -> [FilePath] -> IO ()
 runDocTests verbose =
@@ -246,27 +275,28 @@ runDocTests verbose =
 
 shellTests :: String -> [Test] -> IO [(Test, Result)]
 shellTests shcmd tests = do
-    ran <- process . snd <$> readProcessCombinedWithExitCode shcmd [] script
+    ran <- process <$> readProcessWithExitCode shcmd [] script
     let skipped = zip testsToSkip (repeat Skipped)
     return $ ran ++ skipped
   where
     script = intercalate echoBreak $ map testInput testsToRun
-    process = map determine . zip testsToRun . (++ repeat "") . splitOn breakLn
-    determine (test,actual) =
-        if testExpected test == actual
-            then (test, Success)
-            else (test, UnexpectedResult actual)
+    process (_exitCode, actualOuts, actualErrs) =
+        zipWith3 process1 testsToRun (splitUp actualOuts) (splitUp actualErrs)
+    process1 t o e = (t, determineResult t o e)
+
     shname = takeFileName shcmd
     (testsToRun, testsToSkip) = partition (\t -> testCondition t shname) tests
-    splitOn d sIn = go "" sIn
+
+    splitUp sIn = go "" sIn ++ repeat ""
       where
         go "" "" = []
         go w "" = [w]
         go w s@(c:cs)
-            | d `isPrefixOf` s = w : go "" (drop n s)
+            | breakLn `isPrefixOf` s = w : go "" (drop n s)
             | otherwise = go (w++[c]) cs
-        n = length d
-    echoBreak = "echo '" ++ breaker ++ "'\n"
+        n = length breakLn
+    echoBreak = "echo '" ++ breaker ++ "'\n\
+                \echo '" ++ breaker ++ "' >&2\n"
     breakLn = breaker ++ "\n"
     breaker = "~~~ ~~~ ~~~ ~~~ ~~~ ~~~"
 

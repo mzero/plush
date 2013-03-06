@@ -1,4 +1,4 @@
--- Copyright 2012 Google Inc. All Rights Reserved.
+-- Copyright 2012-2013 Google Inc. All Rights Reserved.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -32,18 +32,15 @@ Positionals are parsed soley as the digits
     sevens
 
 Positionals are not settable via readonly or export
--- TODO: can't test these yet until we find a way to cause shells to not
--- exit on special utility failure
---  # readonly 7=september 2>/dev/null || true
---  # echo $7
---  seven
---  # set | fgrep 7=
---  # export 7=september 2>/dev/null || true
---  # echo $7
---  seven
---  # env | fgrep 7=
+    # readonly 7=september      # SKIP plush TODO(mzero): fix!
+    ! bad variable name
+    ! not a valid identifier
+    # export 7=september        # SKIP plush TODO(mzero): fix!
+    ! bad variable name
+    ! not a valid identifier
 
 Shift parameters
+    # set one two three four five six seven eight nine ten eleven twelve
     # shift
     # echo $*
     two three four five six seven eight nine ten eleven twelve
@@ -57,20 +54,18 @@ Shift parameters
 Shift errors codes
     # shift && echo ok || echo fail
     ok
-TODO: these are commented out for the same reasons as above
-shift too big
---  # shift 9 2>/dev/null && echo ok || echo fail
---  fail
---  # echo $*
---  six seven eight nine ten eleven twelve
+
+    # shift 9                   # SKIP bash doesn't error, just doesn't shift!
+    ! shift count too large
+    ! shift
+
 shift negative
---  # shift -1 2>/dev/nulll && echo ok || echo fail
---  fail
---  # echo $*
---  six seven eight nine ten eleven twelve
+    # shift -1
+    ! shift count can't be negative
+    ! shift
+
 shift non-numeric
---  # shift less 2>/dev/nulll && echo ok || echo fail
---  fail
---  # echo $*
---  six seven eight nine ten eleven twelve
+    # shift less
+    ! shift argument not numeric
+    ! shift
 

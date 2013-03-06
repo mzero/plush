@@ -109,8 +109,10 @@ can't set readonly shell variable
 Note: skipped on other shells as the error message is inconsistent
 TODO(mzero): can't test this now that plush ALSO exits on shell error!
     # readonly lll=x
-    # lll=y && echo succeed || echo fail        # SKIP
-    var is read-only: lll
+    # lll=y
+    ! read-only
+    ! read only
+    ! readonly
 
 per-command exported variable bindings are restored after command exits
     # export mmm=1
@@ -120,27 +122,21 @@ per-command exported variable bindings are restored after command exits
     mmm=1
 
 per-command variable bindings for special built-in commands are not restored
-Note: actually does the wrong thing here, and restores the binding.
     # nnn=1
     # nnn=2 set mmm=1
-    # set | tr -d \'\" | fgrep nnn
+    # set | tr -d \'\" | fgrep nnn  # SKIP bash does the wrong thing here
     nnn=2
 
 failing variable commands stop after failure
-Note: Skipped in dash because the error message is inconsistent.
-Note: Skipped in sh and bash because they fail this test.
-TODO(mzero): can't test this now that plush ALSO exits on shell error!
+TODO(mzero): can't really test what happens after failure as the shell exits
     # export nnn=1
     # export ooo=2
     # export ppp=3
     # readonly ooo
-    # unset nnn ooo ppp                         # SKIP
-    var is read-only: ooo
-    # env | fgrep nnn                           # SKIP
-    # env | fgrep ooo                           # SKIP
-    ooo=2
-    # env | fgrep ppp                           # SKIP
-    ppp=3
+    # unset nnn ooo ppp
+    ! read-only
+    ! read only
+    ! readonly
 
 pipe in last test gives an error
     # dummy=test

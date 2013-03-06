@@ -99,5 +99,8 @@ redirection
 
 readonly variable aborts the loop
     # readonly x=10
-    # for x in a b; do echo $x; done    # ONLY plush
-    var is read-only: x
+    # for x in a b; do echo $x; done
+    ! read-only
+    ! read only
+    ! readonly
+

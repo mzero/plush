@@ -60,7 +60,7 @@ Options
     # echo $-
     m
 
-    # (set -x; echo hello)
+    # (set -x; echo hello) 2>&1
     .+ echo hello
     hello
     # echo world

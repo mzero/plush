@@ -103,7 +103,7 @@ substitution, arithmetic expansion, and quote removal
     # case `echo apple` in apple) echo yes ;; *) echo no;; esac
     yes
 
-    # case $((6 * 7)) in 42) echo yes ;; *) echo no;; esac  # SKIP plush (TODO)
+    # case $((6 * 7)) in 42) echo yes ;; *) echo no;; esac
     yes
 
     # case 'ap'\p"le" in apple) echo yes ;; *) echo no;; esac
@@ -121,7 +121,7 @@ substitution, arithmetic expansion, and quote removal
     # case apple in `echo apple`) echo yes ;; *) echo no ;; esac
     yes
 
-    # case 42 in $((6 * 7))) echo yes ;; *) echo no ;; esac # SKIP plush (TODO)
+    # case 42 in $((6 * 7))) echo yes ;; *) echo no ;; esac
     yes
 
     # case apple in 'ap'\p"le") echo yes ;; *) echo no ;; esac

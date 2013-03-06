@@ -60,5 +60,7 @@ Unset functions. Note that we skip this test for other shells because
 the error messages are different.
     # foo() { echo ok; }
     # unset -f foo
-    # foo                               # ONLY plush
-    Unknown command: foo
+    # foo
+    ! Unknown
+    ! not found
+
