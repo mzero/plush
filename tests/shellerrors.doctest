@@ -1,0 +1,109 @@
+-- Copyright 2013 Google Inc. All Rights Reserved.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+Shell Errors 2.8.1
+
+Shell language syntax error
+    # >< ; echo not run
+    ! unexpected
+    ! Syntax error
+
+Special utility syntax errors are tested in the test suite for each utility.
+
+Redirection error
+    # set -o posix                              # ONLY bash
+    # : 2>&@ ; echo not run
+    ! redirect
+    ! Syntax error
+
+Variable assignment errrors
+    # set -o posix                              # ONLY bash
+    # readonly y=1 ; y=2 : ;  echo not run
+    ! read-only
+    ! readonly
+    ! read only
+
+Expansion errors
+    # : ${z?user generated error} ; echo not run
+    ! user generated error
+
+    # x=bob ; : $(( x + 1 )) ; echo not run     # SKIP bash treats x as 0
+    ! value isn't numeric
+    ! Illegal number
+
+    # : ${x!y} ; echo not run
+    ! unexpected "!"
+    ! Leftover
+    ! Bad substitution
+    ! bad substitution
+
+Dot script not found
+    # rm -rf /tmp/doctest ; mkdir /tmp/doctest ; cd /tmp/doctest
+    # set -o posix                              # ONLY bash
+    # . knuffle ; echo not run
+    ! not found
+    ! No such file
+
+    cleanup!
+    # rm -rf /tmp/doctest
+
+Errors in subshells and command substitution don't "leak" out
+    # ( echo ${x?what} ; echo not run ) ; echo run
+    run
+    ! what
+
+    # echo first `echo ${x?what} ; echo not run` ; echo second
+    first
+    second
+
+Location of error in command structure shouldn't matter
+    # echo ${x?oops}
+    ! oops
+
+    # y=${x?oops} echo hi
+    ! oops
+
+    # y=${x?oops}
+    ! oops
+
+    # echo hi >${x?oops}
+    ! oops
+
+    # if echo ${x?oops}; then echo yes; else no; fi
+    ! oops
+
+    # for x in a ${b?oops} c; do echo ==$x==; done
+    ! oops
+
+    # while ${b?oops}; do echo hi; done
+    ! oops
+
+    # until ${b?oops}; do echo hi; done
+    ! oops
+
+    # case ${x?oops} in a*) echo alpha;; b*) echo beta;; esac
+    ! oops
+
+    # case aardvark in a*) echo alpha;; ${x?oops}) echo beta;; esac
+    alpha
+
+    # case aardvark in a*|${x?oops}) echo alpha;; b*) echo beta;; esac
+    alpha
+
+    # case aardvark in ${x?oops}|a*) echo alpha;; b*) echo beta;; esac
+    ! oops
+
+    # case beetle in ${x?oops}) echo alpha;; b*) echo beta;; esac
+    ! oops
+

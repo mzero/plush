@@ -26,7 +26,7 @@ import Data.Maybe (fromJust, fromMaybe, isJust, listToMaybe)
 
 import Plush.Run.Expansion
 import Plush.Run.Posix
-import Plush.Run.Posix.Return (shellError)
+import Plush.Run.Posix.Return (returnError, shellError)
 import Plush.Run.Posix.Utilities (toByteString)
 import Plush.Run.ShellExec
 import Plush.Run.Types
@@ -42,8 +42,11 @@ data RedirPrim
     | RedirDup Fd Fd
     | RedirClose Fd
 
-mkPrim :: (PosixLike m) => Redirect -> ShellExec m (Either String RedirPrim)
-mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
+mkPrim :: (PosixLike m) =>
+    Redirect -> ShellExec m (Either (ShellExec m ShellStatus) RedirPrim)
+mkPrim (Redirect maybeFd rType w) =
+    runExpansion (wordExpansionActive w)
+        >>= either (return . Left . returnError) (mk . quoteRemoval . fst)
   where
     fd = fromIntegral $ fromMaybe (defaultFd rType) maybeFd
 
@@ -63,18 +66,18 @@ mkPrim (Redirect maybeFd rType w) = wordExpansionActive w >>= mk . quoteRemoval
             -- TODO: RedirOutput should check that file doesn't exist
 
         RedirDuplicateInput  | isJust dest -> ok $ RedirDup fd (fromJust dest)
-        RedirDuplicateInput  | hasDash     -> ok $ RedirClose fd
-        RedirDuplicateInput  | otherwise   -> err $ "bad redirect"
+                             | hasDash     -> ok $ RedirClose fd
+                             | otherwise   -> err  "bad redirect"
         RedirDuplicateOutput | isJust dest -> ok $ RedirDup fd (fromJust dest)
-        RedirDuplicateOutput | hasDash     -> ok $ RedirClose fd
-        RedirDuplicateOutput | otherwise   -> err $ "bad redirect"
+                             | hasDash     -> ok $ RedirClose fd
+                             | otherwise   -> err  "bad redirect"
 
       where
         hasDash = s == "-"
         dest = listToMaybe [ Fd i | (i,r) <- reads s, null r]
 
     ok = return . Right
-    err = return . Left
+    err = return . Left . shellError 125
 
     openForRead   = (ReadOnly, Nothing, defaultFileFlags)
     openForWrite  = (WriteOnly, Just stdFileMode, truncFileFlags)
@@ -98,7 +101,7 @@ withRedirection [] act = act
 withRedirection (r:rs) act = do
     errOrPrim <- mkPrim r
     case errOrPrim of
-        Left err -> shellError 125 err
+        Left errAct -> errAct
 
         Right (RedirFile destFd fp (om, mfm, off)) -> saveAway destFd $ do
             fileFd <- openFd fp om mfm off

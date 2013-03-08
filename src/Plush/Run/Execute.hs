@@ -21,8 +21,8 @@ module Plush.Run.Execute (
     )
 where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad
-import Data.Functor
 import Data.List (intercalate)
 
 import Plush.Run.Command
@@ -88,24 +88,24 @@ execCommand (Function (Name _ name) fun) = setFun name fun >> success
 
 execSimpleCommand :: (PosixLike m) => SimpleCommand -> ShellExec m ShellStatus
 execSimpleCommand (SimpleCommand ws as rs) = do
-    bindings <- forM as parseAssignment
-    cmdAndArgs <- expandAndSplit ws
+    expansions `withExpansion'` \((bindings, cmdAndArgs), lastStatus) -> do
+        flags <- getFlags
+        when (F.xtrace flags) $ xtrace bindings cmdAndArgs
 
-    flags <- getFlags
-    when (F.xtrace flags) $ xtrace bindings cmdAndArgs
-
-    withRedirection rs $ do
-        case cmdAndArgs of
-            [] -> bindVars setShellVar bindings >>= returnError
-            (cmd:args) -> do
-                (_, ex, _) <- commandSearch cmd
-                case ex of
-                    UtilityAction ua  -> ua bindings args
-                    FunctionAction fa -> fa execFunctionBody bindings args
+        withRedirection rs $ do
+            case cmdAndArgs of
+                [] -> bindVars setShellVar bindings
+                        >>= ifError returnError (return $ StStatus lastStatus)
+                (cmd:args) -> commandSearch cmd >>= apply bindings args
   where
+    expansions = (,) <$> mapM parseAssignment as <*> expandAndSplit ws
     parseAssignment (Assignment name w) = do
         we <- byPathParts wordExpansionActive w
         return (name, quoteRemoval we)
+    apply bindings args (_, ex, _) =
+        case ex of
+            UtilityAction ua  -> ua bindings args
+            FunctionAction fa -> fa execFunctionBody bindings args
 
 xtrace :: (PosixLike m) => Bindings -> [String] -> ShellExec m ()
 xtrace bindings cmdAndArgs = do
@@ -120,35 +120,39 @@ execCompoundCommand :: (PosixLike m) => CompoundCommand -> [Redirect]
     -> ShellExec m ShellStatus
 execCompoundCommand cmd redirects = withRedirection redirects $ case cmd of
     BraceGroup cmds -> execCommandList cmds
-    Subshell cmds -> subshell $ execCommandList cmds
+    Subshell cmds -> downgradeErrors <$> subshell (execCommandList cmds)
     ForLoop name words_ cmds -> execFor name words_ cmds
     CaseConditional word items -> execCase word items
     IfConditional conds mElse -> execIf conds mElse
     WhileLoop test body -> execLoop True test body
     UntilLoop test body -> execLoop False test body
+  where
+    downgradeErrors = StStatus . statusExitCode
 
 execFor :: (PosixLike m) => Name -> Maybe [Word] -> CommandList
     -> ShellExec m ShellStatus
-execFor (Name _ name) inWords cmds =
-    maybe getArgs expandAndSplit inWords >>= forLoop
+execFor (Name _ name) inWords cmds = case inWords of
+        Nothing -> getArgs >>= forLoop
+        Just ws -> expandAndSplit ws `withExpansion` forLoop
   where
     forLoop = runLoop True . map step
     step w = (setShellVar name w >>= returnError, cmds)
 
 execCase :: (PosixLike m) =>
     Word -> [([Word], Maybe CommandList)] -> ShellExec m ShellStatus
-execCase word items = wordExpansionActive word >>= check items . quoteRemoval
+execCase word items =
+    wordExpansionActive word `withExpansion` (check items . quoteRemoval)
   where
     check [] _ = success
-    check ((ps, mcl):is) w = match ps w >>= \m ->
-        if m
-            then maybe success execute mcl
-            else check is w
-    match [] _ = return False
-    match (p:ps) w = wordExpansionActive p >>= \q ->
-        if patternMatch (makePattern q) w
-            then return True
-            else match ps w
+    check ((ps, mcl):is) w = match ps w
+            (maybe success execute mcl)
+            (check is w)
+    match [] _ _ifMatch ifNoMatch = ifNoMatch
+    match (p:ps) w ifMatch ifNoMatch =
+        wordExpansionActive p `withExpansion` \q ->
+            if patternMatch (makePattern q) w
+                then ifMatch
+                else match ps w ifMatch ifNoMatch
 
 execIf :: (PosixLike m) =>
     [(CommandList, CommandList)] -> Maybe CommandList -> ShellExec m ShellStatus

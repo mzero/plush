@@ -72,7 +72,7 @@ execType = typeCommandList
 
     typeSimple (SimpleCommand [] _ _) = return ExecuteForeground
     typeSimple (SimpleCommand ws _ _) =
-        expandAndSplit ws >>= typeFields
+        expandPassive ws >>= typeFields . map quoteRemoval
 
     typeFields [] = return ExecuteForeground
     typeFields (cmd:_) = do

@@ -88,6 +88,7 @@ Library
     Plush.Run.ExecuteType
     Plush.Run.Expansion
     Plush.Run.Expansion.Arithmetic
+    Plush.Run.Expansion.Types
     Plush.Run.Pattern
     Plush.Run.Posix
     Plush.Run.Posix.IO

@@ -60,18 +60,34 @@ Use alternate operator
     argv[3] = <pear>
 
 Indicate error operator
-    # : "${unknown?}" "${nothing?}" "${something?}"       # ONLY plush
-    unknown is unset
-    # : "${unknown:?}" "${nothing:?}" "${something:?}"    # ONLY plush
-    unknown is unset or null
-    nothing is unset or null
-    # : "${unknown?one}" "${nothing?two}" "${something?three}"      # ONLY plush
-    unknown: one
-    # : "${unknown:?one}" "${nothing:?two}" "${something:?three}"   # ONLY plush
-    unknown: one
-    nothing: two
+    # unset unknown ;       : "${unknown?}"
+    ! unknown is unset
+    ! not set
+    # nothing='' ;          : "${nothing?}"
+    # something='apple' ;   : "${something?}"
+
+    # unset unknown ;       : "${unknown:?}"
+    ! unknown is unset or null
+    ! null
+    # nothing='' ;          : "${nothing:?}"
+    ! nothing is unset or null
+    ! null
+    # something='apple' ;   : "${something:?}"
+
+    # unset unknown ;       : "${unknown?one}"
+    ! unknown: one
+    # nothing='' ;          : "${nothing?two}"
+    # something='apple' ;   : "${something?three}"
+
+    # unset unknown ;       : "${unknown:?one}"
+    ! unknown: one
+    # nothing='' ;          : "${nothing:?two}"
+    ! nothing: two
+    # something='apple' ;   : "${something:?three}"
 
 Assign default operator
+    # nothing=''
+    # something='apple'
     # recho "${unknown=pear}" "${nothing=pear}" "${something=pear}"
     argv[1] = <pear>
     argv[2] = <>

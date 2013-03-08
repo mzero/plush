@@ -71,6 +71,15 @@ Binary Operations
     # echo $((0&&0)) $((1||0)) $((2||4)) $((0||8))
     0 1 1 1
 
+Division by zero is an error
+    # echo $((3/0))
+    ! division by zero
+    ! division by 0
+
+    # echo $((3%0))
+    ! division by zero
+    ! division by 0
+
 Conditional expressions
     # echo $((1?2:3)) $((0?1:2))
     2 2

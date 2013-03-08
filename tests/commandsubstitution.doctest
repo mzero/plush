@@ -88,3 +88,16 @@ Output from commands doesn't do parameter, command, or arithmetic expansions
     [1:+]
     [1:4))]
 
+If no command name, then the exit status of a command is the last command
+substitution performed.
+    # desert=`echo $fruit pie; false` ; echo $? $desert
+    1 apple pie
+
+    # breakfast=$(echo $fruit pie; false) ; echo $? $breakfast
+    1 apple pie
+
+    # just=strange `false` ; echo $?
+    1
+
+    # just=strange $(false) ; echo $?
+    1

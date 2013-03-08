@@ -21,7 +21,6 @@ where
 
 import Control.Applicative ((<$>), (<*>), (<*))
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Error (Error(..), ErrorT, runErrorT, throwError)
 import Data.Bits
 import Data.Char (digitToInt)
 import Data.List (foldl')
@@ -30,24 +29,17 @@ import Text.Parsec.Expr
 import Text.Parsec.String
 
 import Plush.Parser.Tokens (name)
+import Plush.Run.Expansion.Types
 import Plush.Run.Posix
-import Plush.Run.Posix.Return
-import Plush.Run.Posix.Utilities
 import Plush.Run.ShellExec
-import Plush.Run.Types
 import Plush.Utilities
 
 -- | Parse and evaluate an arithmetic expression. This can both fetch and set
 -- shell variables.
-runArithmetic :: (PosixLike m) => String -> ShellExec m String
+runArithmetic :: (PosixLike m) => String -> Expansion m String
 runArithmetic s = case parse (expression <* eof) "" s of
-    Left errs -> do
-        errStr (show errs)
-        return "???"
-    Right e -> do
-        result <- runErrorT (evaluate e)
-        return $ either (const "!!!") show result
-    -- TODO(mzero): fix these returns, once we can propigate a bad status
+    Left errs -> noteShellError 127 (show errs) >> return ""
+    Right e -> show <$> evaluate e
 
 --
 -- Evaluation
@@ -60,39 +52,35 @@ type ArithType = Int
 data Expr = ExConstant ArithType
           | ExUnary (ArithType -> ArithType) Expr
           | ExBinary (ArithType -> ArithType -> ArithType) Expr Expr
+          | ExDivide (ArithType -> ArithType -> ArithType) Expr Expr
           | ExConditional Expr Expr Expr
           | ExFetch String
           | ExStore String Expr
 
--- | Errors during evalutaion. These are just 'ErrorCode' values from calls to
--- 'shellError'. Rather than throw them in the 'PosixLIke' monad, these will be
--- used in an 'ErrorT' monad wrapper to insulate them from other errors.
-newtype EvalError = EvalError ErrorCode
-instance Error EvalError where
-    noMsg = EvalError $ ErrorCode (ExitFailure 1)
-
--- | Evaluate an expression tree. The extra 'ErrorT' monad layer isolates the
--- errors that can happen here from other errors thrown in 'PosixLike' monad.
-evaluate :: (PosixLike m) => Expr -> ErrorT EvalError (ShellExec m) ArithType
+-- | Evaluate an expression tree.
+evaluate :: (PosixLike m) => Expr -> Expansion m ArithType
 evaluate (ExConstant n)     = return n
 evaluate (ExUnary f ea)     = f <$> evaluate ea
 evaluate (ExBinary f ea eb) = f <$> evaluate ea <*> evaluate eb
+evaluate (ExDivide f ea eb) = do
+    a <- evaluate ea
+    b <- evaluate eb
+    if b == 0
+        then noteShellError 127 "division by zero" >> return 0
+        else return $ f a b
 evaluate (ExConditional et ea eb) =
     evaluate et >>= (\t -> evaluate $ if t /= 0 then ea else eb)
 evaluate (ExFetch var) = do
     mn <- lift (getVar var)
     case readMaybe <$> mn of
         Just (Just n) -> return n
-        _ -> lift (shellError 127
-                            ("variable " ++ var ++ ": value isn't numeric"))
-                >>= throwErrorCode
+        _ -> noteShellError 127 ("variable " ++ var ++ ": value isn't numeric")
+                >> return 0
 evaluate (ExStore var e) = do
     n <- evaluate e
-    lift (setShellVar var $ show n) >>= ifError throwErrorCode (return ())
+    lift (setShellVar var $ show n) >>= noteError
     return n
 
-throwErrorCode :: (Monad m) => ErrorCode -> ErrorT EvalError m a
-throwErrorCode = throwError . EvalError
 
 --
 -- Parsing
@@ -124,8 +112,8 @@ opExpr = buildExpressionParser operators term
           ]
 
         , [ binaryOp "*" (*)
-          , binaryOp "/" quot
-          , binaryOp "%" rem
+          , divideOp "/" quot
+          , divideOp "%" rem
           ]
 
         , [ binaryOp "+" (+)
@@ -158,6 +146,7 @@ opExpr = buildExpressionParser operators term
 
     prefixOp s f = Prefix (op s >> return (ExUnary f))
     binaryOp s f = Infix (op s >> return (ExBinary f)) AssocLeft
+    divideOp s f = Infix (op s >> return (ExDivide f)) AssocLeft
 
     cmp f a b = fromEnum $ f a b
     bool f a b = cmp f (a /= 0) (b /= 0)

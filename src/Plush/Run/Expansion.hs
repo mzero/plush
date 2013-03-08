@@ -15,12 +15,20 @@ limitations under the License.
 -}
 
 module Plush.Run.Expansion (
+    Expansion,
+    runExpansion,
+    evalExpansion,
+    withExpansion,
+    withExpansion',
+
     expandActive,
     expandPassive,
     expandAndSplit,
     wordExpansionActive,
+
     TildePart, tildeDir, tildePrefix,
     tildeSplit,
+
     byPathParts,
 
     contentExpansion,
@@ -28,7 +36,8 @@ module Plush.Run.Expansion (
 where
 
 import Control.Applicative ((<$>))
-import Control.Monad (void, when)
+import Control.Monad (when)
+import Control.Monad.Trans.Class (lift)
 import Data.Char (isSpace)
 import Data.List (intercalate, intersperse, partition)
 import Data.Maybe (fromMaybe, maybeToList)
@@ -37,6 +46,7 @@ import Text.Parsec
 
 import Plush.Parser
 import Plush.Run.Expansion.Arithmetic
+import Plush.Run.Expansion.Types
 import Plush.Run.Pattern
 import Plush.Run.Posix
 import Plush.Run.Posix.Utilities
@@ -46,8 +56,9 @@ import Plush.Run.ShellExec
 import Plush.Run.Types
 import Plush.Types
 
+
 -- | Like 'expandActive', but preforms the final quote removal as well
-expandAndSplit :: (PosixLike m) => [Word] -> ShellExec m [String]
+expandAndSplit :: (PosixLike m) => [Word] -> Expansion m [String]
 expandAndSplit w = map quoteRemoval <$> expandActive w
 
 -- | Peform all shell expansions, in order:
@@ -58,30 +69,30 @@ expandAndSplit w = map quoteRemoval <$> expandActive w
 -- * subcommand expansion (not yet implemented)
 -- * field splitting
 -- * pathname expansion
-expandActive :: (PosixLike m) => [Word] -> ShellExec m [Word]
+expandActive :: (PosixLike m) => [Word] -> Expansion m [Word]
 expandActive = expand True
 
 -- | Like 'expandActive', only sub commands are not run, nor any shell variables
 -- modified.
 expandPassive :: (PosixLike m) => [Word] -> ShellExec m [Word]
-expandPassive = expand False
+expandPassive = evalExpansion . expand False
 
-expand :: (PosixLike m) => Bool -> [Word] -> ShellExec m [Word]
+expand :: (PosixLike m) => Bool -> [Word] -> Expansion m [Word]
 expand live w = do
     wWordExp <- mapM (wordExpansion live) w
-    ifs <- getVarDefault "IFS" " \t\n"
+    ifs <- lift $ getVarDefault "IFS" " \t\n"
     let wFieldSplit = concatMap (fieldSplitting ifs) wWordExp
-    concat `fmap` mapM pathnameExpansion wFieldSplit
+    lift $ concat `fmap` mapM pathnameExpansion wFieldSplit
 
 
-wordExpansionActive :: (PosixLike m) => Word -> ShellExec m Word
+wordExpansionActive :: (PosixLike m) => Word -> Expansion m Word
 wordExpansionActive = wordExpansion True
 
-wordExpansion :: (PosixLike m) => Bool -> Word -> ShellExec m Word
+wordExpansion :: (PosixLike m) => Bool -> Word -> Expansion m Word
 wordExpansion live w =
     tildeExpansion w >>= modifyPartsM (fmap concat . mapM (basicExpansion live))
 
-basicExpansion :: (PosixLike m) => Bool -> WordPart -> ShellExec m [WordPart]
+basicExpansion :: (PosixLike m) => Bool -> WordPart -> Expansion m [WordPart]
 basicExpansion live = be
   where
     be (Parameter name pmod) = parameterExpansion live name pmod
@@ -98,11 +109,11 @@ basicExpansion live = be
 
 
 parameterExpansion :: (PosixLike m) =>
-    Bool -> String -> ParameterModifier -> ShellExec m [WordPart]
+    Bool -> String -> ParameterModifier -> Expansion m [WordPart]
 parameterExpansion live name pmod
-    | name == "@" = getArgs     >>= pmodf               >>= asFields
-    | name == "*" = getArgs     >>= pmodf               >>= asParts
-    | otherwise   = getVar name >>= pmodf . maybeToList >>= asParts
+    | name == "@" = lift getArgs       >>= pmodf               >>= asFields
+    | name == "*" = lift getArgs       >>= pmodf               >>= asParts
+    | otherwise   = lift (getVar name) >>= pmodf . maybeToList >>= asParts
   where
     pmodf = case pmod of
         PModNone                    -> return
@@ -125,7 +136,7 @@ parameterExpansion live name pmod
     pTest True  vs = any (not . null) vs    -- ':' mods only use non null values
 
     setVar s = do
-        when live $ void $ setShellVar name s
+        when live $ lift (setShellVar name s) >>= noteError
         return s
 
     indicateError True ""  = shouldError " is unset or null"
@@ -133,14 +144,13 @@ parameterExpansion live name pmod
     indicateError _ msg    = shouldError $ ": " ++ msg
 
     shouldError msg = do
-        when live $ errStrLn (name ++ msg)
-            -- TODO(mzero): should shell error at this point
+        when live $ noteShellError 123 (name ++ msg)
         return ""
 
     fullLength [] = return 0
     fullLength [s] = return $ length s
     fullLength vs = do
-        ifs <- getIFS
+        ifs <- lift getIFS
         return $ sum (map length vs) + (length vs - 1) * length ifs
 
     remove _ _  [] = return []
@@ -157,29 +167,31 @@ parameterExpansion live name pmod
     returnParts emptyOk _ []  = return $ if emptyOk then [] else [Expanded ""]
     returnParts _       _ [v] = return [Expanded v]
     returnParts _       f vs  = do
-        ifs <- f <$> getIFS
+        ifs <- f <$> lift getIFS
         return $ intersperse ifs $ map Expanded vs
 
 
-arithmeticExpansion :: (PosixLike m) => [WordPart] -> ShellExec m String
+arithmeticExpansion :: (PosixLike m) => [WordPart] -> Expansion m String
 arithmeticExpansion = runArithmetic . concat . map partText
 
 
 commandSubstituion :: (PosixLike m) =>
-    ShellExec m ShellStatus -> ShellExec m String
-commandSubstituion act = process <$> captureStdout (statusExitCode <$> act)
+    ShellExec m ShellStatus -> Expansion m String
+commandSubstituion act = do
+    (ec, s) <- lift (captureStdout $ statusExitCode <$> act)
+    noteExitCode ec
+    return $ trim "" $ fromByteString s
   where
-    process = trim "" . fromByteString . snd
     trim _ "" = ""
     trim nls (c:cs)
         | c == '\n' = trim (c:nls) cs
         | otherwise = nls ++ c : trim "" cs
 
 
-tildeExpansion :: (PosixLike m) => Word -> ShellExec m Word
+tildeExpansion :: (PosixLike m) => Word -> Expansion m Word
 tildeExpansion = modifyPartsM $ go . compress
   where
-    go [Bare s] = (:[]) . Bare . te <$> tildeSplit s
+    go [Bare s] = (:[]) . Bare . te <$> lift (tildeSplit s)
     go ps = return ps
 
     te (tildePart, pathPart) = (maybe id (</>) $ tildeDir tildePart) pathPart
@@ -263,8 +275,7 @@ pathnameExpansion w = results <$> pathnameGlob "" (parts w)
     results es = expandParts (const [[Bare e] | e <- es]) w
 
 
-byPathParts :: (PosixLike m) => (Word -> ShellExec m Word)
-            -> Word -> ShellExec m Word
+byPathParts :: (Monad m, Functor m) => (Word -> m Word) -> Word -> m Word
 byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
   where
     byparts [] [] = []
@@ -281,5 +292,5 @@ byPathParts f w = unparts <$> mapM f (expandParts (byparts []) w)
 -- arithmetic expansions. Note that the input type, 'Parts' is somewhat more
 -- general, and other constructs, if present, be expanded.
 contentExpansion :: (PosixLike m) => String -> ShellExec m String
-contentExpansion s =
+contentExpansion s = evalExpansion $
     concatMap partText . concat <$> mapM (basicExpansion True) (parseContent s)
