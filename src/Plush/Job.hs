@@ -86,8 +86,8 @@ data ShellThread = ShellThread
 -- the shell is stated, they must not be used for communicating. The returned
 -- handles are tied to the original 'stdout' and 'stderr' and can be used to
 -- communicate to the original streams.
-startShell :: Runner -> IO (ShellThread, Fd, Fd)
-startShell runner = do
+startShell :: IO Runner -> IO (ShellThread, Fd, Fd)
+startShell mkRunner = do
     origInFd <- PM.dupFdCloseOnExec stdInput upperFd
     origOutFd <- PM.dupFdCloseOnExec stdOutput upperFd
     origErrFd <- PM.dupFdCloseOnExec stdError upperFd
@@ -97,6 +97,7 @@ startShell runner = do
     foregroundStdIOParts <- makeStdIOParts
     foregroundRIO <- stdIOLocalPrep foregroundStdIOParts
 
+    runner <- mkRunner
     jobRequestVar <- newEmptyMVar
     scoreBoardVar <- newMVar []
     historyVar <- initHistory runner >>= newMVar

@@ -29,6 +29,7 @@ module Plush.Job.Output (
     outputStreamJson,
 
     getAvailable,
+    getOne,
     ) where
 
 
@@ -127,6 +128,16 @@ getAvailable :: OutputStream a -> IO [a]
 getAvailable (OutputStream fd p0 mv) = do
     s <- readAvailable fd
     modifyMVar mv (\p -> return $ parseAvailable p0 s p)
+
+-- | Return the next available item. Blocks until available via
+-- 'threadWaitRead'
+getOne :: OutputStream a -> IO a
+getOne os@(OutputStream fd _p0 _mv) = do
+    as <- getAvailable os
+    case as of
+        [] -> threadWaitRead fd >> getOne os
+        [a] -> return a
+        (a:_as') -> return a -- TODO(mzero): should stash as' for future return
 
 -- | Read all available bytes from a file descriptor.
 readAvailable :: Fd -> IO B.ByteString -- TODO: should merge with parsing logic

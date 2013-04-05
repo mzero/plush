@@ -17,16 +17,19 @@ limitations under the License.
 {-# LANGUAGE CPP #-}
 
 module Plush.Server.Warp (
-    runSettings,
+    bindServerSocket,
+    closeServerSocket,
+    runSettingsSocket,
     )
     where
 
 
-import Control.Exception (bracket)
+import qualified Control.Exception as Ex
 import Data.Conduit.Network (bindPort)
 import Network.Socket (accept, fdSocket, sClose, Socket)
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai as Wai
+import System.IO.Error (alreadyInUseErrorType, isAlreadyInUseError, mkIOError)
 import System.Posix.IO (FdOption(CloseOnExec), setFdOption)
 
 #if MIN_VERSION_warp(1, 3, 0)
@@ -36,18 +39,44 @@ import Network.Sendfile (sendfileWithHeader, FileRange(PartOfFile))
 import qualified Network.Socket.ByteString as Sock
 #endif
 
--- | A reimplementation of 'Warp.runSettings' to gain access to the sockets.
--- This is to keep them from leaking into exec'd processes.
-runSettings :: Warp.Settings -> Wai.Application -> IO ()
-runSettings settings app = bracket sBind sClose $ \socket -> do
-    setSocketCloseOnExec socket
-    Warp.runSettingsConnection settings (getter socket) app
+
+
+-- | Create a server socket.
+--
+-- If a port number is supplied, then only that port is tried. Failure is
+-- signaled by throwing an IOException. If no port number is supplied, then
+-- a free port is hunted for. Use `socketPort` to extract the port used from
+-- the return socket.
+bindServerSocket :: Maybe Int -> Warp.HostPreference -> IO Socket
+bindServerSocket (Just port) host = do
+    socket <- bindPort port host
+    setSocketCloseOnExec socket `Ex.onException` closeServerSocket socket
+    return socket
+bindServerSocket Nothing host = tryBind [29500..29599]
   where
-    sBind = bindPort (Warp.settingsPort settings) (Warp.settingsHost settings)
-    getter socket = do
+    tryBind [] = Ex.throwIO $ mkIOError alreadyInUseErrorType
+        "No ports could be bound" Nothing Nothing
+    tryBind (p:ps) = bindServerSocket (Just p) host `Ex.catch` tryNext ps
+    tryNext ps e | isAlreadyInUseError e = tryBind ps
+                 | otherwise = Ex.throwIO e
+
+-- | Close a server socket.
+closeServerSocket :: Socket -> IO ()
+closeServerSocket = sClose
+
+-- | A reimplementation of 'Warp.runSettingsSocket' to gain access to the
+-- socket, those they can be kept from leaking into exec'd processes.
+runSettingsSocket :: Warp.Settings -> Socket -> Wai.Application -> IO ()
+runSettingsSocket settings socket app =
+    Warp.runSettingsConnection settings getter app
+  where
+    getter = do
         (conn, sa) <- accept socket
         setSocketCloseOnExec conn
+            -- this call was added in warp-1.3.7.4, to replicate the fixed
+            -- code from here, but has a bug, so we still use this version.
         return (socketConnection conn, sa)
+
 
 #if MIN_VERSION_warp(1, 3, 0)
 #else
@@ -56,12 +85,14 @@ socketConnection :: Socket -> Warp.Connection
 socketConnection s = Warp.Connection
     { Warp.connSendMany = Sock.sendMany s
     , Warp.connSendAll = Sock.sendAll s
-    , Warp.connSendFile = \fp off len act hdr -> sendfileWithHeader s fp (PartOfFile off len) act hdr
+    , Warp.connSendFile = sendFile
     , Warp.connClose = sClose s
     , Warp.connRecv = Sock.recv s bytesPerRead
     }
   where
     bytesPerRead = 4096
+    sendFile fp off len act hdr =
+        sendfileWithHeader s fp (PartOfFile off len) act hdr
 #endif
 
 -- | Sockets used by the web server need to be set so that they are not leaked

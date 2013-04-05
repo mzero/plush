@@ -14,139 +14,164 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Plush.Server (
-    server,
+    ServerType(..),     -- re-exported
+    ServerStart(..),
+
+    serverStart,
+    serverStop,
+    serverStatus,
+    serverRun,
+
+    serversList,
     )
     where
 
-import Control.Applicative ((<$>), (<|>))
-import Control.Concurrent (forkIO)
+import Control.Concurrent (threadDelay)
 import qualified Control.Exception as Ex
-import Control.Monad (replicateM, void)
-import Control.Monad.IO.Class (liftIO)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
-import Data.Conduit.Network (HostPreference(Host))
-import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
-#if MIN_VERSION_wai_middleware_route(0, 7, 3)
-#else
-import qualified Data.Text.Encoding as T
-#endif
-import Data.Time (getZonedTime)
-import qualified Network.HTTP.Types as H
-import qualified Network.Wai as Wai
-import qualified Network.Wai.Handler.Warp as Warp
-import qualified Network.Wai.Middleware.Route as Route
-import System.Posix (Fd, sleep)
-import System.Random
+import Control.Monad (void, when)
+import Control.Monad.Exception (catchIOError)
+import Data.Aeson
+import System.Posix
+import System.Process (rawSystem)
 
-import Plush.Job
-import Plush.Job.Types
-import Plush.Resource
 import Plush.Run
-import Plush.Run.Posix.Utilities (writeStr)
-import Plush.Server.API
-import Plush.Server.Utilities
-import qualified Plush.Server.Warp as Warp'
+import Plush.Run.Posix.Return (success, exitMsg)
+import Plush.Run.Posix.Utilities (outStrLn)
+import Plush.Run.Types
+import Plush.Server.Remote
+import Plush.Server.Status
+import Plush.Server.WebServer
+import Plush.Utilities
 
 
--- | Run the plush web server. The supplied 'Runner' is used as the shell, and
--- an optional port can be supplied. This action does not complete until the
--- shell exits.
-server :: Runner -> Maybe Int -> IO ()
-server runner port = do
-    (shellThread, origOutFd, origErrFd) <- startShell runner
-    key <- genKey
-    writeStr origOutFd $ "Starting server, connect to: " ++ startUrl key
-    void $ forkIO $ launchOpen shellThread (openCmd $ startUrl key)
-    Warp'.runSettings (settings origErrFd)
-        $ dispatchApp (jsonApis shellThread key)
-        $ staticApp
-        $ respApp notFound
+data ServerStart = LocalStart (IO Runner) | RemoteStart String
+
+serverStartType :: ServerStart -> ServerType
+serverStartType (LocalStart _) = LocalServer
+serverStartType (RemoteStart endpoint) = RemoteServer endpoint
+
+
+
+checkIfRunning :: ProcessID -> IO Bool
+checkIfRunning pid = (getProcessPriority pid >> return True)
+    `Ex.catch` ((\_ -> return False) :: IOError -> IO Bool)
+
+check :: ServerType -> IO (Either String ServerInfo)
+check st = readServerInfo st >>= maybe missing present
   where
-    port' = fromMaybe 29544 port
-    settings errOut = Warp.defaultSettings
-        { Warp.settingsPort = port'
-        , Warp.settingsHost = Host "127.0.0.1"
-        , Warp.settingsOnException = reportError errOut
-        }
-    genKey = replicateM 40 $ randomRIO ('a','z')
-    startUrl key =  "http://localhost:" ++ show port' ++ "/index.html#" ++ key
-    openCmd url = "xdg-open " ++ url ++ " 2>/dev/null || open " ++ url
-    launchOpen st cmd =
-        sleep 1 >> submitJob st (CommandRequest "opener" False (CommandItem cmd))
+    missing = return $ Left "no server info found"
+    present si = do
+        r <- checkIfRunning $ siPid si
+        if r
+            then return $ Right si
+            else do
+                removeServerInfo st
+                makeLogger si >>= ($ "appears dead, removing server info")
+                return $ Left "server appears dead, removing server info"
 
 
-reportError :: Fd -> Ex.SomeException -> IO ()
-reportError errOut err = logger $
-    (case e of { Just Ex.ThreadKilled -> Just Nothing; _ -> Nothing })
-    <|> (Just . ("Invalid Request: " ++) . show) <$> (e :: Maybe Warp.InvalidRequest)
-    <|> (Just . Just $ "Exception: " ++ show err)
+start :: ServerStart -> Maybe Int -> IO (Either String ServerInfo)
+start sst mPort =
+    readServerInfo (serverStartType sst) >>= maybe missing present
   where
-    e :: (Ex.Exception a) => Maybe a
-    e = Ex.fromException err
+    present _ = return $ Left
+                    "Not starting: server info found.\n\
+                    \Use --server status to find out more.\n\
+                    \Use --server stop to stop it."
+    missing = case sst of
+        (LocalStart mkRunner) -> startLocal mkRunner mPort
+        (RemoteStart endpoint) -> startRemote endpoint mPort
 
-    logger (Just (Just s)) = do
-        t <- show <$> getZonedTime
-        writeStr errOut $ t ++ ' ' : s
-    logger _ = return ()
-
-#if MIN_VERSION_wai_middleware_route(0, 7, 3)
-
-dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
-dispatchApp = Route.dispatch True . Route.mkRoutes' . map (uncurry Route.Post)
-
-#else
-
--- wai-middleware-route (0, 2, 0)
-dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
-dispatchApp = Route.dispatch . map rte
+stop :: ServerType -> IO (Either String ServerInfo)
+stop st = readServerInfo st >>= maybe missing present
   where
-    rte (p,a) = (Route.rule H.methodPost (T.encodeUtf8 $ T.append "^/" p), a)
+    missing = return $ Left "no server info found"
+    present si = do
+        stopped <- tryToStop
+            [ notRunning
+            , gracefulStop st
+            , signalStop softwareTermination
+            , signalStop killProcess
+            ]
+        if stopped
+            then do
+                removeServerInfo st
+                return $ Right si
+            else return $ Left "couldn't stop the process even with kill"
+      where
+        tryToStop [] = logStop "couldn't stop" >> return False
+        tryToStop ((stopper, whenStopped):more) = do
+            _ <- stopper
+            r <- checkIfRunning (siPid si)
+            if r then tryToStop more else whenStopped >> return True
 
-#endif
+        notRunning = (return (), logStop "already stopped")
+        gracefulStop LocalServer = (return (), return ())
+        gracefulStop (RemoteServer _) = (stopRemote si, return ())
+        signalStop sig =
+            ( signalProcess sig (siPid si) >> threadDelay 100000
+                -- TODO(mzero) is .1s correct?
+            , logStop $ "stopped by signal " ++ show sig
+            )
+        logStop msg = makeLogger si >>= ($ msg)
 
-jsonApis :: ShellThread -> String -> [(T.Text, Wai.Application)]
-jsonApis shellThread key =
-    [ ("api/run", jsonKeyApp runApp)
-    , ("api/poll", jsonKeyApp pollApp)
-    , ("api/input", jsonKeyApp inputApp)
-    , ("api/history",  jsonKeyApp historyApp)
-    ]
+report :: ServerType -> (ServerInfo -> String)
+    -> OutputVerbosity -> Either String ServerInfo -> IO ExitCode
+report _ _ OutputQuiet (Left _) = return $ ExitFailure 1
+report _ _ OutputQuiet (Right _) = return ExitSuccess
+
+report st _ OutputNormal (Left msg) =
+    exitMsg 1 $ serverTypePrefix st ++ ": " ++ msg
+report _  f OutputNormal (Right si) =
+    outStrLn (serverInfoPrefix si ++ ": " ++ f si) >> success
+
+report _ _ OutputJson (Left msg) = do
+    outStrLn (encode $ object ["error" .= msg])
+    return $ ExitFailure 1
+report _ _ OutputJson (Right si) = outStrLn (encode si) >> success
+
+
+serverStart :: ServerStart -> OutputVerbosity -> Maybe Int -> IO ExitCode
+serverStart sst verbosity mPort =
+    start sst mPort >>= report (serverStartType sst) startedMsg verbosity
   where
-    jsonKeyApp j = jsonApp $ keyedApp key $ j shellThread
+    startedMsg si = "started\n" ++ startUrl si
 
+serverStop :: ServerType -> OutputVerbosity -> IO ExitCode
+serverStop st verbosity =
+    stop st >>= report st (const $ "stopped") verbosity
 
-staticApp :: Wai.Middleware
-staticApp app req = do
-    mbs <- if ok then liftIO (getStaticResource fp) else return Nothing
-    case mbs of
-        Nothing -> app req
-        Just bs -> liftIO . return . resp $ LBS.fromChunks [bs]
+serverStatus :: ServerType -> OutputVerbosity -> IO ExitCode
+serverStatus st verbosity = check st >>= report st statusMsg verbosity
   where
-    pi_ = Wai.pathInfo req
-    ok = all (not . T.isPrefixOf ".") pi_
-    fp = T.unpack $ T.intercalate "/" pi_
-    resp = Wai.responseLBS H.status200 [("Content-Type", getMimeType fp)]
+    statusMsg si = startUrl si
 
-getMimeType :: FilePath -> BS.ByteString
-getMimeType fp = fromMaybe defaultMimeType $ flip lookup defaultMimeTypes
-    $ drop 1 $ dropWhile (/= '.') fp
 
-defaultMimeType :: BS.ByteString
-defaultMimeType = "application/octet-stream"
+serverRun :: ServerStart -> OutputVerbosity -> Bool -> IO ExitCode
+serverRun sst verbosity launch = do
+    s1 <- check st
+    s2 <- either (const $ start sst Nothing) (return . Right) s1
+    case (s2, launch) of
+        (Right si, True) -> do
+            let url = startUrl si
+            ec <- safeRawSystem "xdg-open" [url]
+            when (ec /= ExitSuccess) $ void $ safeRawSystem "open" [url]
+        _ -> return ()
+    report (serverStartType sst) msg verbosity s2
+  where
+    st = serverStartType sst
+    safeRawSystem cmd args = rawSystem cmd args
+        `catchIOError` (\_ -> return $ ExitFailure 1)
+    msg si = "running, "
+        ++ if launch then "launching web page" else "url:\n" ++ startUrl si
 
-defaultMimeTypes :: [(String, BS.ByteString)]
-defaultMimeTypes =
-    [ ("css",     "text/css")
-    , ("gif",     "image/gif")
-    , ("html",    "text/html")
-    , ("jpeg",    "image/jpeg")
-    , ("jpg",     "image/jpeg")
-    , ("js",      "text/javascript")
-    , ("ogg",     "application/ogg")
-    , ("png",     "image/png")
-    ]
+
+serversList :: OutputVerbosity -> IO ExitCode
+serversList verbosity =
+    allKnownServers >>= mapM list >>= return . summarizeExit
+  where
+    list st = check st >>= report st (const "running") verbosity
+    summarizeExit = intToExitCode . maximum . (0:) . map exitCodeToInt

@@ -103,8 +103,11 @@ Library
     Plush.Run
     Plush.Server
     Plush.Server.API
+    Plush.Server.Remote
+    Plush.Server.Status
     Plush.Server.Utilities
     Plush.Server.Warp
+    Plush.Server.WebServer
     Plush.Types
     Plush.Types.CommandSummary
     Plush.Utilities

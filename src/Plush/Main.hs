@@ -22,6 +22,7 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
+import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Monoid (mconcat)
 import System.Console.Haskeline
@@ -64,6 +65,8 @@ plushMain = do
                         , optShellName = progName
                         , optSetFlags = flagF
                         , optShellArgs = []
+                        , optPort = Nothing
+                        , optVerbosity = OutputNormal
                         }
             optMode opts opts args
             exitSuccess
@@ -76,6 +79,8 @@ data Options = Options
                 , optShellName :: String
                 , optSetFlags :: F.Flags -> F.Flags
                 , optShellArgs :: [String]
+                , optPort :: Maybe String
+                , optVerbosity :: OutputVerbosity
                 }
 
 commandLineOptions :: [OptionSpec Options]
@@ -85,29 +90,43 @@ commandLineOptions =
     , OptionSpec ['c'] []             (NoArg $ setMode processArg)
     , OptionSpec ['s'] []             (NoArg $ setMode processStdin)
     , OptionSpec ['w'] ["webserver"]  (NoArg $ setMode runWebServer)
+    , OptionSpec ['l'] ["local"]      (NoArg $ setMode localCommand)
+    , OptionSpec ['r'] ["remote"]     (ReqArg $ setMode . remoteCommand)
+    , OptionSpec []    ["servers"]    (NoArg $ setMode serversCommand)
     , OptionSpec []    ["doctest"]    (NoArg $ setMode doctest)
     , OptionSpec []    ["shelltest"]  (NoArg $ setMode shelltest)
     , OptionSpec []    ["login"]      (NoArg $ setLogin True)
     , OptionSpec ['t'] ["test"]       (NoArg $ setRunner runnerInTest)
+    , OptionSpec ['p'] ["port"]       (ReqArg $ setPort)
+    , OptionSpec []    ["quiet"]      (NoArg $ setVerbosity OutputQuiet)
+    , OptionSpec []    ["json"]       (NoArg $ setVerbosity OutputJson)
     ]
   where
     setMode m opts = opts { optMode = m }
     setRunner r opts = opts { optRunner = r }
     setLogin b opts = opts { optLogin = b }
+    setPort n opts = opts { optPort = Just n }
+    setVerbosity v opts = opts { optVerbosity = v }
 
 
 usage :: Handle -> IO ()
 usage h = do
     prog <- getProgName
     hPutStrLn h "Usage:"
-    hPutStr h $ unlines . map (("  "++prog)++) . lines $
-        "                    -- read commands from stdin\n\
-        \ -s                 -- read commands from stdin\n\
-        \ <file>             -- read commands from file\n\
-        \ -c <commands>      -- read commands from argument\n\
-        \ -w [<port>]        -- run web server\n\
-        \ --doctest <file>*  -- run doctest over the files\n\
-        \ --shelltest shell <file>* -- run doctest via the given shell\n"
+    hPutStr h $ unlines . map (prefix prog) . lines $
+        "                           -- read commands from stdin\n\
+        \ -s                        -- read commands from stdin\n\
+        \ FILE                      -- read commands from file\n\
+        \ -c COMMAND...             -- read commands from arguments\n\
+        \\n\
+        \ -l | --local              -- launch (or reconnect) a local shell\n\
+        \ -r | --remote [USER@]HOST -- launch (or reconnect) a remote shell\n\
+        \\n\
+        \ --doctest FILE...         -- run doctest over the files\n\
+        \ --shelltest SHELL FILE... -- run doctest via the given shell\n"
+  where
+    prefix _ "" = ""
+    prefix p l  = "  " ++ p ++ l
 
 usageFailure :: String -> IO a
 usageFailure msg = do
@@ -241,15 +260,44 @@ processScript opts script = do
 -- Web & Server Modes
 --
 
-runWebServer :: Options -> [String] -> IO ()
-runWebServer opts args = case args of
-    [] -> serve Nothing
-    [port] -> maybe badPort (serve . Just) $ readMaybe port
-    _ -> usageFailure "too many arguments"
+serverCommand :: ServerType -> Options -> [String] -> IO ()
+serverCommand st opts args = exitWith =<< case args of
+    []              -> doRun True
+    ["launch"]      -> doRun True
+    ["no-launch"]   -> doRun False
+    ["start"] -> case optPort opts of
+        Nothing     -> doServe Nothing
+        Just port   -> maybe (badPort port) (doServe . Just) $ readMaybe port
+    ["stop"]        -> serverStop st verbosity
+    ["status"]      -> serverStatus st verbosity
+    _ -> usageFailure $ "unknown sub-command: " ++ intercalate " " args
+
   where
-    serve mp = initialInteractiveRunner opts' >>= flip server mp
-    badPort = usageFailure "not a port number"
+    doRun launch = serverRun (starter st) verbosity launch
+    doServe mp = serverStart (starter st) verbosity mp
+
+    starter LocalServer = LocalStart $ initialInteractiveRunner opts'
+    starter (RemoteServer endpoint) = RemoteStart endpoint
+
+    badPort port = usageFailure $ "not a port number: " ++ port
     opts' = opts { optLogin = True }
+    verbosity = optVerbosity opts
+
+localCommand :: Options -> [String] -> IO ()
+localCommand = serverCommand LocalServer
+
+remoteCommand :: String -> Options -> [String] -> IO ()
+remoteCommand endpoint = serverCommand (RemoteServer endpoint)
+
+runWebServer :: Options -> [String] -> IO ()
+runWebServer opts args = do
+    hPutStr stderr "The options -w and --webserver are deprecated. \n\
+                   \Running -l (--local) instead.\n"
+    localCommand opts args
+
+serversCommand :: Options -> [String] -> IO ()
+serversCommand opts [] = serversList (optVerbosity opts) >>= exitWith
+serversCommand _ _ = usageFailure $ "no arguments accepted"
 
 --
 -- Testing Modes

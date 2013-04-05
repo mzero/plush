@@ -19,6 +19,8 @@ module Plush.Utilities (
     readMaybe,
     readUtf8File,
     displayVersion,
+
+    OutputVerbosity(..)
     )
     where
 
@@ -56,3 +58,6 @@ displayVersion = headOr (showVersion v) $ reverse $ versionTags v
     v = CabalPaths.version
     headOr def [] = def
     headOr _ (a:_) = a
+
+-- | Level of output requested from a plush mode.
+data OutputVerbosity = OutputQuiet | OutputNormal | OutputJson
