@@ -30,7 +30,6 @@ module Plush.Job.History (
 
 
 import qualified Control.Exception as Exception
-import Control.Monad (when)
 import Data.Aeson (encode, FromJSON, fromJSON, Result(..), ToJSON)
 import Data.Maybe (mapMaybe)
 import qualified Data.Text.Lazy as LT
@@ -38,7 +37,7 @@ import qualified Data.Text.Lazy.Encoding as LT
 import Data.Time.Clock
 import Data.Time.Format
 import qualified Data.Traversable as TR
-import System.FilePath ((</>), splitExtension, takeDirectory)
+import System.FilePath ((</>), splitExtension)
 import System.Locale
 import System.Posix
 
@@ -46,6 +45,7 @@ import Plush.Job.Output
 import Plush.Job.Types
 import Plush.Run
 import Plush.Run.Posix (getDirectoryContents, write)
+import Plush.Run.Posix.Utilities (createPath)
 import Plush.Run.ShellExec (getVar)
 
 data History = History { histDir :: Maybe FilePath }
@@ -60,17 +60,8 @@ initHistory runner = do
   where
     mkHistDir h = do
         let hdir = h </> ".plush/history"
-        mkPath hdir
+        createPath hdir ownerModes
         return hdir
-
-    -- TODO: refactor these with the ones from FileSystem.hs
-    mkNorm fp = createDirectory fp accessModes
-    mkPath fp = do
-        s <- (isDirectory `fmap` getFileStatus fp) `catchAllAs` False
-        when (not s) $ do
-            mkPath (takeDirectory fp)
-            mkNorm fp
-
 
 startHistory :: CommandRequest -> History -> IO (History, HistoryFile)
 startHistory (CommandRequest _ True (CommandItem _cmd))

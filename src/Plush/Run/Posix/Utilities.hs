@@ -30,11 +30,14 @@ module Plush.Run.Posix.Utilities (
 
     -- * File and directory existance
     doesFileExist, doesDirectoryExist,
+    createPath,
+
     -- * Path simplification
     simplifyPath, reducePath,
 ) where
 
 import Control.Monad.Exception (bracket, catchIOError)
+import Control.Monad (unless)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -140,6 +143,16 @@ doesDirectoryExist :: (PosixLike m) => FilePath -> m Bool
 doesDirectoryExist fp =
     catchIOError (getFileStatus fp >>= return . isDirectory) (\_ -> return False)
 
+-- | Try to ensure that a directory, and all its parents exist, creating them
+-- if needed with the given access mode. Note that due to permissions or other
+-- issues this can fail with various thrown excpetions.
+createPath :: (PosixLike m) => FilePath -> FileMode -> m ()
+createPath fp mode = do
+    s <- (isDirectory `fmap` getFileStatus fp)
+            `catchIOError` (const $ return False)
+    unless s $ do
+        createPath (takeDirectory fp) mode
+        createDirectory fp mode
 
 -- | Simplify a file path, elminiating . and .. components (if possible)
 simplifyPath :: FilePath -> FilePath

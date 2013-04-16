@@ -41,14 +41,8 @@ mkdir = BuiltInUtility $ stdSyntax options "" (perArg go)
         -- TODO: support the -m mode option
         ]
 
-    go flags dir = (if 'p' `elem` flags then mkPath else mkNorm) dir >> success
-
-    mkNorm fp = createDirectory fp accessModes
-    mkPath fp = do
-        s <- getFileStatus fp
-        when (not $ isDirectory s) $ do
-            mkPath (takeDirectory fp)
-            mkNorm fp
+    go flags dir = op flags dir accessModes >> success
+    op flags = if 'p' `elem` flags then createPath else createDirectory
 
 
 touch :: (PosixLike m) => BuiltInUtility m
