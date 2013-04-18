@@ -46,19 +46,22 @@ import Plush.Server.Status
 import Plush.Server.WebServer
 import Plush.Utilities
 
-
+-- | Information needed to start a server. Gleaned from the command line.
 data ServerStart = LocalStart (IO Runner) | RemoteStart String
 
 serverStartType :: ServerStart -> ServerType
 serverStartType (LocalStart _) = LocalServer
 serverStartType (RemoteStart endpoint) = RemoteServer endpoint
 
-
-
+-- | Check to see if a given process is running.
+-- This function never throws, and will return `False` when access permissions
+-- restrict inquiring about a process.
 checkIfRunning :: ProcessID -> IO Bool
 checkIfRunning pid = (getProcessPriority pid >> return True)
     `Ex.catch` ((\_ -> return False) :: IOError -> IO Bool)
 
+-- | Check if a server seems to be up and running. If the server information
+-- appears stale, this function will remove it.
 check :: ServerType -> IO (Either String ServerInfo)
 check st = readServerInfo st >>= maybe missing present
   where
@@ -72,7 +75,7 @@ check st = readServerInfo st >>= maybe missing present
                 makeLogger si >>= ($ "appears dead, removing server info")
                 return $ Left "server appears dead, removing server info"
 
-
+-- | Start a server, if it isn't already running.
 start :: ServerStart -> Maybe Int -> IO (Either String ServerInfo)
 start sst mPort =
     readServerInfo (serverStartType sst) >>= maybe missing present
@@ -85,6 +88,8 @@ start sst mPort =
         (LocalStart mkRunner) -> startLocal mkRunner mPort
         (RemoteStart endpoint) -> startRemote endpoint mPort
 
+-- | Stop a server. Several means are tired, including both TERM and KILL
+-- signals.
 stop :: ServerType -> IO (Either String ServerInfo)
 stop st = readServerInfo st >>= maybe missing present
   where
@@ -118,6 +123,8 @@ stop st = readServerInfo st >>= maybe missing present
             )
         logStop msg = makeLogger si >>= ($ msg)
 
+-- | Format the output of one of the server operations based on the requested
+-- verbosity level.
 report :: ServerType -> (ServerInfo -> String)
     -> OutputVerbosity -> Either String ServerInfo -> IO ExitCode
 report _ _ OutputQuiet (Left _) = return $ ExitFailure 1
@@ -133,23 +140,26 @@ report _ _ OutputJson (Left msg) = do
     return $ ExitFailure 1
 report _ _ OutputJson (Right si) = outStrLn (encode si) >> success
 
-
+-- | Start a server command.
 serverStart :: ServerStart -> OutputVerbosity -> Maybe Int -> IO ExitCode
 serverStart sst verbosity mPort =
     start sst mPort >>= report (serverStartType sst) startedMsg verbosity
   where
     startedMsg si = "started\n" ++ startUrl si
 
+-- | Stop a server command.
 serverStop :: ServerType -> OutputVerbosity -> IO ExitCode
 serverStop st verbosity =
     stop st >>= report st (const $ "stopped") verbosity
 
+-- | Find status of a server command.
 serverStatus :: ServerType -> OutputVerbosity -> IO ExitCode
 serverStatus st verbosity = check st >>= report st statusMsg verbosity
   where
     statusMsg si = startUrl si
 
-
+-- | Start a server if not already running, and then (optionally) launch a
+-- web browser on the URL of the server.
 serverRun :: ServerStart -> OutputVerbosity -> Bool -> IO ExitCode
 serverRun sst verbosity launch = do
     s1 <- check st
@@ -168,7 +178,7 @@ serverRun sst verbosity launch = do
     msg si = "running, "
         ++ if launch then "launching web page" else "url:\n" ++ startUrl si
 
-
+-- | List information about all servers known.
 serversList :: OutputVerbosity -> IO ExitCode
 serversList verbosity =
     allKnownServers >>= mapM list >>= return . summarizeExit

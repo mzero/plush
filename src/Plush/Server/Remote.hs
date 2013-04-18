@@ -34,7 +34,14 @@ import Plush.Run.Types
 import Plush.Server.Status
 import Plush.Server.Warp
 
-
+-- | Start an ssh connection to a remote host, and estabilsh a forwarded
+-- connection to the plush server running locally there.
+--
+-- A ssh connection in master mode is started first, letting the user interact
+-- with the process to authenticate as needed before it detaches. Then, using
+-- that connection, further ssh commands probe the pid of the detached ssh
+-- master, start the remote plush server, and finally establish a local port
+-- forwarded to the remote.
 startRemote :: String -> Maybe Int -> IO (Either String ServerInfo)
 startRemote endpoint mPort = runErrorT $ do
     cfp <- lift sshControlFilePath >>=
@@ -122,6 +129,7 @@ startRemote endpoint mPort = runErrorT $ do
         closeServerSocket sock
         return port
 
+-- | Stop a connection to a remote host.
 stopRemote :: ServerInfo -> IO ()
 stopRemote si = sshControlFilePath >>= \mcfp -> case (mcfp, siType si) of
     (Just cfp, RemoteServer endpoint) -> do

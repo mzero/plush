@@ -57,6 +57,11 @@ import Plush.Server.Utilities
 import qualified Plush.Server.Warp as Warp'
 
 
+-- | Start a local plush server by detaching the server process.
+--
+-- The server process communicates its success or failure at starting up on
+-- a pipe that is created between it and the parent process running this
+-- action.
 startLocal :: IO Runner -> Maybe Int -> IO (Either String ServerInfo)
 startLocal mkRunner mPort = do
     (mP, sP) <- createPipe

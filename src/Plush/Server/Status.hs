@@ -54,6 +54,10 @@ import Plush.Run.Posix.Utilities
 
 data ServerType = LocalServer | RemoteServer String
 
+-- | Information about a server.
+--
+-- If for a remote server, the pid and port are the local pid (of the ssh
+-- master) and port (of the locally forwarded connection.)
 data ServerInfo = ServerInfo
     { siType :: ServerType
     , siPid :: ProcessID
@@ -81,11 +85,12 @@ instance FromJSON ServerInfo where
 
     parseJSON _ = mzero
 
-
+-- | A uniform, human readable prefix for a `ServerType`
 serverTypePrefix :: ServerType -> String
 serverTypePrefix LocalServer = "local plush"
 serverTypePrefix (RemoteServer endpoint) = "remote to " ++ endpoint
 
+-- | A uniform, human readable prefix for a `ServerInfo`
 serverInfoPrefix :: ServerInfo -> String
 serverInfoPrefix si = serverTypePrefix (siType si) ++ extra (siType si) ++ proc
   where
@@ -93,7 +98,10 @@ serverInfoPrefix si = serverTypePrefix (siType si) ++ extra (siType si) ++ proc
     extra (RemoteServer _) = ", ssh"
     proc = "[" ++ show (siPid si) ++ "]"
 
-
+-- | All server information is stored in files under @~/.plush/server@. This
+-- function returns that path to some named file in that directory, making the
+-- directories if needed. If @HOME@ cannot be determined, then all storage
+-- functions do nothing.
 basePath :: FilePath -> IO (Maybe FilePath)
 basePath fp = getEnv "HOME" >>= maybe (return Nothing) mkBase
   where
@@ -101,6 +109,7 @@ basePath fp = getEnv "HOME" >>= maybe (return Nothing) mkBase
         createPath server ownerModes
         return $ Just $ server </> fp
 
+-- | Path to store server info in.
 serverInfoPath :: ServerType ->  IO (Maybe FilePath)
 serverInfoPath LocalServer =  basePath "local.json"
 serverInfoPath (RemoteServer endpoint) =
@@ -127,6 +136,8 @@ removeServerInfo st = serverInfoPath st >>= maybe (return ()) rm
   where
     rm fp = removeLink fp `Ex.catchIOError` (\_ -> return ())
 
+-- \ Return the list of all servers with information stored. Determined simply
+-- from the `basePath` directory contents.
 allKnownServers :: IO [ServerType]
 allKnownServers = basePath "" >>= maybe (return []) go
   where
@@ -139,6 +150,10 @@ allKnownServers = basePath "" >>= maybe (return []) go
                | otherwise = Nothing
     suffix p s = reverse <$> prefix (reverse p) (reverse s)
 
+-- | A logger is an action that will log information in the server log file
+-- (@~/.plush/server/log@) The log entries are prefixed for a given server.
+-- Entries are time stamped, and the log file is opened and closed on each log
+-- action.
 makeLogger :: ServerInfo -> IO (String -> IO ())
 makeLogger si = basePath "log" >>= return . maybe nullLogger logger
   where
@@ -154,9 +169,11 @@ makeLogger si = basePath "log" >>= return . maybe nullLogger logger
     openFdRW fp = openFd fp ReadWrite (Just ownerRWMode) defaultFileFlags
     ownerRWMode = ownerReadMode `unionFileModes` ownerWriteMode
 
+-- | Format the url for a given server.
 startUrl :: ServerInfo -> String
 startUrl si =
     "http://localhost:" ++ show (siPort si) ++ "/index.html#" ++ siKey si
 
+-- | The path format string for ssh's control pipes.
 sshControlFilePath :: IO (Maybe FilePath)
 sshControlFilePath = basePath "control-%r:%h:%p"
