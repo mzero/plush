@@ -12,18 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'api', 'util', 'dir-status', 'env-status'], function($, api, util, dirStatus, envStatus) {
+define(['jquery', 'api', 'util', 'ls-status', 'svn-status'],
+  function($, api, util, lsStatus, svnStatus) {
+
   "use strict";
 
-  function heuristic(ctx, cwd, runCommand) {
-    return [dirStatus, envStatus]; 
+  function updateStatusPane(ctx, cwd, runCommand) {
+    var lsCmd = 'ls -d .svn';
+    api.runStatus(lsCmd, function (d) { statusResults(ctx, cwd, runCommand, d); });
   }
 
-  function updateStatusPane(ctx, cwd, runCommand) {
-    var statuses = heuristic(ctx, cwd);
-    statuses.forEach(function(status) {
-      status.updateStatusPane(ctx, cwd, runCommand);
-    });
+  function statusResults(ctx, cwd, runCommand, d) {
+    if (!d.stdout) {
+      lsStatus.updateStatusPane(ctx, cwd, runCommand);   
+    } else if (d.stdout.indexOf('.svn') >= 0) {
+      svnStatus.updateStatusPane(ctx, cwd, runCommand);
+    } else {
+      lsStatus.updateStatusPane(ctx, cwd, runCommand);
+    }
   }
 
   return {

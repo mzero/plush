@@ -69,21 +69,8 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   function updateContext(ctx) {
     if (ctx.cwd) {
       cwd.parseToDom(ctx.cwd, runCommand);
-      status.updateStatusPane(ctx.cwd, runCommand);
+      status.updateStatusPane(ctx, ctx.cwd, runCommand);
     }
-    var envList = $('#context-env');
-    var shList = $('#context-shell');
-    envList.empty();
-    shList.empty();
-    var vars = ctx.vars || [];
-    vars.forEach(function(v) {
-      var dt = $('<dt></dt>', { class: v.mode });
-      var dd = $('<dd></dd>', { class: v.mode });
-      dt.text(v.name);
-      dd.text(v.value);
-      if (v.scope === 'env') { envList.append(dt); envList.append(dd); }
-      if (v.scope === 'shell') { shList.append(dt); shList.append(dd); }
-    });
   }
 
   function runContext() {
