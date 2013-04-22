@@ -1,5 +1,5 @@
 /* @override
-	http://localhost:29544/css/plush.css
+	http://localhost:29500/css/plush.css
 */
 
 /*
@@ -99,10 +99,17 @@ body {
 }
 
 #status > div {
+  position: absolute;
+  left: 0em;
+  right: 0em;
+  top: 1px;
+  bottom: 0em;
+  overflow: auto;
+}
+
+#status > div > div {
   margin: 1em 1em 1em 0;
   padding: 1em;
-  max-height: 90%;
-  overflow: scroll;
 }
 
 #scrollback,
@@ -185,10 +192,10 @@ html {
   box-shadow: inset 0 5px 12px -1px rgba(92, 95, 76, 0.6);
 }
 
-#status > div {
-  background: #f5f5f5;
-  border-radius: 4px;
-  box-shadow: inset 0 2px 5px -1px rgba(92, 95, 76, 0.6);
+#status > div > div {
+  background: #f4f0e4;
+  border-radius: 2px;
+  box-shadow: 0 2px 5px -1px rgba(92, 95, 76, 0.6);
 }
 
 #input-area {
@@ -346,7 +353,7 @@ h1,h2,h3,h4,blockquote,q {
   font-size: 100%;
 }
 
-#status > div {
+#status > div > div {
   line-height: 1.2;
   font-size: 82%;
 }
@@ -665,18 +672,23 @@ ul.horiz-menu li {
 #status-dir .hidden {
   position: absolute;
   top: 1.35em;
-  z-index: 1;
-  background-color: rgba(254,238,124,0.75);
+  background-color: rgba(254,238,124,0.85);
   width: 16em;
 }
 
 #status-dir td:hover {
-  background-color: rgba(254,238,124,0.75);
+  background-color: rgba(254,238,124,0.85);
   padding-left: 1em;
   cursor: none;
 }
-#status-dir td .hidden { left: -9999em; }
-#status-dir td:hover .hidden { left: inherit; right: 0; }
+#status-dir td .hidden {
+  left: -9999em;
+  z-index: 1;
+}
+#status-dir td:hover .hidden {
+  left: inherit;
+  right: 0;
+}
 
 #status-dir dl {
   font-size: 90%;
