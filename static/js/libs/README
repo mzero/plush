@@ -17,6 +17,22 @@ Local Modifications:
 -none-
 
 
+hterm
+=====
+
+URL: http://www.chromium.org/chromium-os
+Version: hterm 1.4 @ git 10de791, release-R28-4100.B
+License: MIT
+Licesne File: LICENSE
+Repo: http://git.chromium.org/gitweb/?p=chromiumos/platform/assets.git
+Sub-tree: chromeapps/hterm
+
+Local Modifications:
+Distribution .js files were prepared with the mkdeps.sh script in the source
+repo. These .js files are the ones checked in here.
+
+
+
 RequireJS
 ==========
 

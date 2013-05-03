@@ -13,19 +13,13 @@
 // limitations under the License.
 
 define([
-    'order!js/libs/hterm/pubsub.js',
-    'order!js/libs/hterm/dialogs.js',
-
+    'order!js/libs/hterm/hterm_deps.js',
     'order!js/libs/hterm/hterm.js',
-    'order!js/libs/hterm/scrollport.js',
-    'order!js/libs/hterm/terminal.js',
-    'order!js/libs/hterm/terminal_io.js',
-    'order!js/libs/hterm/options.js',
-    'order!js/libs/hterm/screen.js',
-    'order!js/libs/hterm/text_attributes.js',
-    'order!js/libs/hterm/vt.js',
-    'order!js/libs/hterm/keyboard.js',
-    'order!js/libs/hterm/default_keymap.js',
-    'order!js/libs/hterm/preference_manager.js'], function() {
+    ],
+    function() {
+        lib.init(function() { });
+            // TODO(mzero): Should somehow delay this module from being ready
+            // until lib.init() calls the callback.
         return hterm;
-});
+    }
+);

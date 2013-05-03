@@ -316,19 +316,24 @@ function($, api, util, input){
       var node = $('<div></div>', { 'class': 'terminal' })
       node.appendTo(where);
       var term = new hterm.Terminal();
-      term.setAutoCarriageReturn(true);
       term.decorate(node.get(0));
-      term.setFontSize(13);
-      term.setWidth(80);
-      term.setHeight(24);
-      term.interpret(txt);
       term.io.onVTKeystroke = sender;
       term.io.sendString = sender;
-      term.installKeyboard();
-      terminal = term;
-      terminalNode = node;
-      adjustOutput();
-      node.get(0).scrollIntoView(true);
+      term.onTerminalReady = function() {
+        var style = getComputedStyle(where.get(0));
+        term.setFontSize(style.fontSize.replace(/px$/,''));
+        term.setBackgroundColor(style.backgroundColor);
+        term.setForegroundColor(style.color);
+        term.setWidth(80);
+        term.setHeight(24);
+        term.setAutoCarriageReturn(true);
+        term.interpret(txt);
+        term.installKeyboard();
+        terminal = term;
+        terminalNode = node;
+        adjustOutput();
+        node.get(0).scrollIntoView(true);
+      }
     };
 
     function removeVTOutput() {
