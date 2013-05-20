@@ -24,7 +24,7 @@ module Plush.Resource (
 
 import qualified Data.ByteString as B
 
-#ifdef PRODUCTION
+#ifndef LIVE_FILES
 import Data.FileEmbed
 #else
 import System.Directory (getCurrentDirectory, doesDirectoryExist, doesFileExist)
@@ -38,7 +38,7 @@ import qualified Paths_plush as CabalPaths
 getDataResource :: FilePath -> IO (Maybe B.ByteString)
 getStaticResource :: FilePath -> IO (Maybe B.ByteString)
 
-#ifdef PRODUCTION
+#ifndef LIVE_FILES
 
 getDataResource = return . flip lookup dataResources
 getStaticResource = return . flip lookup staticResources

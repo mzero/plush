@@ -41,8 +41,10 @@ Extra-source-files:
   static/js/main.build.js
 
 
-Flag Production
-  Description: build for production, without features for plush developers
+Flag live-files
+  Description:
+    Plush loads data files and serves static files from the datadir.
+    This allows development of those files without rebuilding plush.
   Default: False
 
 
@@ -146,8 +148,8 @@ Library
 
   ghc-options: -Wall -fno-warn-missing-signatures -fwarn-tabs
 
-  if flag(Production)
-    cpp-options: -DPRODUCTION
+  if flag(live-files)
+    cpp-options: -DLIVE_FILES
 
 
 Executable plush

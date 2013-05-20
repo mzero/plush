@@ -119,8 +119,10 @@ usage h = do
         \ FILE                      -- read commands from file\n\
         \ -c COMMAND...             -- read commands from arguments\n\
         \\n\
-        \ -l | --local              -- launch (or reconnect) a local shell\n\
-        \ -r | --remote [USER@]HOST -- launch (or reconnect) a remote shell\n\
+        \ --local [OP]              -- launch (or reconnect) a local shell\n\
+        \ --remote [USER@]HOST [OP] -- launch (or reconnect) a remote shell\n\
+        \         OP = launch (default) | start | status | stop | no-launch\n\
+        \ --servers                 -- status of all running local and remotes\n\
         \\n\
         \ --doctest FILE...         -- run doctest over the files\n\
         \ --shelltest SHELL FILE... -- run doctest via the given shell\n"

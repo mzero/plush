@@ -11,6 +11,75 @@ Mailing list:
   https://groups.google.com/d/forum/thecomfyshell
 
 
+=== Building ===
+
+You need a Haskell development tool set installed first. See below for details
+of the prerequisites if you get stuck.
+
+Run these commands:
+  cabal install --only-dependencies
+  cabal configure
+  cabal build
+
+=== Running ===
+
+Now you have the built executable in the dist directory:
+  ./dist/build/plush/
+
+To launch the web based UI version of plush:
+  ./dist/build/plush/plush --local
+
+If you want to run plush from a terminal, you can just run it with no options
+(or standard shell options like `-s` and `-c`) and it will run with the
+terminal UI.
+
+
+=== Running Remotely ===
+
+*First,* you need to be able to ssh to the remote machine with a simple command:
+  ssh _host_
+or
+  ssh _user@host_
+
+If you need to supply options, then set up an entry in `.ssh/config` for the
+remote, and set them there so you can `ssh` with just the name of the machine.
+
+*Second,* you need to get the plush executable on the remote system, either by
+building there, or copying it from some similar system.
+
+*Third,* `plush` needs to be on the `PATH` that is seen by `ssh`. Run this
+command to see what `PATH` that is, _don't trust your intuition!_
+  ssh _host_ env | grep PATH
+
+Move plush on the remote machine into one the directories on that `PATH`
+
+*Fourth,* on the local machine run this (you can do this from any shell, even a
+local plush):
+  plush --remote _host_
+
+
+=== Plush Server ===
+
+When run with the web UI, plush runs as a detached process. The `--local` and
+`--remote` options reconnect to that process, starting it if needed. You can
+find the state of those servers via the command:
+  plush --servers
+
+You can easily manipulate the state with these commands:
+  plush --local start     # start if not running
+  plush --local status    # report status of the local server, if any
+  plush --local stop      # stop the server if running, killing if necessary
+  plush --local launch    # start if not running, then launch a web UI (default)
+  plush --local no-luanch # start if not running, then just report status
+
+Replace `--local` with `--remote _host_` to manipulate the connection to plush
+on a remote host. The connection remote is a detached `ssh` process.  The
+`--remote` commands operate on that process. To operate on the remote plush
+process, use the `--local` commands via `ssh` like so:
+  ssh _host_ plush --local status
+
+
+
 === Prerequisites ===
 
 You'll need a GHC based Haskell installation. Easiest is to just get and install
@@ -23,24 +92,14 @@ On Ubuntu Lucid these packages are required:
 On Ubuntu Oneiric and later the Haskell Platform is installed by these packages:
   haskell-platform, haskell-platform-doc, haskell-platform-prof
 
-=== Building ===
-
-Run these commands:
-  cabal install --only-dependencies
-  cabal configure
-  cabal build
-
-Now you have the built executable in the dist directory:
-  ./dist/build/plush/plush
-
 
 === Running Tests ===
 
 Before you can run shell tests, you'll need an implementation of recho.
 Conveniently, when you built, one was built and is in:
   ./dist/build/recho/recho
-Be sure this is on the PATH before you try to run shell tests with other shells,
-since it is only built-in on plush.
+Be sure this is on the `PATH` before you try to run shell tests with other
+shells, since it is only built-in on plush.
 
 The doctests are all in tests/*.doctest:
   ./dist/build/plush/plush -d doctest tests/*.doctest
@@ -59,61 +118,21 @@ against bash, sh, dash, and plush with:
   ./alltests.sh
 
 
-=== Running ===
+=== Live Files Builds ===
 
-plush can run commands in two modes:
-  live: Operate on your system just as any shell would
-  test: Operate on a simulated environment, with only stdin/stdout connected
-        to the "real world". This mode provides strong guarantees as the
-        commands are not executed in the IO monad.
+The build procedure above will result in a production build. The static files
+that plush uses will be compiled into the executable itself. With this kind of
+build, you can just put the executable on your `PATH` and you're done.
 
-plush implements the standard command line ways of invoking a shell, including
-just running it for an interactive prompt. See the help:
-  ./dist/build/plush/plush --help
+If you are working on the JavaScript, HTML, and CSS parts of plush, you can
+make a build that pulls those files live out of the development tree. This
+enables fast javascript development, since all you need to do is reload in the
+browser to test your changes.
 
-Currently, these commands are implemented as built-ins, and work in both
-live and test modes:
-  cd, set
-  false, true
-  echo, recho
-  cat, fgrep
-  mkdir, rm, touch
-
-Executables will be found (with PATH search) and run in live mode only.
-
-
-=== Development & Production Builds ===
-
-The build procedure above will result in a development build. The static files
-that Plush uses will be used live out of the development tree, assuming you
-start plush from the root of the development tree. This enables fast javascript
-development, since all you need to do is reload in the browser to test your
-changes.
-
-If you want to run plush from another folder than the source tree root, and
-plush is not installed, an environment variable needs to be set so plush can
-find its data files, which are in the source tree:
-  export plush_datadir=<source tree root>
-
-Be sure to undo or change this export if you install plush, or change to a
-different development directory.
-
-You can build plush in production mode, which will embed all the static files
-directly into the plush exectuable. To do so:
+You can build plush in with live files:
   cabal clean
-  cabal configure -fProduction
+  cabal configure -flive-files
   cabal build
 
-
-=== Running The Server ===
-
-plush can run a web server, serving the shell environment to your browser:
-
-    ./dist/build/plush/plush -w
-
-This will start a server on a live shell. Add -t if you want to run in test
-mode.
-
-Open the URL that this command prints in a browser.
-
-
+Be sure you start plush from the root of the development tree, since it will
+look for those files in the working directory at start up.
