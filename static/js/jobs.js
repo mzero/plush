@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-define(['jquery', 'api', 'util', 'input', 'hterm'],
-function($, api, util, input){
+define(['jquery', 'api', 'util', 'input', 'cterm', 'hterm'],
+function($, api, util, input, cterm){
   'use strict';
 
   var LINES_IN_TINY = 3;
@@ -198,13 +198,9 @@ function($, api, util, input){
     var output = node.find('.output-container');
     var outputArea = output.find('.output');
     var deferredOutputLoader = null;
-    var lastOutputSpan = null;
-    var lastOutputType = null;
-    var lastOutputTime = 0;
-    var linesOutput = 0;
-    var newlinesOutput = 0;
     var terminal = null;
     var terminalNode = null;
+    var terminalIsFullScreen = false;
 
     function sender(s) {
       api.api('input', {job: job, input: s}, function() {});
@@ -275,18 +271,20 @@ function($, api, util, input){
     }
 
     function adjustOutput() {
-      var n = linesOutput;
-      if (n == 0 && input) n = 1;
-
       var m, s;
-      if (n == 0)                   m = s = 'hide';
-      else if (n <= LINES_IN_TINY)  m = s = 'tiny';
-      else if (n <= LINES_IN_PAGE)  m = s = 'page';
-      else                          { m = 'full'; s = 'page'; }
 
-      if (terminal) {
-        m = 'full';
-        s = 'full';
+      if (terminalIsFullScreen) {
+        m =  s = 'full';
+      } else if (terminal) {
+        var n = terminal.getLineCount();
+        if (n == 0 && input) n = 1;
+
+        if (n == 0)                   m = s = 'hide';
+        else if (n <= LINES_IN_TINY)  m = s = 'tiny';
+        else if (n <= LINES_IN_PAGE)  m = s = 'page';
+        else                          { m = 'full'; s = 'page'; }
+      } else {
+        m = s = 'hide';
       }
 
       if (!deferredOutputLoader) {
@@ -331,26 +329,62 @@ function($, api, util, input){
         term.installKeyboard();
         terminal = term;
         terminalNode = node;
+        terminalIsFullScreen = true;
         adjustOutput();
         node.get(0).scrollIntoView(true);
       }
     };
 
-    function removeVTOutput() {
-      if (terminal) {
+    function removeOutput() {
+      if (terminalIsFullScreen) {
         terminal.uninstallKeyboard();
         terminal.setCursorVisible(false);
-        terminal = null;
       }
+      terminal = null;
+      fullScreenReplayBuffer = null;
     };
 
+    var pleaseGoFullScreen = false;
+    var fullScreenReplayBuffer = '';
+    var FULL_SCREEN_REPLAY_MAX_LENGTH = 4096;
+
     function addOutput(cls, txt) {
-      if (terminal) {
-        return terminal.interpret(txt);
-      } else if (txt.match('\u001b[\[]')) {
-        return addVTOutput(txt);
+      if (terminal === null) {
+        terminal = new cterm.Terminal(outputArea, output, goFullScreen);
+      }
+      if (terminalIsFullScreen) {
+        terminal.interpret(txt);
+        return;
       }
 
+      if (fullScreenReplayBuffer !== null) {
+        if (fullScreenReplayBuffer.length + txt.length
+            < FULL_SCREEN_REPLAY_MAX_LENGTH) {
+          fullScreenReplayBuffer += txt;
+        } else {
+          fullScreenReplayBuffer = null;
+          console.log('***** clearing fullScreenReplayBuffer');
+        }
+      }
+      terminal.setSpanClass(cls);
+      terminal.interpret(txt);
+      if (pleaseGoFullScreen) {
+        pleaseGoFullScreen = false;
+        outputArea.empty();
+        addVTOutput(fullScreenReplayBuffer || '');
+        fullScreenReplayBuffer = '';
+      } else {
+        adjustOutput();
+      }
+    }
+
+    var lastOutputSpan = null;
+    var lastOutputType = null;
+    var lastOutputTime = 0;
+    var linesOutput = 0;
+    var newlinesOutput = 0;
+
+    function addPlainOutput(cls, txt) {
       var wasAtEnd = (output.scrollTop() + output.height()
                     >= outputArea.outerHeight());
       var scrollIfAfter = lastOutputTime + AUTO_SCROLL_ON_OUTPUT_AFTER_MS
@@ -376,6 +410,8 @@ function($, api, util, input){
       }
     }
 
+    function goFullScreen() { pleaseGoFullScreen = true; }
+
     function setRunning() {
       setClass('running');
     }
@@ -383,7 +419,7 @@ function($, api, util, input){
     function setComplete(exitcode) {
       setClass(exitcode === 0 ? 'complete' : 'failed');
       removeInput();
-      removeVTOutput();
+      removeOutput();
     }
 
     var jobPublic = {
