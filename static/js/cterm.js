@@ -109,7 +109,12 @@ function($, input){
 
   Terminal.prototype.ensureSpan_ = function() {
     if (this.currSpan_ === null) {
-      this.currSpan_ = $('<span></span>', { 'class': this.spanClass_ });
+      if (this.attrs_.isDefault()) {
+        this.currSpan_ = $('<span></span>', { 'class': this.spanClass_ });
+      } else {
+        this.currSpan_ = $(this.attrs_.createContainer());
+        this.currSpan_.addClass(this.spanClass_);
+      }
       this.currSpan_.appendTo(this.output_);
       this.currLineSpans_.push(this.currSpan_);
     }
@@ -124,6 +129,10 @@ function($, input){
       }
       this.currSpan_ = null;
       this.currLength_ = 0;
+    }
+    if (this.currSpan_ !== null
+        && !this.attrs_.matchesContainer(this.currSpan_.get(0))) {
+      this.currSpan_ = null
     }
     this.ensureSpan_();
     var t = this.currSpan_.text();
