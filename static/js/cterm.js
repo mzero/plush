@@ -31,10 +31,8 @@ function($, input){
   // overwriting is done by erasing the line entirely in anticipation of full
   // overwrite.
 
-  var Terminal = function(output, container, goFullScreen) {
+  var Terminal = function(output, goFullScreen) {
     this.output_ = output;        // div that contains spans
-    this.container_ = container;  // div that contains output - and scrolls
-
     this.goFullScreen_ = goFullScreen;
 
     this.attrs_ = new hterm.TextAttributes(window.document);

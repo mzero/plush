@@ -22,8 +22,6 @@ function($, api, util, input, cterm){
   var SCROLL_PAGE = {};
   var SCROLL_FULL = {};
 
-  var AUTO_SCROLL_ON_OUTPUT_AFTER_MS = 500;
-
   var scrollback = $('#scrollback');
   var jobProto = scrollback.children('.job.proto').detach();
   jobProto.removeClass('proto');
@@ -347,10 +345,11 @@ function($, api, util, input, cterm){
     var pleaseGoFullScreen = false;
     var fullScreenReplayBuffer = '';
     var FULL_SCREEN_REPLAY_MAX_LENGTH = 4096;
+    var SCROLL_END_TOLERANCE = 6;
 
     function addOutput(cls, txt) {
       if (terminal === null) {
-        terminal = new cterm.Terminal(outputArea, output, goFullScreen);
+        terminal = new cterm.Terminal(outputArea, goFullScreen);
       }
       if (terminalIsFullScreen) {
         terminal.interpret(txt);
@@ -363,11 +362,21 @@ function($, api, util, input, cterm){
           fullScreenReplayBuffer += txt;
         } else {
           fullScreenReplayBuffer = null;
-          console.log('***** clearing fullScreenReplayBuffer');
         }
       }
+
+      var oldEnd = outputArea.outerHeight();
+      var wasAtEnd = (
+            output.scrollTop() + output.height() + SCROLL_END_TOLERANCE
+            >= oldEnd);
+
       terminal.setSpanClass(cls);
       terminal.interpret(txt);
+
+      if (wasAtEnd) {
+        util.scrollIntoView(output, outputArea, oldEnd);
+      }
+
       if (pleaseGoFullScreen) {
         pleaseGoFullScreen = false;
         outputArea.empty();
@@ -375,38 +384,6 @@ function($, api, util, input, cterm){
         fullScreenReplayBuffer = '';
       } else {
         adjustOutput();
-      }
-    }
-
-    var lastOutputSpan = null;
-    var lastOutputType = null;
-    var lastOutputTime = 0;
-    var linesOutput = 0;
-    var newlinesOutput = 0;
-
-    function addPlainOutput(cls, txt) {
-      var wasAtEnd = (output.scrollTop() + output.height()
-                    >= outputArea.outerHeight());
-      var scrollIfAfter = lastOutputTime + AUTO_SCROLL_ON_OUTPUT_AFTER_MS
-      var spanOffset = 0;
-      lastOutputTime = Date.now();
-
-      if (lastOutputType == cls && lastOutputSpan) {
-        spanOffset = lastOutputSpan.height();
-        lastOutputSpan.append(document.createTextNode(txt));
-      }
-      else {
-        lastOutputType = cls;
-        lastOutputSpan = $('<span></span>', { 'class': cls }).text(txt);
-        lastOutputSpan.appendTo(outputArea);
-      }
-      newlinesOutput += countOccurances(txt, '\n');
-      linesOutput =
-          newlinesOutput + (txt[txt.length-1] === '\n' ? 0 : 1);
-      adjustOutput();
-
-      if (wasAtEnd && lastOutputTime >= scrollIfAfter) {
-        util.scrollIntoView(output, outputArea, spanOffset);
       }
     }
 
