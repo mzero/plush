@@ -69,6 +69,11 @@ function($, input){
     this.scrollOnOutput = null;             // written
 
     this.vt_ = new hterm.VT(this);  // set this last, relies on the above!
+    this.vt_.decodeUTF8 = function (str) { return str; };
+      // Monkey patching the VT so that it doesn't try to decode inputs to
+      // interpret(). Note that this will affect the data passed to
+      // copyStringToClipboard() as well: It won't be decoded where it needs
+      // to be. However that function causes fall back... so no worries!
   };
 
   if (TRACE) {
@@ -94,6 +99,7 @@ function($, input){
   }
 
   Terminal.prototype.interpret = function(str) {
+    // See Note above about monkey patching decodeUTF8 for why this works
     this.vt_.interpret(str);
   };
 
