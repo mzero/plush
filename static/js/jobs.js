@@ -268,13 +268,23 @@ function($, api, util, input, cterm){
       input.find('input').focus();
     }
 
+    var lineHeight = null;
+
+
     function adjustOutput() {
       var m, s;
 
       if (terminalIsFullScreen) {
         m =  s = 'full';
       } else if (terminal) {
-        var n = terminal.getLineCount();
+        var n1 = terminal.getLineCount();
+        if (lineHeight === null) {
+          lineHeight = Math.max(1,
+              outputArea.css('lineHeight').replace(/px$/,''));
+        }
+        var n2 = Math.floor(outputArea.height() / lineHeight);
+        var n = Math.max(n1, n2);
+
         if (n == 0 && input) n = 1;
 
         if (n == 0)                   m = s = 'hide';
