@@ -120,13 +120,17 @@ function($, input){
 
   Terminal.prototype.print = function(str) {
     if (this.cursor_.column < this.currLength_) {
-      // this is an overwrite situation
-      this.clearLength_ = this.currLength_;
-      while (this.currLineSpans_.length > 0) {
-        this.currLineSpans_.pop().remove();
+      if (this.cursor_.column == 0) {
+        // this is an overwrite situation
+        this.clearLength_ = this.currLength_;
+        while (this.currLineSpans_.length > 0) {
+          this.currLineSpans_.pop().remove();
+        }
+        this.currSpan_ = null;
+        this.currLength_ = 0;
+      } else {
+        this.fallback_('print from mid-line: ' + this.cursor_.column);
       }
-      this.currSpan_ = null;
-      this.currLength_ = 0;
     }
     if (this.currSpan_ !== null
         && !this.attrs_.matchesContainer(this.currSpan_.get(0))) {
@@ -186,13 +190,11 @@ function($, input){
   }
 
   Terminal.prototype.setCursorColumn = function(c) {
-    var delta = c - this.cursor_.column;
-    if (delta > 0) {
-      this.spaces_(delta);
-    } else if (c == 0) {
+    c = Math.max(0, c);
+    if (c > this.cursor_.column) {
+      this.spaces_(c - this.cursor_.column);
+    } else {
       this.cursor_.column = c;
-    } else if (delta < 0) {
-      this.fallback_('setCursorColumn to mid-line: ' + c);
     }
   }
 
@@ -224,6 +226,14 @@ function($, input){
     } else {
       this.clearLength_ = 0;
     }
+  }
+
+  Terminal.prototype.cursorLeft = function(n) {
+    this.setCursorColumn(this.cursor_.column - (n || 1));
+  }
+
+  Terminal.prototype.cursorRight = function(n) {
+    this.setCursorColumn(this.cursor_.column + (n || 1));
   }
 
   Terminal.prototype.cursorUp = function(n) {
@@ -258,8 +268,8 @@ function($, input){
   Terminal.prototype.clearTabStopAtCursor  = fallback('clearTabStopAtCursor');
   Terminal.prototype.copyStringToClipboard = fallback('copyStringToClipboard');
   Terminal.prototype.cursorDown            = fallback('cursorDown');
-  Terminal.prototype.cursorLeft            = fallback('cursorLeft');
-  Terminal.prototype.cursorRight           = fallback('cursorRight');
+  Terminal.prototype.cursorLeft;             // see above
+  Terminal.prototype.cursorRight;            // see above
   Terminal.prototype.cursorUp;               // see above
   Terminal.prototype.deleteChars           = fallback('deleteChars');
   Terminal.prototype.deleteLines           = fallback('deleteLines');
