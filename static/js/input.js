@@ -262,6 +262,7 @@ define(['jquery'], function($) {
       }
 
       specs.split(/[, ]+/).forEach(function(spec) {
+        if (spec === '') return;
         var parts = spec.split('+');
         if (parts.length === 0) return;
         var keyName = parts.pop();
