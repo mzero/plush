@@ -382,6 +382,10 @@ h1,h2,h3,h4,blockquote,q {
   background: url(failed.png) no-repeat 4px 0;
 }
 
+.job:focus {
+  outline: none;
+}
+
 .job .command {
   white-space: pre-wrap;
 }
@@ -398,7 +402,7 @@ h1,h2,h3,h4,blockquote,q {
   color: #035590;
 }
 
-.job > .output-container {
+.job .output-container {
   color: #3f3f3f;
   background: #eef1f7;
   transition: all 0.125s ease-in-out;
@@ -406,21 +410,22 @@ h1,h2,h3,h4,blockquote,q {
   -moz-transition: all 0.125s ease-in-out;
 }
 
-.job > .output-hide {
+.job.output-hide .output-container {
+  border: none;
 }
-.job > .output-hide .output {
+.job.output-hide .output {
   display: none;
   max-height: 0;
 }
-.job > .output-tiny {
+.job.output-tiny .output-container {
   max-height: 4em;
   overflow: auto;
 }
-.job > .output-page {
+.job.output-page .output-container {
   max-height: 25em;
   overflow: auto;
 }
-.job > .output-full {
+.job.output-full .output-container {
   max-height: 1000000em;
 }
 
@@ -464,36 +469,6 @@ h1,h2,h3,h4,blockquote,q {
   color: #bd1c10;
 }
 
-.job > .input-container {
-  color: #3f3f3f;
-  background: #eef1f7;
-  margin-top: 0;
-  position: relative;
-  height: 1.9em;
-  border: none;
-  border-bottom: 1px solid #c0c0c0;
-}
-.input-container input {
-  height: 1.5em;
-  color: #035590;
-  background: none;
-  position: absolute;
-  top: 0;
-  right: 11em;
-  left: 0;
-  margin: 0;
-  padding: 0.25em 6em 0.25em 1em;
-  border: none;
-  border-left: 8px solid #c0c0c0;
-  padding-left: 5px;
-  font-family: monospace;
-  font-size: 100%;
-}
-.input-container input:focus {
-  outline: none;
-  border-left-color: #ff9134;
-}
-
 .job .view-controls {
   float: right;
   width: 6em;
@@ -507,6 +482,12 @@ h1,h2,h3,h4,blockquote,q {
   height: 1em;
   padding-top: 0.25em;
   z-index: 1;
+}
+
+.output-container .cursor {
+  float: left;
+  border-left: 4px solid #ff9134;
+  margin-left: -1em;
 }
 
 #history {

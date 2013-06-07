@@ -46,6 +46,8 @@ function($, input){
     this.lastLineSpans_ = null;
     this.lastLength_ = 0;
     this.spanClass_ = '';
+    this.inputSpan_ = $('<span class="cursor"> </span>');
+    this.inputSpanVisible_ = false;
 
     // both VT and the client use this object for sending back to the process
     this.io = new hterm.Terminal.IO(this);
@@ -66,12 +68,16 @@ function($, input){
     this.scrollOnKeystroke = null;          // written
     this.scrollOnOutput = null;             // written
 
-    this.vt_ = new hterm.VT(this);  // set this last, relies on the above!
-    this.vt_.decodeUTF8 = function (str) { return str; };
-      // Monkey patching the VT so that it doesn't try to decode inputs to
-      // interpret(). Note that this will affect the data passed to
+    this.vt = new hterm.VT(this);  // set this here, relies on the above!
+    this.vt.encodeUTF8 = function(str) { return str; };
+    this.vt.decodeUTF8 = function(str) { return str; };
+      // Monkey patching the VT so that it doesn't do the UTF-8 encode/decode.
+      // This is so the terminal doesn't encode characters sent, or decode
+      // inputs to interpret(). Note that this will affect the data passed to
       // copyStringToClipboard() as well: It won't be decoded where it needs
       // to be. However that function causes fall back... so no worries!
+
+    this.keyboard = new hterm.Keyboard(this);
   };
 
   if (TRACE) {
@@ -98,7 +104,7 @@ function($, input){
 
   Terminal.prototype.interpret = function(str) {
     // See Note above about monkey patching decodeUTF8 for why this works
-    this.vt_.interpret(str);
+    this.vt.interpret(str);
   };
 
   Terminal.prototype.getLineCount = function() {
@@ -115,6 +121,31 @@ function($, input){
       }
       this.currSpan_.appendTo(this.output_);
       this.currLineSpans_.push(this.currSpan_);
+    }
+  }
+
+  Terminal.prototype.setCursorVisible = function(show) {
+    if (show) {
+      if (!this.inputSpanVisible_) {
+        if (this.currLineSpans_.length > 0) {
+          this.inputSpan_.insertBefore(this.currLineSpans_[0]);
+        } else {
+          this.inputSpan_.appendTo(this.output_);
+        }
+        this.inputSpanVisible_ = true;
+      }
+    } else {
+      if (this.inputSpanVisible_) {
+        this.inputSpan_.remove();
+        this.inputSpanVisible_ = false;
+      }
+    }
+  }
+
+  Terminal.prototype.repositionInputSpan_ = function() {
+    if (this.inputSpanVisible_) {
+      this.setCursorVisible(false);
+      this.setCursorVisible(true);
     }
   }
 
@@ -165,6 +196,8 @@ function($, input){
 
     this.cursor_.column = 0;
     this.cursor_.row += 1;
+
+    this.repositionInputSpan_();
   };
 
   Terminal.prototype.lineFeed = function() {
@@ -252,6 +285,8 @@ function($, input){
 
       var t = this.currSpan_.text().replace(/\n$/, '');
       this.currSpan_.text(t);
+
+      this.repositionInputSpan_();
       return;
     }
     this.fallback_('cursorUp: ' + n);
@@ -302,7 +337,7 @@ function($, input){
   Terminal.prototype.setCursorBlink        = ignore('setCursorBlink');
   Terminal.prototype.setCursorColumn;        // see above
   Terminal.prototype.setCursorPosition;      // see above
-  Terminal.prototype.setCursorVisible      = ignore('setCursorVisible');
+  Terminal.prototype.setCursorVisible;       // see above
   Terminal.prototype.setInsertMode         = fallback('setInsertMode');
   Terminal.prototype.setOriginMode         = fallback('setOriginMode');
   Terminal.prototype.setReverseVideo       = fallback('setReverseVideo');
@@ -318,6 +353,19 @@ function($, input){
   Terminal.prototype.vtScrollDown          = fallback('vtScrollDown');
   Terminal.prototype.vtScrollUp            = fallback('vtScrollUp');
 
+  Terminal.prototype.installKeyboard = function(elem) {
+    this.keyboard.installKeyboard((elem || this.output_).get(0));
+  };
+  Terminal.prototype.uninstallKeyboard = function() {
+    this.keyboard.installKeyboard(null);
+  };
+  Terminal.prototype.onVTKeystroke = function(str) {
+    this.io.onVTKeystroke(str);
+  };
+
+  Terminal.prototype.getDocument = function() {
+    return this.output_.get(0).ownerDocument;
+  };
 
   return {
     Terminal: Terminal
