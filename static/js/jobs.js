@@ -285,7 +285,9 @@ function($, api, util, input, cterm){
     };
 
     function setClass(cls) {
-      node.removeClass('running complete').addClass(cls);
+      if (!node.hasClass(cls)) {
+        node.removeClass('running complete').addClass(cls);
+      }
     };
 
     function goCTerm() {

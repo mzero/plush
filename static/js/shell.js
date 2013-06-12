@@ -19,9 +19,9 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
 
   var screen = $('#screen');
   var commandline = $('#commandline');
+  var prompt = $('#prompt');
 
   function setupPromptPicker() {
-    var prompt = $('#prompt');
     var promptPicker = $('#prompt-picker');
 
     var storedPrompt = localStorage.getItem('prompt');
@@ -39,6 +39,9 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
       return false;
     });
   }
+
+  $('#input-area').on('focusin', function() { prompt.addClass('focus'); });
+  $('#input-area').on('focusout', function() { prompt.removeClass('focus'); });
 
   function setupLinks() {
     $('#show-help').click(function() {

@@ -224,6 +224,9 @@ html {
   background: #cbcba3;
   text-decoration: none;
 }
+#prompt.focus {
+  color: #ff9134;
+}
 
 input#commandline {
   font-family: monospace;
@@ -405,6 +408,7 @@ h1,h2,h3,h4,blockquote,q {
 .job .output-container {
   color: #3f3f3f;
   background: #eef1f7;
+  border: 1px solid #dde0e7;
   transition: all 0.125s ease-in-out;
   -webkit-transition: all 0.125s ease-in-out;
   -moz-transition: all 0.125s ease-in-out;
@@ -469,19 +473,36 @@ h1,h2,h3,h4,blockquote,q {
   color: #bd1c10;
 }
 
-.job .view-controls {
+.job .view-controls,
+.job .input-controls {
   float: right;
-  width: 6em;
   height: 1em;
+  color: #5b89e6;
+  background-color: #eef1f7;
+  border: 1px solid #dde0e7;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 2px 4px 6px 4px;
+  position: relative;
+  bottom: -2px;
+  margin-left: 1em;
+}
+
+.job.max-deferred .view-controls,
+.job.max-hide .view-controls {
+  border-radius: 4px;
+  border: none;
+  padding-bottom: 4px;
+  width: 1.5em;
+}
+
+.job .view-controls {
+  width: 6em;
   font-family: "Courier New", Courier, mono;
 }
 
 .job .input-controls {
-  float: right;
-  width: 11em;
-  height: 1em;
-  padding-top: 0.25em;
-  z-index: 1;
+  width: 10em;
 }
 
 .output-container .cursor {
@@ -533,10 +554,9 @@ ul.horiz-menu li {
 
 .horiz-menu button {
   border: none;
-  color: #5b89e6;
-  background-color: #eef1f7;
   cursor: pointer;
-  margin-right: 0.75em;
+  margin: 0 0.35em;
+  background: inherit;
 }
 .horiz-menu button:hover {
   color: #ff9134;
@@ -544,10 +564,9 @@ ul.horiz-menu li {
 
 .view-controls button {
   width: 1em;
-  height: 1em;
 }
 .input-controls button {
-  padding-left: 1em;
+  width: 2em;;
 }
 #annotations {
   position: absolute;
