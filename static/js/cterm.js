@@ -40,9 +40,7 @@ function($, input){
     this.autoCarriageReturn_ = false;
 
     this.currLineSpans_ = [];
-    this.currSpan_ = null;
     this.currLength_ = 0;
-    this.clearLength_ = 0;
     this.lastLineSpans_ = null;
     this.lastLength_ = 0;
     this.spanClass_ = '';
@@ -102,6 +100,10 @@ function($, input){
     }
   }
 
+  Terminal.prototype.attrMatch_ = function(elem) {
+    return this.attrs_.matchesContainer(elem.get(0));
+  };
+
   Terminal.prototype.interpret = function(str) {
     // See Note above about monkey patching decodeUTF8 for why this works
     this.vt.interpret(str);
@@ -109,20 +111,7 @@ function($, input){
 
   Terminal.prototype.getLineCount = function() {
     return this.cursor_.row + (this.currLength_ > 0 ? 1 : 0)
-  }
-
-  Terminal.prototype.ensureSpan_ = function() {
-    if (this.currSpan_ === null) {
-      if (this.attrs_.isDefault()) {
-        this.currSpan_ = $('<span></span>', { 'class': this.spanClass_ });
-      } else {
-        this.currSpan_ = $(this.attrs_.createContainer());
-        this.currSpan_.addClass(this.spanClass_);
-      }
-      this.currSpan_.appendTo(this.output_);
-      this.currLineSpans_.push(this.currSpan_);
-    }
-  }
+  };
 
   Terminal.prototype.setCursorVisible = function(show) {
     if (show) {
@@ -140,39 +129,121 @@ function($, input){
         this.inputSpanVisible_ = false;
       }
     }
-  }
+  };
 
   Terminal.prototype.repositionInputSpan_ = function() {
     if (this.inputSpanVisible_) {
       this.setCursorVisible(false);
       this.setCursorVisible(true);
     }
+  };
+
+  Terminal.prototype.modifyLine_ = function(del, ins) {
+    var cIndex, dIndex;
+    var cSpan = null, dSpan = null;
+    var cSpanText = '', dSpanText = '';
+    var cOffset = 0;
+
+    // find the span that contains the cursor
+    if (this.cursor_.column >= this.currLength_) {
+      // common case optimization: appending to the end of a line
+      if (this.currLineSpans_.length > 0) {
+        cIndex = this.currLineSpans_.length - 1;
+        cSpan = this.currLineSpans_[cIndex];
+        cSpanText = cSpan.text();
+        cOffset = cSpanText.length;
+      }
+    } else {
+      cOffset = this.cursor_.column;
+      for (cIndex = 0; cIndex < this.currLineSpans_.length; cIndex += 1) {
+        cSpan = this.currLineSpans_[cIndex];
+        cSpanText = cSpan.text();
+        if (cSpanText.length >= cOffset) break;
+        cOffset -= cSpanText.length;
+      }
+    }
+
+    if (cSpan !== null) {
+      // delete characters from the cursor span
+      var e = Math.min(del, cSpanText.length - cOffset);
+      var preText = cSpanText.slice(0, cOffset);
+      var postText = cSpanText.slice(cOffset + e);
+      del -= e;
+      if (postText.length === 0) {
+        cSpan.text(cSpanText = preText);
+        this.currLength_ -= e;
+      } else {
+        // this is the insert in the middle of a span case, assert(del === 0)
+        if (this.attrMatch_(cSpan)) {
+          cSpan.text(preText + ins + postText);
+          this.currLength_ += ins.length - e;
+          return;
+        }
+        cSpan.text(cSpanText = preText);
+        var nSpan = cSpan.clone();
+        nSpan.text(postText);
+        nSpan.insertAfter(cSpan);
+        this.currLineSpans_.splice(cIndex + 1, 0, nSpan);
+      }
+
+      // delete characters from subsequent spans
+      dIndex = cIndex + 1;
+      while (true) {
+        if (dIndex < this.currLineSpans_.length) {
+          dSpan = this.currLineSpans_[dIndex];
+          dSpanText = dSpan.text();
+        } else {
+          dSpan = null;
+          break;
+        }
+        if (del === 0) break;
+
+        var f = Math.min(del, dSpanText.length);
+        dSpanText = dSpanText.slice(f);
+        del -= f;
+        this.currLength_ -= f;
+
+        if (dSpanText.length > 0) {
+          dSpan.text(dSpanText);
+          break; // assert(del === 0)
+        } else {
+          dSpan.remove();
+          this.currLineSpans_.splice(dIndex,1);
+        }
+      }
+    }
+
+    if (ins.length === 0) return;
+    this.currLength_ += ins.length;
+
+    // finally - insert between cSpan and dSpan
+    if (cSpan !== null && this.attrMatch_(cSpan)) {
+      cSpan.text(cSpanText + ins);
+    } else if (dSpan !== null && this.attrMatch_(dSpan)) {
+      dSpan.text(ins + dSpanText);
+    } else {
+      var nSpan;
+      if (this.attrs_.isDefault()) {
+        nSpan = $('<span></span>', { 'class': this.spanClass_ });
+      } else {
+        nSpan = $(this.attrs_.createContainer());
+        nSpan.addClass(this.spanClass_);
+      }
+      nSpan.text(ins);
+      if (cSpan !== null) {
+        nSpan.insertAfter(cSpan)
+        this.currLineSpans_.splice(cIndex+1, 0, nSpan);
+      } else {
+        nSpan.appendTo(this.output_);
+        this.currLineSpans_.push(nSpan);
+      }
+    }
   }
 
   Terminal.prototype.print = function(str) {
-    if (this.cursor_.column < this.currLength_) {
-      if (this.cursor_.column == 0) {
-        // this is an overwrite situation
-        this.clearLength_ = this.currLength_;
-        while (this.currLineSpans_.length > 0) {
-          this.currLineSpans_.pop().remove();
-        }
-        this.currSpan_ = null;
-        this.currLength_ = 0;
-      } else {
-        this.fallback_('print from mid-line: ' + this.cursor_.column);
-      }
-    }
-    if (this.currSpan_ !== null
-        && !this.attrs_.matchesContainer(this.currSpan_.get(0))) {
-      this.currSpan_ = null
-    }
-    this.ensureSpan_();
-    var t = this.currSpan_.text();
-    t = t + str
-    this.currSpan_.text(t);
-    this.currLength_ = t.length;
-    this.cursor_.column = this.currLength_;
+    this.modifyLine_(str.length, str);
+    this.cursor_.column = Math.min(
+      this.cursor_.column + str.length, this.currLength_);
   }
 
   Terminal.prototype.forwardTabStop = function() {
@@ -180,19 +251,14 @@ function($, input){
   }
 
   Terminal.prototype.newLine = function() {
-    if (this.currLength_ < this.clearLength_) {
-      this.fallback_('newLine: did not overwrite line as promised');
-    }
-    this.ensureSpan_();
-    this.currSpan_.text(this.currSpan_.text() + '\n');
-
     this.lastLineSpans_ = this.currLineSpans_;
     this.lastLength_ = this.currLength_;
 
+    this.cursor_.column = this.currLength_;
+    this.modifyLine_(0, '\n');
+
     this.currLineSpans_ = [];
-    this.currSpan_ = null;
     this.currLength_ = 0;
-    this.clearLength_ = 0;
 
     this.cursor_.column = 0;
     this.cursor_.row += 1;
@@ -244,9 +310,7 @@ function($, input){
     while (this.currLineSpans_.length > 0) {
       this.currLineSpans_.pop().remove();
     }
-    this.currSpan_ = null;
     this.currLength_ = 0;
-    this.clearLength_ = 0;
     this.cursor_.column = 0;
     if (c > 0) {
       this.spaces_(c);
@@ -254,11 +318,7 @@ function($, input){
   }
 
   Terminal.prototype.eraseToRight = function() {
-    if (this.cursor_.column < this.currLength_) {
-      this.eraseLine();
-    } else {
-      this.clearLength_ = 0;
-    }
+    this.modifyLine_(this.currLength_ - this.cursor_.column, '');
   }
 
   Terminal.prototype.cursorLeft = function(n) {
@@ -276,15 +336,14 @@ function($, input){
         && this.lastLineSpans_ !== null) {
       // we can support cursor up if nothing has been put on the new line yet
       this.currLineSpans_ = this.lastLineSpans_;
-      this.currSpan_ = this.currLineSpans_[this.currLineSpans_.length - 1];
       this.currLength_ = this.lastLength_;
-      this.clearLength_ = 0;
 
       this.lastLineSpans_ = null;
       this.lastLength_ = 0;
 
-      var t = this.currSpan_.text().replace(/\n$/, '');
-      this.currSpan_.text(t);
+      var n = this.currLineSpans_[this.currLineSpans_.length - 1];
+      var t = n.text().replace(/\n$/, '');
+      n.text(t);
 
       this.repositionInputSpan_();
       return;
