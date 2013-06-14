@@ -167,18 +167,17 @@ define(['jquery', 'api', 'util'], function($, api, util) {
       if (type === 'b' || type === 'c') {
         file.deviceInfo = items.slice(4, 6).join(" ");
         file.datetime = items.slice(6, 9).join(" ");
-
-        file.name = line.match(/^([^ ]+[ ]+){9}(.+)$/)[2];
+        file.name = items[9];
       } else {
         file.size = items[4];
         file.datetime = items.slice(5, 8).join(" ");
 
         if (type === 'l') {
-          var nameAndTarget = line.match(/^([^ ]+[ ]+){8}(.+)$/)[2].split(' -> ');
+          var nameAndTarget = items[8].split(' -> ');
           file.name = nameAndTarget[0];
           file.target = nameAndTarget[1];
         } else {
-          file.name = line.match(/^([^ ]+[ ]+){8}(.+)$/)[2];
+          file.name = items[8];
         }
       }
 
