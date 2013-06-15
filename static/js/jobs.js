@@ -444,6 +444,10 @@ function($, api, util, input, cterm){
 
     function setComplete(exitcode) {
       setClass(exitcode === 0 ? 'complete' : 'failed');
+      setOutputComplete();
+    }
+
+    function setOutputComplete() {
       removeInput();
       removeOutput();
     }
@@ -462,6 +466,7 @@ function($, api, util, input, cterm){
       addOutput: addOutput,
       setRunning: setRunning,
       setComplete: setComplete,
+      setOutputComplete: setOutputComplete,
       setDeferredOutput: setDeferredOutput
     };
 
@@ -478,6 +483,7 @@ function($, api, util, input, cterm){
     },
     setRunning: function() { },
     setComplete: function(e) { },
+    setOutputComplete: function() { },
     setDeferredOutput: function(f) { }
   };
 
