@@ -4,13 +4,14 @@
 # It is a a login shell if any of these are true:
 #   * argv[0] starts with a '-' (login does this)
 #   * invoked with --login option
-#   * started in web server mode (-w)
+#   * started in server mode (--local or --remote)
 #
 # If you don't want any login processing, remove the commands from this file
 # but don't delete the file: It is automatically re-created to the default
 # script if it is found missing.
 
 echo ~/.plush/profile ...
+cd
 
 #
 # Clean up history

@@ -4,7 +4,7 @@
 # It is an interactive shell if any of these are true:
 #   * stdin and stderr are terminals
 #   * invoked with -i option
-#   * started in web server mode (-w)
+#   * started in server mode (--local or --remote)
 # In addition, real and effictive uids & gids must be the same.
 #
 # If you don't want any of this processing, remove the commands from this file
@@ -17,6 +17,24 @@ echo ~/.plush/env ...
 # Shell Variables
 #
 PS1='⾙ '    # U+2F99 KANGXI RADICAL SHELL
+
+#
+# Settings for the various UI modes
+#
+case "${PLUSH_UIMODE-batch}" in
+
+    batch)  # running a script file or commands piped to stdin
+            ;;
+
+    tty)    # running interactively with input from a terminal
+            ;;
+
+    web)    # running as a server, accessed from a web browser
+            export TERM=xterm
+            export GIT_PAGER=''
+            export MANPAGER=ul
+            ;;
+esac
 
 #
 # Common Aliases
