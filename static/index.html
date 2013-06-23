@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-Copyright 2012 Google Inc. All Rights Reserved.
+Copyright 2012-2013 Google Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ limitations under the License.
         <a id="report-bug" href="http://code.google.com/p/plush/issues/entry?template=Defect%20report%20from%20plush" target="_blank">report bug</a>
       </div>
       <h1>Plush <small>– the comfy shell</small>
-      <p class="info version" data-cmd="plush-version"></p>
+        <p class="info version" data-cmd="plush-version"></p>
       </h1>
       <div id="header-info">
         <div><small>logged in as</small>
@@ -53,92 +53,88 @@ limitations under the License.
         </div>
       </div>
     </div>
-    <div id="main">
-      <div id="status">
-        <div>
-          <div id="status-dir">
-            <h1 id="status-dir-cwd">/</h1>
-            <table>
-              <tbody>
-                <tr class="file proto">
-                  <td>
-                    <span class="name"></span>
-                    <div class="hidden">
-                      <dl class="ls-details">
-                        <dt class="type key">Type</dt><dd class="type value"></dd>
-                        <dt class="size key">Size</dt><dd class="size value"></dd>
-                        <dt class="info key">Info</dt><dd class="info value"></dd>
-                        <dt class="owner key">Owner</dt><dd class="owner value"></dd>
-                        <dt class="group key">Group</dt><dd class="group value"></dd>
-                        <dt class="time key">Time</dt><dd class="time value"></dd>
-                        <dt class="perms key">Perms</dt>
-                          <dd class="perms value">
-                            <code class="owner" title="Owner"></code>
-                            <code class="group" title="Group"></code>
-                            <code class="other" title="Other"></code>
-                            <code class="alt" title= "Alternate Access Method"></code>
-                          </dd>
-                        <dt class="links key">Link Count</dt><dd class="links value"></dd>
-                        <dt class="target key">Target</dt><dd class="target value"></dd>
-                      </dl>
-                      <dl class="svn-details">
-                        <dt class="type key">Type</dt><dd class="type value"></dd>
-                      </dl>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+    <div id="status">
+      <div id="status-dir">
+        <h1 id="status-dir-cwd">/</h1>
+        <table>
+          <tbody>
+            <tr class="file proto">
+              <td>
+                <span class="name"></span>
+                <div class="hidden">
+                  <dl class="ls-details">
+                    <dt class="type key">Type</dt><dd class="type value"></dd>
+                    <dt class="size key">Size</dt><dd class="size value"></dd>
+                    <dt class="info key">Info</dt><dd class="info value"></dd>
+                    <dt class="owner key">Owner</dt><dd class="owner value"></dd>
+                    <dt class="group key">Group</dt><dd class="group value"></dd>
+                    <dt class="time key">Time</dt><dd class="time value"></dd>
+                    <dt class="perms key">Perms</dt>
+                      <dd class="perms value">
+                        <code class="owner" title="Owner"></code>
+                        <code class="group" title="Group"></code>
+                        <code class="other" title="Other"></code>
+                        <code class="alt" title= "Alternate Access Method"></code>
+                      </dd>
+                    <dt class="links key">Link Count</dt><dd class="links value"></dd>
+                    <dt class="target key">Target</dt><dd class="target value"></dd>
+                  </dl>
+                  <dl class="svn-details">
+                    <dt class="type key">Type</dt><dd class="type value"></dd>
+                  </dl>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="status-env">
+        <div class="hidden proto">
+          <h1>Shell Vars</h1>
+          <dl id="context-shell">
+          </dl>
+          <h1>Environment</h1>
+          <dl id="context-env">
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div id="screen">
+      <div class="bezel"></div>
+      <div id="scrollback">
+        <div class="job proto" tabindex="-1">
+          <div class="job-controls">
+            <ul class="input-controls horiz-menu">
+              <li><button class="send-eof"><small>EOF</small></button></li><li><button class="send-sigint" title="interrupt (2)">^C</button></li><li><button class="send-sigquit" title="quit (3)">☢</button></li><li><button class="send-sigkill" title="kill (9)">⌧</button></li>
+            </ul>
+            <ul class="view-controls horiz-menu">
+              <li><button class="view-hide" title="hide">∅</button></li><li><button class="view-tiny" title="view tiny">▂</button></li><li><button class="view-page" title="view page">▅</button></li><li><button class="view-full" title="view full">▇</button></li><li><button class="view-deferred" title="fetch output">...</button></li>
+            </ul>
           </div>
-          <div id="status-env">
-            <div class="hidden proto">
-              <h1>Shell Vars</h1>
-              <dl id="context-shell">
-              </dl>
-              <h1>Environment</h1>
-              <dl id="context-env">
-              </dl>
-            </div>
+          <pre class="command mono-font"></pre>
+          <div class="output-container output-page mono-font">
+            <pre class="output"></pre>
           </div>
         </div>
       </div>
-      <div id="plush-jobs"></div>
-      <div id="screen"><div>
-        <div id="scrollback">
-          <div class="job proto" tabindex="-1">
-            <div class="job-controls">
-              <ul class="view-controls horiz-menu">
-                <li><button class="view-hide" title="hide">∅</button></li><li><button class="view-tiny" title="view tiny">▂</button></li><li><button class="view-page" title="view page">▅</button></li><li><button class="view-full" title="view full">▇</button></li><li><button class="view-deferred" title="fetch output">...load...</button></li>
-              </ul>
-              <ul class="input-controls horiz-menu">
-                <li><button class="send-eof"><small>EOF</small></button></li><li><button class="send-sigint" title="interrupt (2)">^C</button></li><li><button class="send-sigquit" title="quit (3)">☢</button></li><li><button class="send-sigkill" title="kill (9)">⌧</button></li>
-              </ul>
-            </div>
-            <pre class="command"></pre>
-            <div class="output-container output-page">
-              <pre class="output"></pre>
-            </div>
-          </div>
+      <div id="history">
+        <div class="item proto">
+          <pre><span class="command mono-font"></span><span class="count"></span></pre>
         </div>
-        <div id="history">
-          <div class="item proto">
-            <pre><span class="command"></span><span class="count"></span></pre>
-          </div>
-        </div>
-        <div id="input-area">
-          <ul id="prompt-picker">
-            <li><a>$</a></li>
-            <li><a>¢</a></li>
-            <li><a>€</a></li>
-            <li><a>௹</a></li>
-            <li><a>#</a></li>
-            <li><a>⾙</a></li>
-            <li><a>♥</a></li>
-          </ul>
-          <span id="prompt">$</span><input id="commandline" /><br>
-          <div id="annotations"></div>
-        </div>
-      </div></div>
+      </div>
+      <div id="input-area">
+        <ul id="prompt-picker">
+          <li><a>$</a></li>
+          <li><a>¢</a></li>
+          <li><a>€</a></li>
+          <li><a>௹</a></li>
+          <li><a>#</a></li>
+          <li><a>⾙</a></li>
+          <li><a>♥</a></li>
+        </ul>
+        <span id="prompt">$</span><input id="commandline" class="mono-font" /><br>
+        <div id="annotations" class="mono-font"></div>
+      </div>
     </div>
     <div id="help-holder"></div>
   </body>
