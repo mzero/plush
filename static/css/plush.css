@@ -25,7 +25,7 @@ Plush requires a rather complex and tight layout: It is trying to pack a large
 amount of information and controls in a small space. It differs from most web
 page design in that it isn't primarily for reading prose or presenting a single
 domain of structured information. The shell presents primarily mono-spaced text
-information from a wide variety of commands all in a mixed space.
+information from a wide variety of commands all in a single, mixed use space.
 
 While the HTML structure (see index.html) follows standard "semantic markup"
 conventions, the CSS here must deviate from what is often considered standard
@@ -36,26 +36,14 @@ Most of the layout and styling is done in px units. In order for the tight
 layout to work, especially with often hundreds of divs, sizing small elements
 in em units has led to factional pixel placement, and uneven spacing.
 
+== Sizing ==
+The primary text size is set in pixels: 12px/14px. This allows consistent
+sizing and placement of the monospaced text with repsect to other elements of
+the shell interface.
+
 We expect that users will use page zoom to make the user interface bigger or
 smaller. Using the browser's font setting to change the size only makes sense
-when the user is controlling the nominal size of written prose. For shell-like
-monospace output, users are very particular about font size for that appliction
-apart from others. As such, Plush will eventually support choosing the output
-font size, though for now it is set at 12px. To support this in the future, a
-few elements that would need to resize with that choice use em units, even
-though the font size itself is set in px.
-
-== Structure ==
-For most sections of the page, there is a corresponding section of this file
-where the rules for each element contain all the styles settings needed. This
-means that individual rules contain layout, typography, and graphic settings.
-It is easier to find and edit such rules and sections where these work together.
-
-There are a few exceptions to this:
-1) General reset or normalization rules come at the top;
-2) The major layout is in a section of rules devoted just to layout;
-3) The typogrpahy for the monospaced text;
-4) The color scheme of the monospaced text, and associated elements;
+when the user is controlling the nominal size of written prose.
 */
 
 /* @group Reset & Normalization */
@@ -63,11 +51,24 @@ There are a few exceptions to this:
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+       box-sizing: border-box;
 }
 
 html {
   font-family: "Lucida Grande", Lucida, Verdana, sans-serif;
+  font-size: 12px;
+  line-height: 14px;
+}
+
+pre,
+.mono-font {
+  font-family:
+    /* these fonts have very similar metrics and thus layout about the same */
+    "Source Code Pro",  /* deemed best by mzero */
+    "DejaVu Sans Mono", /* commonly available, and commonly used */
+    Menlo,              /* std. on mac, and nearly same as DejaVu */
+    monospace;          /* give up, use default */
   font-size: 12px;
   line-height: 14px;
 }
@@ -255,21 +256,6 @@ html {
   border-bottom: solid 3px rgba(229,228,211,1);
   margin-bottom: 3px;
   word-break: break-all;
-}
-
-/* @end */
-
-/* @group Typography */
-
-.mono-font, pre {
-  font: 11px/14px "Andale Mono", "DejaVu Sans Mono", monospace;
-  letter-spacing: -1px;
-}
-
-.use-menlo .mono-font,
-.use-menlo pre {
-  font: 12px/14px "Menlo", "DejaVu Sans Mono", monospace;
-  letter-spacing: inherit;
 }
 
 /* @end */
