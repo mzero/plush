@@ -51,6 +51,7 @@ when the user is controlling the nominal size of written prose.
 * {
   margin: 0;
   padding: 0;
+  border: 0;
   -moz-box-sizing: border-box;
        box-sizing: border-box;
 }
@@ -86,7 +87,16 @@ a:focus,a:hover,a:active {
   text-decoration: underline
 }
 
+button {
+  font-size: 100%;
+  line-height: 100%;
+  vertical-align: middle;
+}
 
+button::-moz-focus-inner {
+  padding: 0;
+  border: 0;
+}
 
 /* @end */
 
@@ -400,10 +410,6 @@ html {
   display: inline-block;
   height: 23px;
   margin-left: 3px;
-}
-
-.view-controls {
-  font-family: "Courier New", Courier, mono;
 }
 
 .job.max-deferred .view-controls,
