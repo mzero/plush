@@ -21,9 +21,10 @@ define([
             // TODO(mzero): Should somehow delay this module from being ready
             // until lib.init() calls the callback.
 
-        hterm.VT.prototype.encodeUTF8 = function(str) { return str; }
-        hterm.VT.prototype.decodeUTF8 = function(str) { return str; }
-          // Monkey patching the VT so that it doesn't do the UTF-8
+        hterm.Keyboard.prototype.encode =
+        hterm.VT.prototype.decode =
+          function(str) { return str; };
+          // Monkey patching objects so that they don't do the UTF-8
           // encode/decode. This is so the terminal doesn't encode characters
           // sent, or decode inputs to interpret().
           //
