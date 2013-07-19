@@ -578,6 +578,11 @@ hterm.Keyboard = function(terminal) {
   this.backspaceSendsBackspace = false;
 
   /**
+   * The encoding method for data sent to the host.
+   */
+  this.characterEncoding = 'utf-8';
+
+  /**
    * Set whether the meta key sends a leading escape or not.
    */
   this.metaSendsEscape = true;
@@ -684,6 +689,16 @@ hterm.Keyboard.KeyActions = {
 };
 
 /**
+ * Encode a string according to the 'send-encoding' preference.
+ */
+hterm.Keyboard.prototype.encode = function(str) {
+  if (this.characterEncoding == 'utf-8')
+    return this.terminal.vt.encodeUTF8(str);
+
+  return str;
+};
+
+/**
  * Capture keyboard events sent to the associated element.
  *
  * This enables the keyboard.  Captured events are consumed by this class
@@ -758,10 +773,8 @@ hterm.Keyboard.prototype.onKeyPress_ = function(e) {
     ch = e.charCode;
   }
 
-  if (ch) {
-    var str = this.terminal.vt.encodeUTF8(String.fromCharCode(ch));
-    this.terminal.onVTKeystroke(str);
-  }
+  if (ch)
+    this.terminal.onVTKeystroke(String.fromCharCode(ch));
 
   e.preventDefault();
   e.stopPropagation();
@@ -818,7 +831,6 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
   var PASS = hterm.Keyboard.KeyActions.PASS;
   var STRIP = hterm.Keyboard.KeyActions.STRIP;
 
-  var shift = e.shiftKey;
   var control = e.ctrlKey;
   var alt = this.altIsMeta ? false : e.altKey;
   var meta = this.altIsMeta ? (e.altKey || e.metaKey) : e.metaKey;
@@ -834,6 +846,10 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
   } else {
     action = getAction('normal');
   }
+
+  // The action may have cleared the e.shiftKey, so we wait until after
+  // getAction to read it.
+  var shift = e.shiftKey;
 
   if (alt && this.altSendsWhat == 'browser-key' && action == DEFAULT) {
     // When altSendsWhat is 'browser-key', we wait for the keypress event.
@@ -920,22 +936,21 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
     }
 
   } else {
-    // Just send it as-is.
-
     if (action === DEFAULT) {
+      action = keyDef.keyCap.substr((e.shiftKey ? 1 : 0), 1);
+
       if (control) {
         var unshifted = keyDef.keyCap.substr(0, 1);
         var code = unshifted.charCodeAt(0);
         if (code >= 64 && code <= 95) {
-        action = String.fromCharCode(code - 64);
+          action = String.fromCharCode(code - 64);
         }
-      } else if (alt && this.altSendsWhat == '8-bit') {
-        var ch = keyDef.keyCap.substr((e.shiftKey ? 1 : 0), 1);
-        var code = ch.charCodeAt(0) + 128;
-        action = this.terminal.vt.encodeUTF8(String.fromCharCode(code));
-      } else {
-        action = keyDef.keyCap.substr((e.shiftKey ? 1 : 0), 1);
       }
+    }
+
+    if (alt && this.altSendsWhat == '8-bit' && action.length == 1) {
+      var code = action.charCodeAt(0) + 128;
+      action = String.fromCharCode(code);
     }
 
     // We respect alt/metaSendsEscape even if the keymap action was a literal
@@ -1106,6 +1121,11 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   function sh(a, b) {
     return function(e, k) {
       var action = !e.shiftKey ? a : b
+
+      // Clear e.shiftKey so that the keyboard code doesn't try to apply
+      // additional modifiers to the sequence.
+      e.shiftKey = false;
+
       return resolve(action, e, k);
     }
   }
@@ -1720,6 +1740,12 @@ hterm.PreferenceManager = function(profileId) {
     ['enable-clipboard-write', true],
 
     /**
+     * Respect the host's attempt to change the cursor blink status using
+     * DEC Private Mode 12.
+     */
+    ['enable-dec12', false],
+
+    /**
      * Default font family for the terminal text.
      */
     ['font-family', ('"DejaVu Sans Mono", "Everson Mono", ' +
@@ -1828,6 +1854,13 @@ hterm.PreferenceManager = function(profileId) {
     ['pass-meta-number', null],
 
     /**
+     * Set the expected encoding for data received from the host.
+     *
+     * Valid values are 'utf-8' and 'raw'.
+     */
+    ['receive-encoding', 'utf-8'],
+
+    /**
      * If true, scroll to the bottom on any keystroke.
      */
     ['scroll-on-keystroke', true],
@@ -1841,6 +1874,13 @@ hterm.PreferenceManager = function(profileId) {
      * The vertical scrollbar mode.
      */
     ['scrollbar-visible', true],
+
+    /**
+     * Set the encoding for data sent to host.
+     *
+     * Valid values are 'utf-8' and 'raw'.
+     */
+    ['send-encoding', 'utf-8'],
 
     /**
      * Shift + Insert pastes if true, sent to host if false.
@@ -3165,20 +3205,15 @@ hterm.ScrollPort.prototype.measureCharacterSize = function(opt_weight) {
   this.ruler_.style.fontWeight = opt_weight || '';
 
   this.rowNodes_.appendChild(this.ruler_);
-  var adjustedSize = hterm.getClientSize(this.ruler_);
+  var rulerSize = hterm.getClientSize(this.ruler_);
 
-  this.ruler_.style.webkitTextSizeAdjust = 'none';
-  var unadjustedSize = hterm.getClientSize(this.ruler_);
-
-  var zoomFactor = adjustedSize.width / unadjustedSize.width;
-
-  this.ruler_.style.webkitTextSizeAdjust = '';
+  var zoomFactor = this.document_.width / this.document_.body.clientWidth;
 
   // In some fonts, underscores actually show up below the reported height.
   // We add one to the height here to compensate, and have to add a bottom
   // border to text with a background color over in text_attributes.js.
-  var size = new hterm.Size(adjustedSize.width / this.ruler_.textContent.length,
-                            adjustedSize.height + 1);
+  var size = new hterm.Size(rulerSize.width / this.ruler_.textContent.length,
+                            rulerSize.height + 1);
   size.zoomFactor = zoomFactor;
 
   this.rowNodes_.removeChild(this.ruler_);
@@ -3769,8 +3804,15 @@ hterm.ScrollPort.prototype.onScrollWheel_ = function(e) {
   if (top > scrollMax)
     top = scrollMax;
 
-  // Moving scrollTop causes a scroll event, which triggers the redraw.
-  this.screen_.scrollTop = top;
+  if (top != this.screen_.scrollTop) {
+    // Moving scrollTop causes a scroll event, which triggers the redraw.
+    this.screen_.scrollTop = top;
+
+    // Only preventDefault when we've actually scrolled.  If there's nothing
+    // to scroll we want to pass the event through so Chrome can detect the
+    // overscroll.
+    e.preventDefault();
+  }
 };
 
 /**
@@ -3966,10 +4008,10 @@ hterm.Terminal = function(opt_profileId) {
 
   // These prefs are cached so we don't have to read from local storage with
   // each output and keystroke.  They are initialized by the preference manager.
+  this.backgroundColor_ = null;
+  this.foregroundColor_ = null;
   this.scrollOnOutput_ = null;
   this.scrollOnKeystroke_ = null;
-  this.foregroundColor_ = null;
-  this.backgroundColor_ = null;
 
   // Terminal bell sound.
   this.bellAudio_ = this.document_.createElement('audio');
@@ -4140,6 +4182,10 @@ hterm.Terminal.prototype.setProfile = function(profileId, opt_callback) {
       terminal.vt.enableClipboardWrite = !!v;
     },
 
+    'enable-dec12': function(v) {
+      terminal.vt.enableDec12 = !!v;
+    },
+
     'font-family': function(v) {
       terminal.syncFontFamily();
     },
@@ -4216,6 +4262,15 @@ hterm.Terminal.prototype.setProfile = function(profileId, opt_callback) {
       terminal.passMetaNumber = v;
     },
 
+    'receive-encoding': function(v) {
+       if (!(/^(utf-8|raw)$/).test(v)) {
+         console.warn('Invalid value for "receive-encoding": ' + v);
+         v = 'utf-8';
+       }
+
+       terminal.vt.characterEncoding = v;
+    },
+
     'scroll-on-keystroke': function(v) {
       terminal.scrollOnKeystroke_ = v;
     },
@@ -4226,6 +4281,15 @@ hterm.Terminal.prototype.setProfile = function(profileId, opt_callback) {
 
     'scrollbar-visible': function(v) {
       terminal.setScrollbarVisible(v);
+    },
+
+    'send-encoding': function(v) {
+       if (!(/^(utf-8|raw)$/).test(v)) {
+         console.warn('Invalid value for "send-encoding": ' + v);
+         v = 'utf-8';
+       }
+
+       terminal.keyboard.characterEncoding = v;
     },
 
     'shift-insert-paste': function(v) {
@@ -4244,7 +4308,6 @@ hterm.Terminal.prototype.setProfile = function(profileId, opt_callback) {
       opt_callback();
   }.bind(this));
 };
-
 
 /**
  * Set the color for the cursor.
@@ -4556,7 +4619,7 @@ hterm.Terminal.prototype.realizeSize_ = function(columnCount, rowCount) {
     this.realizeHeight_(rowCount);
 
   // Send new terminal size to plugin.
-  this.io.onTerminalResize(columnCount, rowCount);
+  this.io.onTerminalResize_(columnCount, rowCount);
 };
 
 /**
@@ -6237,13 +6300,13 @@ hterm.Terminal.prototype.overlaySize = function() {
 /**
  * Invoked by hterm.Terminal.Keyboard when a VT keystroke is detected.
  *
- * @param {string} string The VT string representing the keystroke.
+ * @param {string} string The VT string representing the keystroke, in UTF-16.
  */
 hterm.Terminal.prototype.onVTKeystroke = function(string) {
   if (this.scrollOnKeystroke_)
     this.scrollPort_.scrollRowToBottom(this.getRowCount());
 
-  this.io.onVTKeystroke(string);
+  this.io.onVTKeystroke(this.keyboard.encode(string));
 };
 
 /**
@@ -6332,9 +6395,7 @@ hterm.Terminal.prototype.onScroll_ = function() {
  * React when text is pasted into the scrollPort.
  */
 hterm.Terminal.prototype.onPaste_ = function(e) {
-  var text = this.vt.encodeUTF8(e.text);
-  text = text.replace(/\n/mg, '\r');
-  this.io.onVTKeystroke(text);
+  this.onVTKeystroke(e.text.replace(/\n/mg, '\r'));
 };
 
 /**
@@ -6492,6 +6553,9 @@ hterm.Terminal.IO.prototype.push = function() {
   var io = new hterm.Terminal.IO(this.terminal_);
   io.keyboardCaptured_ = this.keyboardCaptured_;
 
+  io.columnCount = this.columnCount;
+  io.rowCount = this.rowCount;
+
   io.previousIO_ = this.terminal_.io;
   this.terminal_.io = io;
 
@@ -6522,11 +6586,25 @@ hterm.Terminal.IO.prototype.sendString = function(string) {
  *
  * Clients should override this to receive notification of keystrokes.
  *
+ * The keystroke data will be encoded according to the 'send-encoding'
+ * preference.
+ *
  * @param {string} string The VT key sequence.
  */
 hterm.Terminal.IO.prototype.onVTKeystroke = function(string) {
   // Override this.
   console.log('Unobserverd VT keystroke: ' + JSON.stringify(string));
+};
+
+hterm.Terminal.IO.prototype.onTerminalResize_ = function(width, height) {
+  var obj = this;
+  while (obj) {
+    obj.columnCount = width;
+    obj.rowCount = height;
+    obj = obj.previousIO_;
+  }
+
+  this.onTerminalResize(width, height);
 };
 
 /**
@@ -6977,6 +7055,17 @@ hterm.VT = function(terminal) {
   this.enableClipboardWrite = true;
 
   /**
+   * Respect the host's attempt to change the cursor blink status using
+   * the DEC Private mode 12.
+   */
+  this.enableDec12 = false;
+
+  /**
+   * The expected encoding method for data received from the host.
+   */
+  this.characterEncoding = 'utf-8';
+
+  /**
    * Max length of an unterminated DCS, OSC, PM or APC sequence before we give
    * up and ignore the code.
    *
@@ -7335,9 +7424,11 @@ hterm.VT.prototype.onTerminalMouse_ = function(e) {
 /**
  * Interpret a string of characters, displaying the results on the associated
  * terminal object.
+ *
+ * The buffer will be decoded according to the 'receive-encoding' preference.
  */
 hterm.VT.prototype.interpret = function(buf) {
-  this.parseState_.resetBuf(this.decodeUTF8(buf));
+  this.parseState_.resetBuf(this.decode(buf));
 
   while (!this.parseState_.isComplete()) {
     var func = this.parseState_.func;
@@ -7351,6 +7442,16 @@ hterm.VT.prototype.interpret = function(buf) {
       throw 'Parser did not alter the state!';
     }
   }
+};
+
+/**
+ * Decode a string according to the 'receive-encoding' preference.
+ */
+hterm.VT.prototype.decode = function(str) {
+  if (this.characterEncoding == 'utf-8')
+    return this.decodeUTF8(str);
+
+  return str;
 };
 
 /**
@@ -7696,7 +7797,8 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       break;
 
     case '12':  // att610
-      this.terminal.setCursorBlink(state);
+      if (this.enableDec12)
+        this.terminal.setCursorBlink(state);
       break;
 
     case '25':  // DECTCEM
@@ -8475,6 +8577,9 @@ hterm.VT.OSC['4'] = function(parseState) {
  * Read is not implemented due to security considerations.  A remote app
  * that is able to both write and read to the clipboard could essentially
  * take over your session.
+ *
+ * The clipboard data will be decoded according to the 'receive-encoding'
+ * preference.
  */
 hterm.VT.OSC['52'] = function(parseState) {
   // Args come in as a single 'clipboard;b64-data' string.  The clipboard
@@ -8486,7 +8591,7 @@ hterm.VT.OSC['52'] = function(parseState) {
 
   var data = atob(args[1]);
   if (data)
-    this.terminal.copyStringToClipboard(this.decodeUTF8(data));
+    this.terminal.copyStringToClipboard(this.decode(data));
 };
 
 /**
@@ -9705,27 +9810,33 @@ lib.resource.add('hterm/audio/bell', 'audio/ogg;base64',
 'v9+movui1wUNPAj059N3OVxzk4gV73PmE8FIA2F5mRq37Evc76vLXfF4rD5UJJAw46hW6LZCb5sN' +
 'Ldx+kzMCAAB+hfy95+965ZCLP7B3/VlTHCvDEKtQhTm4KiCgAEAbrfbWTPssAAAAXpee1tVrozYY' +
 'n41wD1aeYtkKfswN5/SXPO0JDnhO/4laUortv/s412fybe/nONdncoCHnBVliu0CQGBWlPY/5Kwo' +
-'m2L/kruPM6Q7oz4tvDQy+bZ3HzOi+gNHA4DZEgA='
+'m2L/kruPM6Q7oz4tvDQy+bZ3HzOi+gNHA4DZEgA=' +
+''
 );
 
 lib.resource.add('hterm/concat/date', 'text/plain',
-'Wed, 24 Apr 2013 05:32:55 +0000'
+'Tue, 02 Jul 2013 03:51:13 +0000' +
+''
 );
 
 lib.resource.add('hterm/changelog/version', 'text/plain',
-'1.5'
+'1.12' +
+''
 );
 
 lib.resource.add('hterm/changelog/date', 'text/plain',
-'2013-04-18'
+'2013-06-24' +
+''
 );
 
 lib.resource.add('hterm/git/HEAD', 'text/plain',
-'618d5f27b92eca57ac144b41b1b038fc793918e4'
+'5fb5f2b375a2d913d125d41da013d4d8c7e25b8b' +
+''
 );
 
 lib.resource.add('hterm/git/shortstat', 'text/plain',
-'2 files changed, 4 insertions(+), 3 deletions(-)'
+'' +
+''
 );
 
 
