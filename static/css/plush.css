@@ -838,7 +838,6 @@ input#commandline:focus {
 }
 #help td {
   width: 50%;
-  text-align: top;
   vertical-align: top;
 }
 #help dl dt {
