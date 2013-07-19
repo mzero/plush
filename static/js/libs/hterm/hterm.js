@@ -89,15 +89,18 @@ lib.registerInit('hterm', function(onInit) {
 
   if (!hterm.defaultStorage) {
     var ary = navigator.userAgent.match(/\sChrome\/(\d\d)/);
-    var version = parseInt(ary[1]);
-    if (chrome.storage && chrome.storage.sync && version > 21) {
-      hterm.defaultStorage = new lib.Storage.Chrome(chrome.storage.sync);
-    } else {
-      hterm.defaultStorage = new lib.Storage.Local();
+    if (ary && 'chrome' in window) {
+      var version = parseInt(ary[1]);
+      if (chrome.storage && chrome.storage.sync && version > 21) {
+        hterm.defaultStorage = new lib.Storage.Chrome(chrome.storage.sync);
+      }
     }
   }
+  if (!hterm.defaultStorage) {
+    hterm.defaultStorage = new lib.Storage.Local();
+  }
 
-  if (chrome.tabs) {
+  if ('chrome' in window && chrome.tabs) {
     // The getCurrent method gets the tab that is "currently running", not the
     // topmost or focused tab.
     chrome.tabs.getCurrent(onTab);
@@ -1124,6 +1127,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
 
       // Clear e.shiftKey so that the keyboard code doesn't try to apply
       // additional modifiers to the sequence.
+      // delete e.shiftKey;
       e.shiftKey = false;
 
       return resolve(action, e, k);
@@ -2908,6 +2912,10 @@ hterm.ScrollPort.prototype.decorate = function(div) {
                                               this.onResize_.bind(this));
 
   var doc = this.document_ = this.iframe_.contentDocument;
+  doc.open();
+  doc.write('<html></html>');
+  doc.close();
+
   doc.body.style.cssText = (
       'margin: 0px;' +
       'padding: 0px;' +

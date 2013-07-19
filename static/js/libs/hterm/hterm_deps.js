@@ -73,8 +73,7 @@ lib.rtdep = function(var_args) {
   try {
     throw new Error();
   } catch (ex) {
-    var stackArray = ex.stack.split('\n');
-    source = stackArray[2].replace(/^\s*at\s+/, '');
+    source = ex.stack.replace(/^[^]*(\s+at\s+|@)/, '');
   }
 
   for (var i = 0; i < arguments.length; i++) {
