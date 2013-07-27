@@ -410,6 +410,42 @@ function($, api, util, input, cterm){
       removeOutput();
     }
 
+    function createNotification(exitcode){
+
+      function isHidden() {
+
+        function getHiddenProp(){
+            var prefixes = ['webkit','moz','ms','o'];
+            
+            // if 'hidden' is natively supported just return it
+            if ('hidden' in document) return 'hidden';
+            
+            // otherwise loop over all the known prefixes until we find one
+            for (var i = 0; i < prefixes.length; i++){
+                if ((prefixes[i] + 'Hidden') in document) 
+                    return prefixes[i] + 'Hidden';
+            }
+        
+            // otherwise it's not supported
+            return null;
+        }
+
+          var prop = getHiddenProp();
+          if (!prop) return false;
+          
+          return document[prop];
+      }
+
+      if (!this.historical && isHidden() && window.webkitNotifications.checkPermission() === 0) {
+          var not = window.webkitNotifications.createNotification('../img/chair-tiny.png', this.cmd, exitcode === 0 ? 'Complete' : 'Error')
+          setTimeout(function(){not.cancel();}, 3000 );
+          not.onclick = function(event){window.focus();not.cancel();};
+          not.show();
+
+      }
+    }
+
+
     if (!historical) {
       takingInput = true;
       addOutput('stdout', '');
@@ -420,10 +456,13 @@ function($, api, util, input, cterm){
 
     var jobPublic = {
       job: job,
+      cmd:cmd,
+      historical: historical,
       user: true,
       addOutput: addOutput,
       setRunning: setRunning,
       setComplete: setComplete,
+      createNotification: createNotification,
       setDeferredOutput: setDeferredOutput
     };
 

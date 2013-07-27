@@ -122,6 +122,7 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
       }
       else {
         j.setComplete(d.exitcode);
+        j.createNotification(d.exitcode);
         commandline.focus();
         runContext();
       }
@@ -140,6 +141,11 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
     if (cmd.trim() !== '') {
       annotation.clearAnnotations();
       runCommand(cmd);
+
+      //This is needed to enable HTML5 notifications. It must be in handler for user input. Another option would to introduce a UI element for requesting this permission
+      if (window.webkitNotifications.checkPermission() !== 0) {
+         window.webkitNotifications.requestPermission();
+       }
     }
   }
 
