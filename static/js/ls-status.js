@@ -145,10 +145,18 @@ define(['jquery', 'api', 'util'], function($, api, util) {
     api.runStatus(lsCmd, function (d) { statusResults(cwd, d); });
   }
 
+  function stripCSI(out) {
+    // If CLICOLOR is set `ls` will output ANSI CSI SGR codes that
+    // should be stripped before display here. See also:
+    // http://en.wikipedia.org/wiki/ANSI_escape_code
+    // http://en.wikipedia.org/wiki/Control_Sequence_Introducer#CSI_codes
+    return out.replace(/\x1b\[[^m]*m/g, '');
+  }
+
   function parseLsOutput(out) {
     var files = [];
 
-    out.split(/\r?\n/).slice(1, -1).forEach(function(line) {
+    stripCSI(out).split(/\r?\n/).slice(1, -1).forEach(function(line) {
       var items = line.split(/ +/);
       var mode = items[0];
       var type = mode.substring(0, 1);
