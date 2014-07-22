@@ -187,7 +187,7 @@ runJob st foregroundRIO childPrep r0
         case mStat of
             Nothing             -> return ()
             Just (Exited ec)    -> cleanUp closeMs ec
-            Just (Terminated _) -> cleanUp closeMs $ ExitFailure 129
+            Just Terminated {}  -> cleanUp closeMs $ ExitFailure 129
             Just (Stopped _)    -> return ()
 
     cleanUp closeMs exitCode = do

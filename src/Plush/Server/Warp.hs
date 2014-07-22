@@ -19,13 +19,13 @@ limitations under the License.
 module Plush.Server.Warp (
     bindServerSocket,
     closeServerSocket,
-    runSettingsSocket,
+    Warp.runSettingsSocket,
     )
     where
 
 
 import qualified Control.Exception as Ex
-import Data.Conduit.Network (bindPort)
+import Data.Streaming.Network (bindPortTCP)
 import Network.Socket (accept, fdSocket, sClose, Socket)
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai as Wai
@@ -49,7 +49,7 @@ import qualified Network.Socket.ByteString as Sock
 -- the return socket.
 bindServerSocket :: Maybe Int -> Warp.HostPreference -> IO Socket
 bindServerSocket (Just port) host = do
-    socket <- bindPort port host
+    socket <- bindPortTCP port host
     setSocketCloseOnExec socket `Ex.onException` closeServerSocket socket
     return socket
 bindServerSocket Nothing host = tryBind [29500..29599]
@@ -63,19 +63,6 @@ bindServerSocket Nothing host = tryBind [29500..29599]
 -- | Close a server socket.
 closeServerSocket :: Socket -> IO ()
 closeServerSocket = sClose
-
--- | A reimplementation of 'Warp.runSettingsSocket' to gain access to the
--- socket, those they can be kept from leaking into exec'd processes.
-runSettingsSocket :: Warp.Settings -> Socket -> Wai.Application -> IO ()
-runSettingsSocket settings socket app =
-    Warp.runSettingsConnection settings getter app
-  where
-    getter = do
-        (conn, sa) <- accept socket
-        setSocketCloseOnExec conn
-            -- this call was added in warp-1.3.7.4, to replicate the fixed
-            -- code from here, but has a bug, so we still use this version.
-        return (socketConnection conn, sa)
 
 
 #if MIN_VERSION_warp(1, 3, 0)

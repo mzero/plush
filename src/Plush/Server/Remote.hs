@@ -24,7 +24,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Error (ErrorT, catchError, runErrorT, throwError)
 import Data.Aeson
-import Data.Conduit.Network (HostPreference(Host))
+import Data.String (fromString)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
 import Network.Socket (socketPort)
@@ -124,7 +124,7 @@ startRemote endpoint mPort = runErrorT $ do
 
     genPort :: IO Int
     genPort = do
-        sock <- bindServerSocket Nothing (Host "127.0.0.1")
+        sock <- bindServerSocket Nothing (fromString "127.0.0.1")
         port <- fromIntegral `fmap` socketPort sock
         closeServerSocket sock
         return port

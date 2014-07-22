@@ -25,12 +25,11 @@ import Control.Applicative ((<$>))
 import Control.Concurrent (myThreadId)
 import qualified Control.Exception as Ex
 import Control.Monad (replicateM)
-import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (encode, fromJSON, Result(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Data.Conduit.Network (HostPreference(Host))
 import Data.Maybe (fromMaybe)
+import Data.String (fromString)
 import qualified Data.Text as T
 #if MIN_VERSION_wai_middleware_route(0, 7, 3)
 #else
@@ -125,11 +124,11 @@ server mkRunner port reportInfo = do
                         $ staticApp
                         $ respApp notFound
   where
-    bindSock = Warp'.bindServerSocket port (Host "127.0.0.1")
+    bindSock = Warp'.bindServerSocket port (fromString "127.0.0.1")
     closeSock = Warp'.closeServerSocket
     settings port' logger = Warp.defaultSettings
         { Warp.settingsPort = port'
-        , Warp.settingsHost = Host "127.0.0.1"
+        , Warp.settingsHost = fromString "127.0.0.1"
         , Warp.settingsOnException = logError logger
         }
     genKey = replicateM 40 $ randomRIO ('a','z')
@@ -149,7 +148,7 @@ server mkRunner port reportInfo = do
             [keyboardSignal, keyboardTermination, softwareTermination]
             -- TODO(mzero): are these the right set of signals to catch?
 
-    logError logger err
+    logError logger _mreq err
         | Ex.fromException err == Just Ex.ThreadKilled = return ()
         | otherwise = case Ex.fromException err :: Maybe Warp.InvalidRequest of
             Just e -> logger $ "invalid request: " ++ show e
@@ -191,11 +190,11 @@ jsonApis shellThread key =
 
 
 staticApp :: Wai.Middleware
-staticApp app req = do
-    mbs <- if ok then liftIO (getStaticResource fp) else return Nothing
+staticApp app req respond = do
+    mbs <- if ok then getStaticResource fp else return Nothing
     case mbs of
-        Nothing -> app req
-        Just bs -> liftIO . return . resp $ LBS.fromChunks [bs]
+        Nothing -> app req respond
+        Just bs -> respond . resp $ LBS.fromChunks [bs]
   where
     pi_ = Wai.pathInfo req
     ok = all (not . T.isPrefixOf ".") pi_

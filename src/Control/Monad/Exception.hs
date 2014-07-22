@@ -15,6 +15,7 @@ limitations under the License.
 -}
 
 {-# Language CPP, GeneralizedNewtypeDeriving, RankNTypes #-}
+{-# Language DeriveTraversable #-}
 
 {-| This module supports monads that can throw extensible exceptions. The
     exceptions are the very same from "Control.Exception", and the operations
