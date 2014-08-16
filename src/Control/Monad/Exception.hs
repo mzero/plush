@@ -48,7 +48,10 @@ module Control.Monad.Exception (
     finally,
   ) where
 
+#if MIN_VERSION_base(4,6,0)
+#else
 import Prelude hiding (catch)
+#endif
 
 import Control.Applicative (Alternative, Applicative)
 import Control.Arrow (left)

@@ -35,9 +35,7 @@ module Plush.Server.Utilities (
 import qualified Blaze.ByteString.Builder.ByteString as B
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (mzero)
-import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
-import Data.ByteString.Lazy (fromChunks)
 import Network.HTTP.Types
 import Network.Wai
 

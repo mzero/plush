@@ -22,7 +22,7 @@ module Plush.Server.Remote (
 
 import Control.Concurrent (threadDelay)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Error (ErrorT, catchError, runErrorT, throwError)
+import Control.Monad.Trans.Error (catchError, runErrorT, throwError)
 import Data.Aeson
 import Data.String (fromString)
 import qualified Data.Text.Lazy as T

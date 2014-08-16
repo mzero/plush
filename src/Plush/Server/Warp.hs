@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE CPP #-}
-
 module Plush.Server.Warp (
     bindServerSocket,
     closeServerSocket,
@@ -26,19 +24,10 @@ module Plush.Server.Warp (
 
 import qualified Control.Exception as Ex
 import Data.Streaming.Network (bindPortTCP)
-import Network.Socket (accept, fdSocket, sClose, Socket)
+import Network.Socket (fdSocket, sClose, Socket)
 import qualified Network.Wai.Handler.Warp as Warp
-import qualified Network.Wai as Wai
 import System.IO.Error (alreadyInUseErrorType, isAlreadyInUseError, mkIOError)
 import System.Posix.IO (FdOption(CloseOnExec), setFdOption)
-
-#if MIN_VERSION_warp(1, 3, 0)
-import Network.Wai.Handler.Warp (socketConnection)
-#else
-import Network.Sendfile (sendfileWithHeader, FileRange(PartOfFile))
-import qualified Network.Socket.ByteString as Sock
-#endif
-
 
 
 -- | Create a server socket.
@@ -64,23 +53,6 @@ bindServerSocket Nothing host = tryBind [29500..29599]
 closeServerSocket :: Socket -> IO ()
 closeServerSocket = sClose
 
-
-#if MIN_VERSION_warp(1, 3, 0)
-#else
--- | This isn't exported by Warp prior to 1.3
-socketConnection :: Socket -> Warp.Connection
-socketConnection s = Warp.Connection
-    { Warp.connSendMany = Sock.sendMany s
-    , Warp.connSendAll = Sock.sendAll s
-    , Warp.connSendFile = sendFile
-    , Warp.connClose = sClose s
-    , Warp.connRecv = Sock.recv s bytesPerRead
-    }
-  where
-    bytesPerRead = 4096
-    sendFile fp off len act hdr =
-        sendfileWithHeader s fp (PartOfFile off len) act hdr
-#endif
 
 -- | Sockets used by the web server need to be set so that they are not leaked
 -- into processes fork/exec'd by the shell.

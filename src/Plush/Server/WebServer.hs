@@ -126,11 +126,11 @@ server mkRunner port reportInfo = do
   where
     bindSock = Warp'.bindServerSocket port (fromString "127.0.0.1")
     closeSock = Warp'.closeServerSocket
-    settings port' logger = Warp.defaultSettings
-        { Warp.settingsPort = port'
-        , Warp.settingsHost = fromString "127.0.0.1"
-        , Warp.settingsOnException = logError logger
-        }
+    settings port' logger = foldr ($) Warp.defaultSettings
+        [ Warp.setPort port'
+        , Warp.setHost $ fromString "127.0.0.1"
+        , Warp.setOnException $ logError logger
+        ]
     genKey = replicateM 40 $ randomRIO ('a','z')
 
     reportStartFailure origOutFd e =
