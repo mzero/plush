@@ -85,6 +85,14 @@ function($, annotation, api, cwd, help, history, input, jobs, status) {
   }
 
   function runInfoGather() {
+    // flush any pending output from startup
+    api.runStatus(':', function (d) {
+      var msgs = (d.stdout || '') + (d.stderr || '');
+      if (msgs.length > 0) {
+        console.log("start up messages:\n" + msgs);
+      }
+    });
+    // run any commands in .info elements
     $('#header .info').each(function() {
       var elem = $(this);
       api.runStatus(elem.data('cmd'), function (d) {

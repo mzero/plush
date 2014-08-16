@@ -62,6 +62,7 @@ plushMain = do
                         { optMode = processFile
                         , optRunner = runnerInIO
                         , optLogin = take 1 progName == "-"
+                        , optUiMode = UiBatch
                         , optShellName = progName
                         , optSetFlags = flagF
                         , optShellArgs = []
@@ -76,12 +77,15 @@ data Options = Options
                 { optMode :: Options -> [String] -> IO ()
                 , optRunner :: Runner
                 , optLogin :: Bool
+                , optUiMode :: UiMode
                 , optShellName :: String
                 , optSetFlags :: F.Flags -> F.Flags
                 , optShellArgs :: [String]
                 , optPort :: Maybe String
                 , optVerbosity :: OutputVerbosity
                 }
+
+data UiMode = UiBatch | UiTty | UiWeb
 
 commandLineOptions :: [OptionSpec Options]
 commandLineOptions =
@@ -160,6 +164,7 @@ setupShell opts (defProfile, defEnv) = do
     Shell.setName $ optShellName opts
     Shell.setFlags $ optSetFlags opts $ baseFlags
     Shell.setArgs $ optShellArgs opts
+    void $ Shell.setShellVar "PLUSH_UIMODE" uiModeString
     when (optLogin opts) $ do
         home <- Shell.getVarDefault "HOME" ""
         when (not $ null home) $ do
@@ -191,6 +196,11 @@ setupShell opts (defProfile, defEnv) = do
     createScriptIfMissing (Just content) fp = do
         exists <- doesFileExist fp
         unless exists $ writeAllFile fp content
+
+    uiModeString = case optUiMode opts of
+        UiBatch -> "batch"
+        UiTty -> "tty"
+        UiWeb -> "web"
 
 --
 -- Information Modes
@@ -240,10 +250,11 @@ processStdin opts args = do
     isInTerm <- hIsTerminalDevice stdin
     isErrTerm <- hIsTerminalDevice stderr
     if isInTerm && isErrTerm
-        then initialInteractiveRunner opts' >>= runRepl
+        then initialInteractiveRunner opts'' >>= runRepl
         else getContents >>= processScript opts'
   where
     opts' = opts { optShellArgs = args }
+    opts'' = opts' { optUiMode = UiTty }
 
 
 processScriptNameArgs :: Options -> String -> [String] -> IO ()
@@ -282,7 +293,7 @@ serverCommand st opts args = exitWith =<< case args of
     starter (RemoteServer endpoint) = RemoteStart endpoint
 
     badPort port = usageFailure $ "not a port number: " ++ port
-    opts' = opts { optLogin = True }
+    opts' = opts { optLogin = True, optUiMode = UiWeb }
     verbosity = optVerbosity opts
 
 localCommand :: Options -> [String] -> IO ()

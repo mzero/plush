@@ -128,8 +128,11 @@ getAllHistory h = case (histDir h) of
 getHistoryOutput :: [ JobName ] -> History -> IO [ ReportOne HistoryItem ]
 getHistoryOutput jobs h = case (histDir h) of
     Nothing -> return []
-    Just hdir -> concat `fmap` mapM (readJsonFile hdir ".out") jobs
-
+    Just hdir -> concat `fmap` mapM (readHistoryOutput hdir) jobs
+  where
+    readHistoryOutput hdir j = do
+        os <- readJsonFile hdir ".out" j
+        return $ os ++ [ReportOne j HiEndOfOutput]
 
 readJsonFile :: (FromJSON a) =>
     FilePath -> FilePath -> String -> IO [ReportOne a]

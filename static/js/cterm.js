@@ -67,14 +67,6 @@ function($, input){
     this.scrollOnOutput = null;             // written
 
     this.vt = new hterm.VT(this);  // set this here, relies on the above!
-    this.vt.encodeUTF8 = function(str) { return str; };
-    this.vt.decodeUTF8 = function(str) { return str; };
-      // Monkey patching the VT so that it doesn't do the UTF-8 encode/decode.
-      // This is so the terminal doesn't encode characters sent, or decode
-      // inputs to interpret(). Note that this will affect the data passed to
-      // copyStringToClipboard() as well: It won't be decoded where it needs
-      // to be. However that function causes fall back... so no worries!
-
     this.keyboard = new hterm.Keyboard(this);
   };
 
@@ -105,7 +97,6 @@ function($, input){
   };
 
   Terminal.prototype.interpret = function(str) {
-    // See Note above about monkey patching decodeUTF8 for why this works
     this.vt.interpret(str);
   };
 

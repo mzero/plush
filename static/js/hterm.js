@@ -20,6 +20,18 @@ define([
         lib.init(function() { });
             // TODO(mzero): Should somehow delay this module from being ready
             // until lib.init() calls the callback.
+
+        hterm.Keyboard.prototype.encode =
+        hterm.VT.prototype.decode =
+          function(str) { return str; };
+          // Monkey patching objects so that they don't do the UTF-8
+          // encode/decode. This is so the terminal doesn't encode characters
+          // sent, or decode inputs to interpret().
+          //
+          // TODO(mzero): This will affect the data passed to
+          // copyStringToClipboard() as well: It won't be decoded but it should
+          // be, as it is sent (I think) encoded from the host.
+
         return hterm;
     }
 );

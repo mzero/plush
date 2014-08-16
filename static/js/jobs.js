@@ -259,8 +259,11 @@ function($, api, util, input, cterm){
 
       if (terminalIsFullScreen) {
         m =  s = 'full';
-      } else if (terminal) {
-        var n = terminal.getLineCount();
+      } else {
+        var n = 0;
+        if (terminal) {
+          n = terminal.getLineCount();
+        }
         var lh = outputArea.css('lineHeight').replace(/px$/,'');
         var oh = outputArea.height();
         if (lh >= 1 && oh > 0) {
@@ -273,8 +276,6 @@ function($, api, util, input, cterm){
         else if (n <= LINES_IN_TINY)  m = s = 'tiny';
         else if (n <= LINES_IN_PAGE)  m = s = 'page';
         else                          { m = 'full'; s = 'page'; }
-      } else {
-        m = s = 'hide';
       }
 
       if (!deferredOutputLoader) {
@@ -377,13 +378,50 @@ function($, api, util, input, cterm){
       };
     }
 
+    function freezeHTerm() {
+      var rows = terminal.screen_.rowsArray;
+      var newSpans = [];
+      for (var i = rows.length - 1; i >= 0; i -= 1) {
+        var parts = rows[i].childNodes;
+        if (newSpans.length === 0) {
+          if (parts.length == 0) continue;
+          if (parts.length == 1
+              && parts[0].nodeType == 3
+              && parts[0].textContent.length == 0) continue;
+        }
+
+        var eol = '\n';
+        for (var j = parts.length - 1; j >= 0; j -= 1) {
+          var elem = parts[j];
+          var newNode = null;
+          if (elem.nodeType == 1) {
+            newNode = $('<pre></pre>', { style: elem.style.cssText });
+            newNode.text(elem.innerText + eol);
+          } else if (elem.nodeType == 3) {
+            newNode = $('<pre></pre>');
+            newNode.text(elem.textContent + eol);
+          }
+          if (newNode) {
+            newSpans.unshift(newNode);
+            eol = '';
+          }
+        }
+      }
+      outputArea.empty();
+      outputArea.removeClass('vtoutput');
+      newSpans.forEach(function(sp) { outputArea.append(sp); });
+    }
 
     function removeOutput() {
       if (terminal !== null) {
         terminal.uninstallKeyboard();
         terminal.setCursorVisible(false);
-        adjustOutput();
+        if (terminalIsFullScreen) {
+          freezeHTerm();
+        }
         terminal = null;
+        terminalIsFullScreen = false;
+        adjustOutput();
       }
       terminalOutput = function() { };
     };
@@ -406,6 +444,10 @@ function($, api, util, input, cterm){
 
     function setComplete(exitcode) {
       setClass(exitcode === 0 ? 'complete' : 'failed');
+      setOutputComplete();
+    }
+
+    function setOutputComplete() {
       removeInput();
       removeOutput();
     }
@@ -424,6 +466,7 @@ function($, api, util, input, cterm){
       addOutput: addOutput,
       setRunning: setRunning,
       setComplete: setComplete,
+      setOutputComplete: setOutputComplete,
       setDeferredOutput: setDeferredOutput
     };
 
@@ -440,6 +483,7 @@ function($, api, util, input, cterm){
     },
     setRunning: function() { },
     setComplete: function(e) { },
+    setOutputComplete: function() { },
     setDeferredOutput: function(f) { }
   };
 

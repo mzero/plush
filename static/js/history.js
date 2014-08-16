@@ -171,6 +171,9 @@ define(['api', 'util', 'input', 'jobs'], function(api, util, input, jobs) {
     if ('exitcode' in item) {
       j.setComplete(item.exitcode);
     }
+    if ('endOfOutput' in item) {
+      j.setOutputComplete();
+    }
   }
 
   var searchMode = false;
