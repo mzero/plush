@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -}
 
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, CPP #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
 
 module Plush.Server.WebServer (
     startLocal,
@@ -31,16 +31,11 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Maybe (fromMaybe)
 import Data.String (fromString)
 import qualified Data.Text as T
-#if MIN_VERSION_wai_middleware_route(0, 7, 3)
-#else
-import qualified Data.Text.Encoding as T
-#endif
 import Data.Typeable (Typeable)
 import qualified Network.HTTP.Types as H
 import Network.Socket (socketPort)
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
-import qualified Network.Wai.Middleware.Route as Route
 import System.Posix
 import System.Random
 
@@ -163,27 +158,23 @@ server mkRunner port reportInfo = do
     remoteLocalServerInfo = removeServerInfo LocalServer
 
 
-#if MIN_VERSION_wai_middleware_route(0, 7, 3)
-
 dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
-dispatchApp = Route.dispatch True . Route.mkRoutes' . map (uncurry Route.Post)
-
-#else
-
--- wai-middleware-route (0, 2, 0)
-dispatchApp :: [(T.Text, Wai.Application)] -> Wai.Middleware
-dispatchApp = Route.dispatch . map rte
+dispatchApp routes defaultApp req =
+    case (isPost, findApi) of
+        (True, Just apiApp) -> apiApp req
+        _                   -> defaultApp req
   where
-    rte (p,a) = (Route.rule H.methodPost (T.encodeUtf8 $ T.append "^/" p), a)
-
-#endif
+    isPost = Wai.requestMethod req == H.methodPost
+    findApi = case Wai.pathInfo req of
+        ["api", p] -> lookup p routes
+        _          -> Nothing
 
 jsonApis :: ShellThread -> String -> [(T.Text, Wai.Application)]
 jsonApis shellThread key =
-    [ ("api/run", jsonKeyApp runApp)
-    , ("api/poll", jsonKeyApp pollApp)
-    , ("api/input", jsonKeyApp inputApp)
-    , ("api/history",  jsonKeyApp historyApp)
+    [ ("run", jsonKeyApp runApp)
+    , ("poll", jsonKeyApp pollApp)
+    , ("input", jsonKeyApp inputApp)
+    , ("history",  jsonKeyApp historyApp)
     ]
   where
     jsonKeyApp j = jsonApp $ keyedApp key $ j shellThread
